@@ -2930,6 +2930,9 @@ function saveSettings() {
 window.AppState = {
   get: () => ({ D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins }),
   apply: (s) => {
+    const wasQ = (typeof view !== 'undefined' && view === 'q');
+    const prevP = P;
+    const prevKey = (wasQ && Array.isArray(Q) && typeof P === 'number' && Q[P] != null) ? Q[P] : null;
     D = s.D == null ? null : s.D;
     R = s.R || {}; W = s.W || {}; Q = s.Q || []; P = s.P || 0;
     S = s.S || 1; A = s.A || []; L = s.L || []; V = s.V || {};
@@ -2942,7 +2945,15 @@ window.AppState = {
     todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
     save();
     if (window.DriveSync) DriveSync.refreshUI();
-    if (!document.getElementById('ed')) home();
+    if (wasQ) {
+      const nowKey = (Array.isArray(Q) && typeof P === 'number' && P >= 0 && Q[P] != null) ? Q[P] : null;
+      if (nowKey !== prevKey || P !== prevP) {
+        try { if (typeof show === 'function') show(); } catch (e) {}
+      }
+      return;
+    }
+    if (document.getElementById('ed')) return;
+    home();
   },
   save: save,
   home: home,
