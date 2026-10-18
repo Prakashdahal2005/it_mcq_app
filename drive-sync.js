@@ -8,6 +8,8 @@
   var SCHEMA = 1;
   var DAILY_LIMIT = 100;
   var MAX_BYTES = 20 * 1024 * 1024;
+  var PERIODIC_MS = 5 * 60 * 1000;
+  var MIN_FOCUS_GAP_MS = 60 * 1000;
   var SCOPE = 'https://www.googleapis.com/auth/drive.file';
   var DRIVE = 'https://www.googleapis.com/drive/v3';
   var UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -30,7 +32,9 @@
     reject: null,
     busy: false,
     queued: false,
-    debounce: null,
+    dirty: false,
+    dirtyWhileBusy: false,
+    lastAttempt: 0,
     suppress: false,
     pending: null,
     status: 'disconnected',
@@ -671,8 +675,11 @@
     if (!navigator.onLine) { setStatus('offline', 'Offline. Changes will sync when you reconnect.'); return Promise.resolve(); }
     if (state.busy) { state.queued = true; return Promise.resolve(); }
     state.busy = true;
+    state.dirtyWhileBusy = false;
+    state.lastAttempt = Date.now();
     setStatus('syncing', 'Checking Google Drive…');
     var remoteMeta = null;
+    var failed = false;
 
     return locateCanonical().then(function (file) {
       remoteMeta = file;
@@ -749,9 +756,11 @@
       });
     }).catch(function (err) {
       if (err && err.name === 'TypeError') err = new SyncError('network', 'Network error reaching Google Drive. Will retry.');
+      state.dirtyWhileBusy = true;
       handleError(err, !!opts.explicit);
     }).then(function () {
       state.busy = false;
+      if (!state.dirtyWhileBusy) state.dirty = false;
       if (state.queued) {
         state.queued = false;
         setTimeout(function () { performSync({ mode: 'auto' }); }, 1500);
@@ -801,6 +810,8 @@
         meta.pendingState = null;
         saveMeta(meta);
         state.pending = null;
+        state.dirty = false;
+        state.dirtyWhileBusy = false;
         setStatus('ok', 'Restored from Google Drive.');
       });
     }).catch(function (err) {
@@ -833,6 +844,8 @@
           meta.journal.push({ at: Date.now(), revision: meta.revision || 0, snapshot: snap.name, snapshotId: snap.id });
           recordSync(meta, inv, up);
           state.pending = null;
+          state.dirty = false;
+          state.dirtyWhileBusy = false;
           setStatus('ok', 'Approved change saved. A recovery snapshot (' + snap.name + ') was kept on Drive.');
         });
       });
@@ -944,7 +957,7 @@
       + '<button onclick="DriveSync.restoreNow()">Restore from Drive</button>'
       + '<button onclick="DriveSync.disconnect()">Disconnect</button>'
       + '</div>'
-      + '<p class="mu sm" style="margin-top:12px">Sync keeps a versioned JSON backup (<b>' + BACKUP_NAME + '</b>) of your question banks and progress in your own Google Drive. Before any approved change that would delete questions, a dated recovery snapshot is written and verified first. Your Gemini API key is never uploaded. Sync runs only while this page is open, and your downloadable JSON backup keeps working either way.</p>'
+      + '<p class="mu sm" style="margin-top:12px">Sync keeps a versioned JSON backup (<b>' + BACKUP_NAME + '</b>) of your question banks and progress in your own Google Drive. Before any approved change that would delete questions, a dated recovery snapshot is written and verified first. Your Gemini API key is never uploaded. Changes upload automatically every few minutes while the app is open (and when you leave it); your downloadable JSON backup keeps working either way.</p>'
       + '</div>';
   }
 
@@ -959,12 +972,25 @@
     ensureStableIds();
     var meta = getMeta();
     if (meta.clientId && meta.enabled && (typeof google !== 'undefined' && google.accounts)) initTokenClient();
-    window.addEventListener('online', function () { var m = getMeta(); if (m.clientId && m.enabled) performSync({ mode: 'auto' }); });
+    window.addEventListener('online', function () {
+      var m = getMeta();
+      if (m.clientId && m.enabled && state.dirty) performSync({ mode: 'auto' });
+    });
     window.addEventListener('offline', function () { var m = getMeta(); if (m.clientId && m.enabled) setStatus('offline', 'Offline. Changes will sync when you reconnect.'); });
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') { var m = getMeta(); if (m.clientId && m.enabled) performSync({ mode: 'auto' }); }
+      var m = getMeta();
+      if (!m.clientId || !m.enabled) return;
+      if (document.visibilityState === 'hidden') {
+        if (state.dirty && !state.busy) performSync({ mode: 'auto' });
+      } else {
+        if (state.dirty && !state.busy && (Date.now() - state.lastAttempt) > MIN_FOCUS_GAP_MS) performSync({ mode: 'auto' });
+      }
     });
-    setInterval(function () { var m = getMeta(); if (m.clientId && m.enabled && navigator.onLine) performSync({ mode: 'auto' }); }, 5 * 60 * 1000);
+    window.addEventListener('pagehide', function () {
+      var m = getMeta();
+      if (m.clientId && m.enabled && state.dirty && !state.busy) performSync({ mode: 'auto' });
+    });
+    setInterval(function () { var m = getMeta(); if (m.clientId && m.enabled && navigator.onLine && state.dirty) performSync({ mode: 'auto' }); }, PERIODIC_MS);
     if (meta.pendingState === 'review') { state.status = 'blocked'; state.message = 'A previous change needs your review before syncing.'; }
     else if (meta.pendingState === 'reconnect') { state.status = 'reconnect'; state.message = 'Reconnect to resume syncing.'; }
     refreshStatus();
@@ -972,12 +998,12 @@
   }
 
   function onLocalSave() {
-    var meta = getMeta();
     if (state.suppress) return;
+    var meta = getMeta();
     if (!meta.clientId || !meta.enabled) return;
     if (state.pending) return;
-    if (state.debounce) clearTimeout(state.debounce);
-    state.debounce = setTimeout(function () { state.debounce = null; performSync({ mode: 'auto' }); }, 2000);
+    state.dirty = true;
+    if (state.busy) state.dirtyWhileBusy = true;
   }
 
   window.DriveSync = {
