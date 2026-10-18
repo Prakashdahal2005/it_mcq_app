@@ -210,13 +210,26 @@ pre {
   margin-top: 14px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: var(--nob);
-  border-left: 4px solid var(--no);
+  background: var(--code);
+  border: 1px solid var(--bd);
+  border-left: 3px solid var(--bd);
   font-size: 14.5px;
 }
 .exp.lucky { background: var(--skb); border-left-color: var(--sk); }
 .exp.unsure { background: var(--ac-bg); border-left-color: var(--ac); }
 .exp.leech { background: #fff4e6; border-left: 4px solid #f76707; }
+.exp.explanation { margin-top: 8px; padding: 9px 12px; font-size: 14px; }
+.exp.explanation summary { cursor: pointer; font-weight: 600; }
+.exp.explanation div { margin-top: 6px; }
+.et.on, .confidence-btn.on {
+  color: var(--ac);
+  border-color: var(--ac);
+  background: var(--ac-bg);
+  font-weight: 700;
+}
+.confidence-controls { margin: 8px 0; }
+.confidence-controls summary { cursor: pointer; color: var(--mu); font-size: 13px; }
+.confidence-options { margin-top: 8px; }
 
 textarea {
   width: 100%;
@@ -357,8 +370,9 @@ let genInProgress = false;
 let GEM_KEY = localStorage.getItem('bitmcq_gem') || '';
 let GEM_MODEL = 'gemini-3.8-flash';
 let sessionLeechCount = 0;
-let recallTimeout = null;
 let recallWaiting = false;
+let recallFirst = true;
+let SR_BASE = null;
 let CURRENT_Q = null;
 let todayMins = 15;
 let showMoreMenu = false;
@@ -368,7 +382,7 @@ let bgGenStatusText = '';
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
-      D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins, QOV
+      D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins, QOV, recallFirst
     }));
   } catch (e) {
     console.error('Save failed:', e);
@@ -401,6 +415,7 @@ function load() {
       gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
       todayMins = s.todayMins || 15;
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
+      recallFirst = s.recallFirst !== false;
       restoreBanks(s);
       return true;
     }
@@ -2071,6 +2086,7 @@ function show() {
   locked = false;
   CF = 3;
   ET = -1;
+  SR_BASE = null;
   T0 = Date.now();
   cancelRecallTimer();
 
@@ -2124,18 +2140,21 @@ function show() {
       ${CURRENT_Q.code && CURRENT_Q.code.length ? `<pre id="q-code">${esc(CURRENT_Q.code.join('\n'))}</pre>` : ''}
 
       <!-- Recall-First Block for Review Items -->
-      ${(isReview && !MK) ? `
+      ${(isReview && !MK && recallFirst) ? `
         <div class="recall-container" id="recall-box" onclick="revealRecallOptions()">
           <div class="recall-overlay" id="recall-prompt">
             <span class="recall-pulse"></span>
             <b>Recall-First: Think of the answer before looking at the choices.</b>
-            <div class="mu" style="margin-top:6px">Press any key or click anywhere to reveal options (3s auto-reveal)</div>
+            <div class="mu" style="margin:8px 0">Reveal choices whenever you're ready. Press any key to skip.</div>
+            <button class="p sm" onclick="event.stopPropagation();revealRecallOptions()">Show choices now</button>
+            <button class="sm" onclick="event.stopPropagation();setRecallFirst(false)">Turn off recall-first</button>
           </div>
           <div id="opts-container" class="recall-hidden">
             ${renderOptionsHtml(CURRENT_Q)}
           </div>
         </div>
       ` : `
+        ${isReview && !MK ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
         <div id="opts-container">
           ${renderOptionsHtml(CURRENT_Q)}
         </div>
@@ -2161,12 +2180,11 @@ function show() {
     </div>
 
     ${MK ? renderMockPalette() : ''}
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>S</b> don't know · <b>Enter</b> continue · <i>Timing automatically gauges confidence</i></p>
+    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>S</b> don't know · <b>Enter</b> continue · <i>Timing suggests confidence; you can change it</i></p>
   `;
 
-  if (isReview && !MK) {
+  if (isReview && !MK && recallFirst) {
     recallWaiting = true;
-    recallTimeout = setTimeout(revealRecallOptions, 3000);
   }
 
   if (MK) {
@@ -2204,11 +2222,13 @@ function revealRecallOptions() {
   T0 = Date.now();
 }
 
+function setRecallFirst(enabled) {
+  recallFirst = enabled;
+  save();
+  show();
+}
+
 function cancelRecallTimer() {
-  if (recallTimeout) {
-    clearTimeout(recallTimeout);
-    recallTimeout = null;
-  }
   recallWaiting = false;
 }
 
@@ -2259,6 +2279,11 @@ function pick(i) {
     set: S
   };
   L.push(REC);
+  const existingV = V[REC.k];
+  SR_BASE = {
+    k: REC.k,
+    value: existingV ? { ...existingV, history: Array.isArray(existingV.history) ? existingV.history.slice() : [] } : null
+  };
   sr(rawQ, ok, CF);
 
   if (ok) {
@@ -2276,9 +2301,10 @@ function pick(i) {
       // Medium latency / Hesitated: Show brief explanation, pause for Enter
       $('#fb').innerHTML = `
         <div class="exp unsure">
-          <b class="c-ok">Correct, but took ${elapsedSec}s.</b> Capped at 3-day ladder to solidify concept.
-          <div style="margin-top:6px">${esc(rawQ.e || 'No explanation provided.')}</div>
+          <b class="c-ok">Correct.</b> Timing suggested ${confidenceLabel(CF)} after ${elapsedSec}s.
+          ${explanationHtml(rawQ.e)}
         </div>
+        ${confidenceControls()}
         <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
       `;
       save();
@@ -2286,9 +2312,10 @@ function pick(i) {
       // Slow latency / Guess: Pause to ensure discrepancy effect feedback
       $('#fb').innerHTML = `
         <div class="exp lucky">
-          <b class="c-sk">Correct, but took ${elapsedSec}s (slow/deliberated).</b> Scheduled for tomorrow for active retrieval.
-          <div style="margin-top:6px">${esc(rawQ.e || 'No explanation provided.')}</div>
+          <b class="c-sk">Correct.</b> Timing suggested ${confidenceLabel(CF)} after ${elapsedSec}s.
+          ${explanationHtml(rawQ.e)}
         </div>
+        ${confidenceControls()}
         <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
       `;
       save();
@@ -2309,7 +2336,7 @@ function pick(i) {
         <div class="exp leech">
           <b style="color:#d9480f">⚠️ Leech Item (Missed 3 times):</b> Parked until tomorrow to prevent burnout.
           <div style="margin-top:6px">Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
-          <div style="margin-top:4px">${esc(rawQ.e || '')}</div>
+          ${explanationHtml(rawQ.e)}
         </div>
         <p class="mu" style="margin:10px 0 4px">Write an own-words mnemonic or memory anchor (optional):</p>
         <input type="text" id="fx" placeholder="e.g. Deferred update means NO-UNDO on crash" onkeydown="if(event.key==='Enter')fin()">
@@ -2323,11 +2350,12 @@ function pick(i) {
       $('#fb').innerHTML = `
         <div class="exp">
           <b class="c-no">Wrong.</b> Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>
-          <div style="margin-top:6px">${esc(rawQ.e || '')}</div>
+          ${explanationHtml(rawQ.e)}
         </div>
+        ${confidenceControls()}
         <p class="mu" style="margin:10px 0 4px">Error category (optional, Enter to continue):</p>
         <div class="row">
-          ${['Knowledge gap', 'Conceptual', 'Confusion', 'Careless'].map((n, x) => `<button class="et sm" onclick="setEt(${x})">${n}</button>`).join('')}
+          ${['Knowledge gap', 'Conceptual', 'Confusion', 'Careless'].map((n, x) => `<button class="et sm" aria-pressed="false" onclick="setEt(${x})">${n}</button>`).join('')}
         </div>
         <input type="text" id="fx" placeholder="Optional one-line fix: why did you pick that?" style="margin-top:8px" onkeydown="if(event.key==='Enter')fin()">
         <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
@@ -2369,9 +2397,9 @@ function dontKnow() {
   save();
 
   $('#fb').innerHTML = `
-    <div class="exp" style="background:var(--nob);border-left:4px solid var(--no)">
+    <div class="exp">
       <b class="c-no">Scheduled for tomorrow.</b> Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>
-      <div style="margin-top:6px">${esc(rawQ.e || 'No explanation provided.')}</div>
+      ${explanationHtml(rawQ.e)}
     </div>
     <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
   `;
@@ -2379,7 +2407,49 @@ function dontKnow() {
 
 function setEt(x) {
   ET = x;
-  document.querySelectorAll('.et').forEach((b, i) => b.classList.toggle('on', i === x));
+  document.querySelectorAll('.et').forEach((b, i) => {
+    b.classList.toggle('on', i === x);
+    b.setAttribute('aria-pressed', String(i === x));
+  });
+}
+
+function explanationHtml(text) {
+  if (!text) return '';
+  return `<details class="exp explanation"><summary>Why?</summary><div>${esc(text)}</div></details>`;
+}
+
+function confidenceLabel(cf) {
+  return ['Guess', 'Unsure', 'Confident'][cf - 1] || 'Unsure';
+}
+
+function confidenceControls() {
+  return `
+    <details class="confidence-controls">
+      <summary id="confidence-note">Timing suggested ${confidenceLabel(CF)} — adjust if that doesn't match</summary>
+      <div class="row confidence-options">
+        ${['Guess', 'Unsure', 'Confident'].map((label, i) => `<button class="confidence-btn sm ${CF === i + 1 ? 'on' : ''}" aria-pressed="${CF === i + 1}" onclick="setConfidence(${i + 1})">${label}</button>`).join('')}
+      </div>
+    </details>
+  `;
+}
+
+function setConfidence(cf) {
+  if (!REC || !SR_BASE || SR_BASE.k !== REC.k || ![1, 2, 3].includes(cf)) return;
+  const rawQ = CURRENT_Q.origQ || byN(Q[P]);
+  if (!rawQ) return;
+  if (SR_BASE.value) V[REC.k] = { ...SR_BASE.value, history: SR_BASE.value.history.slice() };
+  else delete V[REC.k];
+  CF = cf;
+  REC.cf = cf;
+  REC.lk = REC.ok && cf === 1;
+  sr(rawQ, REC.ok, cf);
+  document.querySelectorAll('.confidence-btn').forEach((b, i) => {
+    b.classList.toggle('on', i === cf - 1);
+    b.setAttribute('aria-pressed', String(i === cf - 1));
+  });
+  const note = $('#confidence-note');
+  if (note) note.textContent = `Confidence: ${confidenceLabel(cf)} — updated`;
+  save();
 }
 
 function fin() {
@@ -2389,6 +2459,7 @@ function fin() {
     REC.fix = f.trim();
     REC.unfixed = !REC.fix;
   }
+  SR_BASE = null;
   save();
   next();
 }
@@ -2734,7 +2805,12 @@ document.addEventListener('keydown', e => {
 
   if (recallWaiting) {
     revealRecallOptions();
-    if (k === ' ' || k === 'enter') return;
+    if (k === 's') {
+      dontKnow();
+      return;
+    }
+    e.preventDefault();
+    return;
   }
 
   if (!locked) {
