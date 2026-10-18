@@ -1729,6 +1729,7 @@ function renderReadinessMeter() {
       };
       return priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
     });
+  const calibratedRows = rows.filter(r => r.isCalibrated);
 
   // Base readiness strictly on First-Attempt Accuracy + Timed Mock performance
   // Never inflate with repeated memory practice!
