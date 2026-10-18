@@ -351,6 +351,7 @@ let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = 
 let EXAM_DATE = '';
 let lastBackup = 0;
 let gemVars = [];
+let QOV = {};
 let gemLast = 0;
 let genInProgress = false;
 let GEM_KEY = localStorage.getItem('bitmcq_gem') || '';
@@ -367,7 +368,7 @@ let bgGenStatusText = '';
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
-      D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins
+      D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins, QOV
     }));
   } catch (e) {
     console.error('Save failed:', e);
@@ -399,6 +400,7 @@ function load() {
       lastBackup = s.lastBackup || 0;
       gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
       todayMins = s.todayMins || 15;
+      QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
       restoreBanks(s);
       return true;
     }
@@ -1175,14 +1177,49 @@ echo $b . "," . $c;
 `;
 
 // Helper: Classify Quick (Conceptual/No-pen) vs Calc (Pen & paper)
+function looksLikeCode(s) {
+  if (!s) return false;
+  const t = String(s);
+  if (/[;{}]/.test(t) && /[=+\-*/<>%!&|]/.test(t)) return true;
+  if (/\b(printf|scanf|strlen|sizeof|malloc|calloc|realloc|free|cout|cin|endl|std::|#include|#define|int\s+main|void\s+main|main\s*\(|return\b)\b/i.test(t)) return true;
+  if (/->|<<|>>|\+\+|--/.test(t)) return true;
+  if (/\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|JOIN)\b/.test(t)) return true;
+  if (/\b(pseudocode|dry\s*run|trace\s+the)\b/i.test(t)) return true;
+  return false;
+}
+
 function isQuickQuestion(q) {
   if (typeof q.quick === 'boolean') return q.quick;
   if (q.calc === true || q.needs_paper === true) return false;
-  if (q.code && q.code.length > 0) return false;
-  if (q.t && (q.t.includes('C') || q.t.includes('T') || q.t.includes('P'))) return false;
-  const s = ((q.q || '') + ' ' + (q.s || '')).toLowerCase();
-  if (/\b(binary|hexadecimal|octal|2's complement|shannon|burst|pipe|bresenham|subnet|prefix expression|postfix|fib\(|kruskal|bst)\b/.test(s)) return false;
+  if (q.code && (Array.isArray(q.code) ? q.code.length > 0 : String(q.code).trim().length > 0)) return false;
+  const tag = q.t || q.tag || '';
+  if (tag && /[CTP]/i.test(tag)) return false;
+  const stem = String(q.q || '');
+  if (/\n/.test(stem)) return false;
+  if (/```/.test(stem)) return false;
+  if (looksLikeCode(stem)) return false;
+  const s = (stem + ' ' + (q.s || '')).toLowerCase();
+  if (/\b(output|trace|evaluate|compute|derive|calculate|following code|following statement|snippet|dry run)\b/.test(s)) return false;
+  if (/\b(binary|hexadecimal|octal|2's complement|shannon|burst|pipe|bresenham|subnet|prefix expression|postfix|fib\(|kruskal|bst|dijkstra|prim|recursion|complexity|big[- ]o)\b/.test(s)) return false;
+  if (/\d\s*[+\-*/%^&|]\s*\d/.test(stem)) return false;
   return true;
+}
+
+// Manual override store: keyed by stable content key qk(q) -> true (quick) / false (pen & paper)
+function effQuick(q) {
+  if (!q) return true;
+  const k = qk(q);
+  if (Object.prototype.hasOwnProperty.call(QOV, k)) return QOV[k];
+  return q.quick !== false;
+}
+
+function setQuick(n, val) {
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
+  if (!rawQ) return;
+  QOV[qk(rawQ)] = !!val;
+  rawQ.quick = !!val;
+  save();
+  show();
 }
 
 // Question Parsers
@@ -1259,8 +1296,11 @@ function parseJson(a) {
       o: x.options.map(String),
       a: an,
       e: (x.tag ? '[' + x.tag + '] ' : '') + (x.why || ''),
-      quick: x.quick !== undefined ? !!x.quick : (x.calc === true || x.needs_paper === true ? false : (!x.code || !x.code.length))
+      quick: x.quick,
+      calc: x.calc,
+      needs_paper: x.needs_paper
     };
+    qObj.quick = isQuickQuestion(qObj);
     out.push(qObj);
   });
   if (!out.length) throw new Error('No valid questions found');
@@ -1280,9 +1320,12 @@ function parseBank(x) {
       if (opts.some(v => v == null || v === '') || an < 0) { skip++; return; }
       seen.add(q.question);
       const item = {
-        id: q.id, s: name, u: su.subject_code || '', t: '',
-        q: String(q.question), code: [], o: opts.map(String), a: an, e: '',
-        quick: q.quick !== undefined ? !!q.quick : (q.calc === true ? false : true)
+        id: q.id, s: name, u: su.subject_code || '', t: (q.tag || ''),
+        q: String(q.question),
+        code: q.code ? (Array.isArray(q.code) ? q.code : String(q.code).split('\n')) : [],
+        o: opts.map(String), a: an,
+        e: q.why || q.explanation || q.reason || '',
+        quick: q.quick, calc: q.calc, needs_paper: q.needs_paper
       };
       item.quick = isQuickQuestion(item);
       qs.push(item);
@@ -1462,7 +1505,7 @@ function dueKeys(quickOnly = false) {
   const daysLeft = getDaysLeft();
 
   (D || []).forEach(q => {
-    if (quickOnly && q.quick === false) return;
+    if (quickOnly && !effQuick(q)) return;
     const v = V[qk(q)];
     if (v) {
       if (v.d <= t || (v.confWrongRetest && v.confWrongRetest <= t)) {
@@ -1473,7 +1516,7 @@ function dueKeys(quickOnly = false) {
 
   if (daysLeft <= 10 && ks.length < 25) {
     (D || []).forEach(q => {
-      if (quickOnly && q.quick === false) return;
+      if (quickOnly && !effQuick(q)) return;
       if (!isLockedIn(q) && !ks.includes(q.n) && V[qk(q)]) {
         ks.push(q.n);
       }
@@ -1481,7 +1524,7 @@ function dueKeys(quickOnly = false) {
   }
 
   A.forEach((a, i) => a.errs.forEach((e, j) => {
-    if (quickOnly && e.quick === false) return;
+    if (quickOnly && !effQuick(e)) return;
     const v = V[qk(e)];
     if (v && v.d <= t && !D.some(q => qk(q) === qk(e))) {
       ks.push(i + ':' + j);
@@ -1529,7 +1572,7 @@ function getTimingConfidence(rawQ, elapsedSec) {
   // Floor: answering under 2.0s is pure reflex/guess or recognition illusion
   if (elapsedSec < 2.0) return 1;
 
-  const isCalcOrTrace = (rawQ.quick === false) || (rawQ.code && rawQ.code.length > 0) || (rawQ.t && /[CTP]/i.test(rawQ.t));
+  const isCalcOrTrace = !effQuick(rawQ) || (rawQ.code && rawQ.code.length > 0) || (rawQ.t && /[CTP]/i.test(rawQ.t));
   const wordCount = (rawQ.q ? rawQ.q.split(/\s+/).length : 20) + (rawQ.code ? rawQ.code.join(' ').split(/\s+/).length : 0);
   const readingBuffer = Math.min(6, Math.max(0, (wordCount - 25) * 0.1));
 
@@ -1601,7 +1644,7 @@ function prepareQuestionForDisplay(rawQ) {
 function buildTodaySession(minutes = 15, quickOnly = false) {
   if (!D || !D.length) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
-  const pool = quickOnly ? D.filter(q => q.quick !== false) : D;
+  const pool = quickOnly ? (D || []).filter(q => effQuick(q)) : (D || []);
   if (!pool.length) return [];
 
   const due = dueKeys(quickOnly);
@@ -1898,7 +1941,7 @@ function home() {
   const un = D.filter(q => !R[q.n]).map(q => q.n);
   const wr = D.filter(q => R[q.n] === 'w').map(q => q.n);
   const sk = D.filter(q => R[q.n] === 's').map(q => q.n);
-  const quickCount = D.filter(q => q.quick !== false).length;
+  const quickCount = (D || []).filter(q => effQuick(q)).length;
 
   $('#app').innerHTML = `
     ${renderBackupNudge()}
@@ -2041,7 +2084,7 @@ function show() {
   const isReview = !!V[qk(rawQ)] && Array.isArray(V[qk(rawQ)].history) && V[qk(rawQ)].history.length > 0;
   const hasVariant = !!rawQ._variant;
   const isShowingVariant = CURRENT_Q.isShowingVariant;
-  const isQuick = rawQ.quick !== false;
+  const isQuick = effQuick(rawQ);
 
   let pauseBtn = '';
   if (MK) {
@@ -2055,6 +2098,7 @@ function show() {
           ${MK ? '<span class="chip" id="tm"></span><span class="chip c-no" id="unans-chip"></span>' : stats()}
           ${pauseBtn}
           <span class="chip mu">${isQuick ? '⚡ Quick (No-pen)' : '📝 Pen &amp; Paper'}</span>
+          <button class="sm" style="padding:2px 8px;font-size:11px" onclick="setQuick(${rawQ.n}, ${isQuick ? 'false' : 'true'})">${isQuick ? 'Mark as Pen & Paper' : 'Mark as Quick'}</button>
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Verified Variant (Original Safe)</span>' : ''}
         </div>
         <button onclick="confirmExit()">☰ Menu</button>
@@ -2366,7 +2410,7 @@ async function triggerBackgroundVariantUpgrades(sessionKeys) {
     if (!q || seenKeys.has(qk(q))) return;
     
     // Safety Rule 1: ONLY rewrite calculation, code, or trace items. Factual items are NEVER rewritten.
-    const isCalcOrTrace = (q.quick === false) || (q.code && q.code.length > 0) || (q.t && /[CTP]/i.test(q.t));
+    const isCalcOrTrace = !effQuick(q) || (q.code && q.code.length > 0) || (q.t && /[CTP]/i.test(q.t));
     if (!isCalcOrTrace) return;
 
     const lastAttempt = [...L].reverse().find(l => l.k === qk(q));
@@ -2770,7 +2814,7 @@ function compact() {
     ...(SETBANK !== null && SETI >= 0 ? { bankId: SETBANK, bi: SETI } : {}),
     errs: D.filter(q => R[q.n] === 'w' || R[q.n] === 's').map(q => ({
       n: q.n, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e, p: W[q.n] ?? -1, r: R[q.n], fx: 0,
-      quick: q.quick !== false, _orig: q._orig
+      quick: effQuick(q), _orig: q._orig
     }))
   };
 }
@@ -2928,7 +2972,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins }),
+  get: () => ({ D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins, QOV }),
   apply: (s) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const prevP = P;
@@ -2943,6 +2987,7 @@ window.AppState = {
     lastBackup = s.lastBackup || 0;
     gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
     todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
+    QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
     save();
     if (window.DriveSync) DriveSync.refreshUI();
     if (wasQ) {
