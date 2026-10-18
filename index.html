@@ -2098,7 +2098,7 @@ function show() {
     </div>
 
     <div class="card" style="margin-top:10px">
-      <div class="q" id="q-stem">${hl(esc(CURRENT_Q.q))}</div>
+      <div class="q" id="q-stem">${renderQuestionStem(CURRENT_Q.q)}</div>
       ${CURRENT_Q.code && CURRENT_Q.code.length ? `<pre id="q-code">${esc(CURRENT_Q.code.join('\n'))}</pre>` : ''}
 
       <!-- Recall-First Block for Review Items -->
@@ -2171,6 +2171,21 @@ function renderOptionsHtml(q) {
       <b>${'ABCD'[i]}</b><span>${esc(o)}</span>
     </button>
   `).join('');
+}
+
+function renderQuestionStem(stem) {
+  const text = String(stem || '');
+  const fence = /```(?:(?:c|cpp|c\+\+)(?=[ \t]|\r?\n))?[ \t]*\r?\n?([\s\S]*?)```/gi;
+  let html = '', lastIndex = 0, match;
+
+  while ((match = fence.exec(text))) {
+    html += hl(esc(text.slice(lastIndex, match.index)));
+    const code = match[1].replace(/^\r?\n/, '').replace(/\r?\n$/, '').replace(/[ \t]+$/, '');
+    html += `<pre>${esc(code)}</pre>`;
+    lastIndex = fence.lastIndex;
+  }
+
+  return html + hl(esc(text.slice(lastIndex)));
 }
 
 function revealRecallOptions() {
