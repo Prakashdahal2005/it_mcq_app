@@ -221,15 +221,12 @@ pre {
 .exp.explanation { margin-top: 8px; padding: 9px 12px; font-size: 14px; }
 .exp.explanation summary { cursor: pointer; font-weight: 600; }
 .exp.explanation div { margin-top: 6px; }
-.et.on, .confidence-btn.on {
+.et.on {
   color: var(--ac);
   border-color: var(--ac);
   background: var(--ac-bg);
   font-weight: 700;
 }
-.confidence-controls { margin: 8px 0; }
-.confidence-controls summary { cursor: pointer; color: var(--mu); font-size: 13px; }
-.confidence-options { margin-top: 8px; }
 
 textarea {
   width: 100%;
@@ -360,7 +357,7 @@ const KEY = 'bitmcq1';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // Core State
-let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, CF = 3, T0 = 0, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0;
+let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0;
 let EXAM_DATE = '';
 let lastBackup = 0;
 let gemVars = [];
@@ -372,7 +369,6 @@ let GEM_MODEL = 'gemini-3.8-flash';
 let sessionLeechCount = 0;
 let recallWaiting = false;
 let recallFirst = true;
-let SR_BASE = null;
 let CURRENT_Q = null;
 let todayMins = 15;
 let showMoreMenu = false;
@@ -1459,58 +1455,42 @@ function getMaxInterval() {
 function isLockedIn(q) {
   const v = V[qk(q)];
   if (!v || !Array.isArray(v.history) || v.history.length < 2) return false;
-  const confHits = [];
+  const correctHits = [];
   for (const h of v.history) {
     if (!h.ok) {
-      confHits.length = 0; // Miss resets locked-in progress
-    } else if (h.cf === 3) {
-      confHits.push(h.t);
+      correctHits.length = 0;
+    } else {
+      correctHits.push(h.t);
     }
   }
-  if (confHits.length < 2) return false;
-  for (let i = 0; i < confHits.length - 1; i++) {
-    for (let j = i + 1; j < confHits.length; j++) {
-      if (confHits[j] - confHits[i] >= 3 * 864e5) return true;
+  if (correctHits.length < 2) return false;
+  for (let i = 0; i < correctHits.length - 1; i++) {
+    for (let j = i + 1; j < correctHits.length; j++) {
+      if (correctHits[j] - correctHits[i] >= 3 * 864e5) return true;
     }
   }
   return false;
 }
 
-function sr(q, ok, cf) {
+function sr(q, ok) {
   const k = qk(q);
   const v = V[k] || (V[k] = { b: 0, d: 0, f: 0, history: [], missCount: 0 });
   if (!Array.isArray(v.history)) v.history = [];
   if (!v.f) v.f = Date.now();
-  v.history.push({ t: Date.now(), ok, cf });
-
-  const maxCap = getMaxInterval();
+  v.history.push({ t: Date.now(), ok });
 
   if (!ok) {
     v.b = 0;
     v.missCount = (v.missCount || 0) + 1;
     v.d = today() + 1;
-    if (cf === 3) {
-      v.confWrongRetest = today() + 3;
-    }
     if (v.missCount >= 3) {
       v.leech = true;
     }
   } else {
     v.missCount = 0;
-    if (cf === 1) {
-      v.b = 0;
-      v.d = today() + 1;
-    } else if (cf === 2) {
-      v.b = Math.min((v.b || 0) + 1, 2);
-      const ladder = [1, 2, 3];
-      const intv = Math.min(ladder[v.b - 1] || 1, 3, maxCap);
-      v.d = today() + intv;
-    } else {
-      v.b = Math.min((v.b || 0) + 1, 4);
-      const ladder = [1, 3, 7, 14];
-      const intv = Math.min(ladder[v.b - 1] || 1, maxCap);
-      v.d = today() + intv;
-    }
+    v.b = Math.min((v.b || 0) + 1, 4);
+    const ladder = [1, 3, 7, 14];
+    v.d = today() + Math.min(ladder[v.b - 1] || 1, getMaxInterval());
   }
 }
 
@@ -1523,7 +1503,7 @@ function dueKeys(quickOnly = false) {
     if (quickOnly && !effQuick(q)) return;
     const v = V[qk(q)];
     if (v) {
-      if (v.d <= t || (v.confWrongRetest && v.confWrongRetest <= t)) {
+      if (v.d <= t) {
         ks.push(q.n);
       }
     }
@@ -1578,34 +1558,6 @@ function streak() {
   if (!d.has(t)) t--;
   while (d.has(t)) { n++; t--; }
   return n;
-}
-
-// Timing-Based Smart Confidence Inference (Zero Button Friction)
-// Includes a <2s floor (instant reaction is recognition/guess, not confident retrieval),
-// word count reading-time scaling, and generous allowance for calc/trace questions.
-function getTimingConfidence(rawQ, elapsedSec) {
-  // Floor: answering under 2.0s is pure reflex/guess or recognition illusion
-  if (elapsedSec < 2.0) return 1;
-
-  const isCalcOrTrace = !effQuick(rawQ) || (rawQ.code && rawQ.code.length > 0) || (rawQ.t && /[CTP]/i.test(rawQ.t));
-  const wordCount = (rawQ.q ? rawQ.q.split(/\s+/).length : 20) + (rawQ.code ? rawQ.code.join(' ').split(/\s+/).length : 0);
-  const readingBuffer = Math.min(6, Math.max(0, (wordCount - 25) * 0.1));
-
-  if (!isCalcOrTrace) {
-    // Pure conceptual / factual question
-    const fastCut = 5.5 + readingBuffer;
-    const medCut = 12.0 + readingBuffer;
-    if (elapsedSec <= fastCut) return 3; // Confident
-    if (elapsedSec <= medCut) return 2;  // Unsure
-    return 1;                            // Slow / Guess
-  } else {
-    // Math, calculation, code-trace or logic evaluation
-    const fastCut = 18.0 + readingBuffer;
-    const medCut = 38.0 + readingBuffer;
-    if (elapsedSec <= fastCut) return 3; // Fast solve for calc -> Confident
-    if (elapsedSec <= medCut) return 2;  // Moderate solve -> Unsure
-    return 1;                            // Slow solve -> Guess / Struggled
-  }
 }
 
 // Option Shuffling with Anchored/Pinned Options
@@ -1668,7 +1620,7 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   // 1. Sure Wins for opening and closing momentum
   const sureWins = pool.filter(q => {
     const v = V[qk(q)];
-    return v && (v.history || []).some(h => h.ok && h.cf === 3) && !due.includes(q.n);
+    return v && (v.history || []).some(h => h.ok) && !due.includes(q.n);
   }).map(q => q.n).sort(() => Math.random() - 0.5);
 
   // 2. Identify Weakest Subject (Calibrated with >= 8 attempts)
@@ -2084,10 +2036,7 @@ function editExamDate() {
 function show() {
   view = 'q';
   locked = false;
-  CF = 3;
   ET = -1;
-  SR_BASE = null;
-  T0 = Date.now();
   cancelRecallTimer();
 
   if (P >= Q.length) {
@@ -2180,7 +2129,7 @@ function show() {
     </div>
 
     ${MK ? renderMockPalette() : ''}
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>S</b> don't know · <b>Enter</b> continue · <i>Timing suggests confidence; you can change it</i></p>
+    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>S</b> don't know · <b>Enter</b> continue</p>
   `;
 
   if (isReview && !MK && recallFirst) {
@@ -2218,8 +2167,6 @@ function revealRecallOptions() {
   if (box) box.classList.remove('recall-hidden');
   const prompt = $('#recall-prompt');
   if (prompt) prompt.style.display = 'none';
-  // Start timing ONLY when the options are actually visible to the student
-  T0 = Date.now();
 }
 
 function setRecallFirst(enabled) {
@@ -2237,7 +2184,6 @@ function confirmExit() {
   home();
 }
 
-// Answer Handling with Smart Timing-Based Confidence
 let REC = null;
 
 function pick(i) {
@@ -2245,9 +2191,6 @@ function pick(i) {
   if (recallWaiting) revealRecallOptions();
 
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
-  const elapsedSec = Math.round((Date.now() - T0) / 100) / 10;
-  const autoCf = getTimingConfidence(rawQ, elapsedSec);
-  CF = autoCf;
 
   if (MK) {
     MK.a[CURRENT_Q.origQ.n] = i;
@@ -2273,53 +2216,23 @@ function pick(i) {
     q: rawQ.q.slice(0, 120),
     ch: origPickedIndex,
     ok,
-    cf: CF,
-    sec: Math.round(elapsedSec),
-    lk: ok && CF === 1,
     set: S
   };
   L.push(REC);
-  const existingV = V[REC.k];
-  SR_BASE = {
-    k: REC.k,
-    value: existingV ? { ...existingV, history: Array.isArray(existingV.history) ? existingV.history.slice() : [] } : null
-  };
-  sr(rawQ, ok, CF);
+  sr(rawQ, ok);
 
   if (ok) {
     if (rawQ._k) mark(rawQ._k, 1, origPickedIndex);
     else { R[rawQ.n] = 'c'; delete W[rawQ.n]; }
     bs[i].classList.add('ok');
-
-    if (CF === 3) {
-      // Fast & Confident: Auto-advance smoothly with zero click friction
-      save();
-      setTimeout(() => {
-        if (view === 'q' && Q[P] === k) next();
-      }, 500);
-    } else if (CF === 2) {
-      // Medium latency / Hesitated: Show brief explanation, pause for Enter
-      $('#fb').innerHTML = `
-        <div class="exp unsure">
-          <b class="c-ok">Correct.</b> Timing suggested ${confidenceLabel(CF)} after ${elapsedSec}s.
-          ${explanationHtml(rawQ.e)}
-        </div>
-        ${confidenceControls()}
-        <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
-      `;
-      save();
-    } else {
-      // Slow latency / Guess: Pause to ensure discrepancy effect feedback
-      $('#fb').innerHTML = `
-        <div class="exp lucky">
-          <b class="c-sk">Correct.</b> Timing suggested ${confidenceLabel(CF)} after ${elapsedSec}s.
-          ${explanationHtml(rawQ.e)}
-        </div>
-        ${confidenceControls()}
-        <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
-      `;
-      save();
-    }
+    $('#fb').innerHTML = `
+      <div class="exp">
+        <b class="c-ok">Correct.</b>
+        ${explanationHtml(rawQ.e)}
+      </div>
+      <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
+    `;
+    save();
   } else {
     // Wrong Answer
     if (rawQ._k) mark(rawQ._k, 0, origPickedIndex);
@@ -2349,10 +2262,9 @@ function pick(i) {
       }
       $('#fb').innerHTML = `
         <div class="exp">
-          <b class="c-no">Wrong.</b> Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>
+          <b class="c-no">Wrong.</b> Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>. Scheduled for tomorrow.
           ${explanationHtml(rawQ.e)}
         </div>
-        ${confidenceControls()}
         <p class="mu" style="margin:10px 0 4px">Error category (optional, Enter to continue):</p>
         <div class="row">
           ${['Knowledge gap', 'Conceptual', 'Confusion', 'Careless'].map((n, x) => `<button class="et sm" aria-pressed="false" onclick="setEt(${x})">${n}</button>`).join('')}
@@ -2385,15 +2297,12 @@ function dontKnow() {
     q: rawQ.q.slice(0, 120),
     ch: -1,
     ok: false,
-    cf: 0,
-    sec: Math.round((Date.now() - T0) / 1000),
-    lk: false,
     set: S
   };
   L.push(REC);
   if (rawQ._k) mark(rawQ._k, 0, -1);
   else { R[rawQ.n] = 's'; }
-  sr(rawQ, false, 0);
+  sr(rawQ, false);
   save();
 
   $('#fb').innerHTML = `
@@ -2418,40 +2327,6 @@ function explanationHtml(text) {
   return `<details class="exp explanation"><summary>Why?</summary><div>${esc(text)}</div></details>`;
 }
 
-function confidenceLabel(cf) {
-  return ['Guess', 'Unsure', 'Confident'][cf - 1] || 'Unsure';
-}
-
-function confidenceControls() {
-  return `
-    <details class="confidence-controls">
-      <summary id="confidence-note">Timing suggested ${confidenceLabel(CF)} — adjust if that doesn't match</summary>
-      <div class="row confidence-options">
-        ${['Guess', 'Unsure', 'Confident'].map((label, i) => `<button class="confidence-btn sm ${CF === i + 1 ? 'on' : ''}" aria-pressed="${CF === i + 1}" onclick="setConfidence(${i + 1})">${label}</button>`).join('')}
-      </div>
-    </details>
-  `;
-}
-
-function setConfidence(cf) {
-  if (!REC || !SR_BASE || SR_BASE.k !== REC.k || ![1, 2, 3].includes(cf)) return;
-  const rawQ = CURRENT_Q.origQ || byN(Q[P]);
-  if (!rawQ) return;
-  if (SR_BASE.value) V[REC.k] = { ...SR_BASE.value, history: SR_BASE.value.history.slice() };
-  else delete V[REC.k];
-  CF = cf;
-  REC.cf = cf;
-  REC.lk = REC.ok && cf === 1;
-  sr(rawQ, REC.ok, cf);
-  document.querySelectorAll('.confidence-btn').forEach((b, i) => {
-    b.classList.toggle('on', i === cf - 1);
-    b.setAttribute('aria-pressed', String(i === cf - 1));
-  });
-  const note = $('#confidence-note');
-  if (note) note.textContent = `Confidence: ${confidenceLabel(cf)} — updated`;
-  save();
-}
-
 function fin() {
   const f = ($('#fx') || {}).value || '';
   if (REC) {
@@ -2459,7 +2334,6 @@ function fin() {
     REC.fix = f.trim();
     REC.unfixed = !REC.fix;
   }
-  SR_BASE = null;
   save();
   next();
 }
@@ -2486,8 +2360,7 @@ async function triggerBackgroundVariantUpgrades(sessionKeys) {
 
     const lastAttempt = [...L].reverse().find(l => l.k === qk(q));
     if (!lastAttempt) return;
-    // Upgrade if missed OR took slow/hesitant time
-    if (!lastAttempt.ok || lastAttempt.cf < 3) {
+    if (!lastAttempt.ok) {
       seenKeys.add(qk(q));
       candidates.push(q);
     }
@@ -2754,9 +2627,9 @@ function mockEnd() {
     x[1]++;
     L.push({
       k: qk(q), t: Date.now(), s, u: q.u || '', q: q.q.slice(0, 120),
-      ch: a === undefined ? -1 : a, ok, cf: 0, sec: 0, lk: false, set: S, mock: 1, unfixed: !ok
+      ch: a === undefined ? -1 : a, ok, set: S, mock: 1, unfixed: !ok
     });
-    try { sr(q, ok, 0); } catch (e) { }
+    try { sr(q, ok); } catch (e) { }
     if (ok) {
       c++; x[0]++; R[q.n] = 'c'; delete W[q.n];
     } else {
