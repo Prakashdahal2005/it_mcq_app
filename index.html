@@ -1538,6 +1538,29 @@ const byN = k => {
   return (D || []).find(q => q.n === k);
 };
 
+function groupQuestionBlocks(questionKeys) {
+  const subjects = new Map();
+  questionKeys.forEach(key => {
+    const question = byN(key);
+    const subject = question ? cl(question.s) : '';
+    if (!subjects.has(subject)) subjects.set(subject, []);
+    subjects.get(subject).push(key);
+  });
+  return [...subjects.values()].flat();
+}
+
+function insertRetryInSubjectBlock(key, subject) {
+  const subjectKey = cl(subject);
+  let insertAt = P + 1;
+  let i = P + 1;
+  while (i < Q.length) {
+    const question = byN(Q[i]);
+    if (!question || cl(question.s) !== subjectKey) break;
+    insertAt = ++i;
+  }
+  Q.splice(insertAt, 0, key);
+}
+
 const mark = (k, f, i) => {
   const [a, j] = k.split(':');
   if (A[a] && A[a].errs[j]) {
@@ -1617,7 +1640,7 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   const due = dueKeys(quickOnly);
   const lockedSet = new Set(pool.filter(q => isLockedIn(q)).map(q => q.n));
 
-  // 1. Sure Wins for opening and closing momentum
+  // Include previously answered questions to reinforce retained knowledge.
   const sureWins = pool.filter(q => {
     const v = V[qk(q)];
     return v && (v.history || []).some(h => h.ok) && !due.includes(q.n);
@@ -1646,7 +1669,7 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     return false;
   }
 
-  // Open with 2 sure wins
+  // Include up to two previously answered questions.
   for (let i = 0; i < 2 && sureWins.length; i++) add(sureWins.pop());
 
   // Due items (probabilistically weighted, max 3 leeches per session to avoid burnout)
@@ -1678,23 +1701,11 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   // Remaining filler
   const remainingAll = pool.map(q => q.n).sort(() => Math.random() - 0.5);
   for (const n of remainingAll) {
-    if (session.length >= targetQ - 1) break;
+    if (session.length >= targetQ) break;
     add(n);
   }
 
-  // End on a win
-  if (sureWins.length) add(sureWins.pop());
-  else if (unseenItems.length) add(unseenItems.pop());
-
-  // Interleave middle
-  if (session.length > 4) {
-    const firstTwo = session.slice(0, 2);
-    const lastOne = session.slice(session.length - 1);
-    const middle = session.slice(2, session.length - 1).sort(() => Math.random() - 0.5);
-    return [...firstTwo, ...middle, ...lastOne];
-  }
-
-  return session;
+  return groupQuestionBlocks(session);
 }
 
 // Honest Readiness Meter
@@ -2258,7 +2269,7 @@ function pick(i) {
     } else {
       if (!RA.has(k)) {
         RA.add(k);
-        Q.splice(Math.min(Q.length, P + 6 + (Math.random() * 4 | 0)), 0, k);
+        insertRetryInSubjectBlock(k, rawQ.s);
       }
       $('#fb').innerHTML = `
         <div class="exp">
@@ -2780,7 +2791,7 @@ function retake() {
 
 function start(q) {
   REV = null; RA.clear(); sessionLeechCount = 0;
-  Q = q; P = 0;
+  Q = MK ? q : groupQuestionBlocks(q); P = 0;
   save(); show();
 }
 
