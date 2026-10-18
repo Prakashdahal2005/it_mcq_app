@@ -1881,6 +1881,7 @@ function home() {
         <div id="err" class="c-no"></div>
         <p class="mu">Have an existing backup? <input type="file" accept=".json" onchange="restore(this.files[0])"></p>
       </div>
+      ${window.DriveSync ? `<p class="mu" style="margin-top:14px">Already have progress in the cloud? Connect Google Drive below and it will restore automatically — no backup file needed.</p>${DriveSync.settingsHTML()}` : ''}
       ${BANKS.length ? bankCard() : ''}
     `;
     $('#f').onchange = e => {
@@ -2941,7 +2942,7 @@ window.AppState = {
     todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
     save();
     if (window.DriveSync) DriveSync.refreshUI();
-    if (!document.getElementById('drive-status')) home();
+    if (!document.getElementById('ed')) home();
   },
   save: save,
   home: home,
