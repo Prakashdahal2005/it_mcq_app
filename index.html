@@ -325,10 +325,12 @@ input[type=text] { width: 100%; font: inherit; color: var(--tx); background: var
 .mock-btn.flg { background: var(--skb); border-color: var(--sk); color: var(--sk); }
 .mock-btn.cur { border: 2px solid var(--ac) !important; font-weight: 800; }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div id="app"></div>
 
+<script src="drive-sync.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const KEY = 'bitmcq1';
@@ -360,6 +362,7 @@ function save() {
   } catch (e) {
     console.error('Save failed:', e);
   }
+  try { if (window.DriveSync) window.DriveSync.onLocalSave(); } catch (e) {}
 }
 
 function restoreBanks(s) {
@@ -2835,7 +2838,8 @@ function restore(f) {
   const r = new FileReader();
   r.onload = () => {
     try {
-      const x = JSON.parse(r.result);
+      const parsed = JSON.parse(r.result);
+      const x = (parsed && parsed.appState && typeof parsed.appState === 'object') ? parsed.appState : parsed;
       D = x.D || null; R = x.R || {}; W = x.W || {}; Q = x.Q || []; P = x.P || 0;
       S = x.S || 1; A = x.A || []; L = x.L || []; V = x.V || {};
       EXAM_DATE = x.EXAM_DATE || ''; lastBackup = x.lastBackup || Date.now();
@@ -2899,6 +2903,7 @@ function openSettings() {
         <button onclick="home()">Cancel</button>
       </p>
     </div>
+    ${window.DriveSync ? DriveSync.settingsHTML() : ''}
   `;
 }
 
@@ -2911,8 +2916,31 @@ function saveSettings() {
 }
 
 // Initialization
+window.AppState = {
+  get: () => ({ D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins }),
+  apply: (s) => {
+    D = s.D == null ? null : s.D;
+    R = s.R || {}; W = s.W || {}; Q = s.Q || []; P = s.P || 0;
+    S = s.S || 1; A = s.A || []; L = s.L || []; V = s.V || {};
+    BANKS = Array.isArray(s.BANKS) ? s.BANKS : [];
+    SETBANK = typeof s.SETBANK === 'number' ? s.SETBANK : null;
+    SETI = typeof s.SETI === 'number' ? s.SETI : -1;
+    EXAM_DATE = s.EXAM_DATE || '';
+    lastBackup = s.lastBackup || 0;
+    gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
+    todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
+    save();
+    if (window.DriveSync) DriveSync.refreshUI();
+    if (!document.getElementById('drive-status')) home();
+  },
+  save: save,
+  home: home,
+  genSets: genSets
+};
+
 load();
 home();
+if (window.DriveSync) DriveSync.init();
 </script>
 </body>
 </html>
