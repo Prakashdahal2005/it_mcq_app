@@ -357,7 +357,7 @@ const KEY = 'bitmcq1';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // Core State
-let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
+let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0;
 let EXAM_DATE = '';
 let lastBackup = 0;
 let gemVars = [];
@@ -1877,7 +1877,6 @@ function dismissBackup() {
 // Home View
 function home() {
   view = 'home';
-  cancelAutoAdvance();
   clearInterval(TI);
   if (MK) { MK = null; Q = []; P = 0; }
   cancelRecallTimer();
@@ -2047,7 +2046,6 @@ function editExamDate() {
 // Question Screen & Presentation
 function show() {
   view = 'q';
-  cancelAutoAdvance();
   locked = false;
   ET = -1;
   cancelRecallTimer();
@@ -2192,13 +2190,6 @@ function cancelRecallTimer() {
   recallWaiting = false;
 }
 
-function cancelAutoAdvance() {
-  if (AUTO_ADVANCE_TIMER !== null) {
-    clearTimeout(AUTO_ADVANCE_TIMER);
-    AUTO_ADVANCE_TIMER = null;
-  }
-}
-
 function confirmExit() {
   if (MK && !confirm('Leave mock exam? Your timer will stop and progress will be lost.')) return;
   home();
@@ -2244,19 +2235,8 @@ function pick(i) {
   if (ok) {
     if (rawQ._k) mark(rawQ._k, 1, origPickedIndex);
     else { R[rawQ.n] = 'c'; delete W[rawQ.n]; }
-    bs[i].classList.add('ok');
-    $('#fb').innerHTML = `
-      <div class="exp">
-        <b class="c-ok">Correct.</b>
-        ${explanationHtml(rawQ.e)}
-      </div>
-      <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
-    `;
-    save();
-    AUTO_ADVANCE_TIMER = setTimeout(() => {
-      AUTO_ADVANCE_TIMER = null;
-      fin();
-    }, 1200);
+    fin();
+    return;
   } else {
     // Wrong Answer
     if (rawQ._k) mark(rawQ._k, 0, origPickedIndex);
@@ -2352,7 +2332,6 @@ function explanationHtml(text) {
 }
 
 function fin() {
-  cancelAutoAdvance();
   const f = ($('#fx') || {}).value || '';
   if (REC) {
     REC.et = ET < 0 ? '' : ['Knowledge gap', 'Conceptual', 'Confusion', 'Careless'][ET];
