@@ -1,4 +1,4 @@
-var CACHE_NAME = 'bitmcq-v10';
+var CACHE_NAME = 'bitmcq-v11';
 var STATIC_ASSETS = [
   './',
   './index.html',

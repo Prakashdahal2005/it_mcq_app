@@ -352,9 +352,32 @@ input[type=text] { width: 100%; font: inherit; color: var(--tx); background: var
 
 <script src="drive-sync.js"></script>
 <script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  startup: { typeset: false }
+};
+
 const $ = s => document.querySelector(s);
 const KEY = 'bitmcq1';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function typesetMath(element) {
+  const mathJax = window.MathJax;
+  if (!element || !mathJax || typeof mathJax.typesetPromise !== 'function') return;
+  mathJax.startup.promise
+    .then(() => mathJax.typesetPromise([element]))
+    .catch(error => console.error('Math typesetting failed:', error));
+}
+
+function clearMath(element) {
+  const mathJax = window.MathJax;
+  if (element && mathJax && typeof mathJax.typesetClear === 'function') {
+    mathJax.typesetClear([element]);
+  }
+}
 
 // Core State
 let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
@@ -2069,6 +2092,7 @@ function show() {
     pauseBtn = `<button class="sm" id="pb" onclick="togglePause()">${MK_PAUSED ? '▶ Resume' : '⏸ Pause'}</button>`;
   }
 
+  clearMath($('#app'));
   $('#app').innerHTML = `
     <div class="top">
       <div class="row" style="justify-content:space-between">
@@ -2144,6 +2168,7 @@ function show() {
     ${MK ? renderMockPalette() : ''}
     <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>S</b> don't know · <b>Enter</b> continue</p>
   `;
+  typesetMath($('#app'));
 
   if (isReview && !MK && recallFirst) {
     recallWaiting = true;
@@ -2267,6 +2292,7 @@ function pick(i) {
       </div>
       <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
     `;
+    typesetMath($('#fb'));
     save();
     AUTO_ADVANCE_TIMER = setTimeout(() => {
       AUTO_ADVANCE_TIMER = null;
@@ -2294,6 +2320,7 @@ function pick(i) {
         <input type="text" id="fx" placeholder="e.g. Deferred update means NO-UNDO on crash" onkeydown="if(event.key==='Enter')fin()">
         <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Park &amp; Continue → (Enter)</button></p>
       `;
+      typesetMath($('#fb'));
     } else {
       if (!RA.has(k)) {
         RA.add(k);
@@ -2311,6 +2338,7 @@ function pick(i) {
         <input type="text" id="fx" placeholder="Optional one-line fix: why did you pick that?" style="margin-top:8px" onkeydown="if(event.key==='Enter')fin()">
         <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
       `;
+      typesetMath($('#fb'));
     }
     save();
   }
@@ -2351,6 +2379,7 @@ function dontKnow() {
     </div>
     <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
   `;
+  typesetMath($('#fb'));
 }
 
 function setEt(x) {
@@ -2997,6 +3026,12 @@ window.AppState = {
 load();
 home();
 if (window.DriveSync) DriveSync.init();
+const mathJaxScript = document.createElement('script');
+mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js';
+mathJaxScript.async = true;
+mathJaxScript.onload = () => typesetMath($('#app'));
+mathJaxScript.onerror = () => console.error('MathJax failed to load; math expressions will remain unformatted.');
+document.head.appendChild(mathJaxScript);
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
