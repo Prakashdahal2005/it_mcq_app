@@ -380,9 +380,10 @@ function clearMath(element) {
 }
 
 // Core State
-let D = null, R = {}, W = {}, Q = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
+let D = null, R = {}, W = {}, Q = [], QRESULTS = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
 let EXAM_DATE = '';
 let lastBackup = 0;
+let lastFreshSetDay = null;
 let gemVars = [];
 let QOV = {};
 let gemLast = 0;
@@ -401,7 +402,7 @@ let bgGenStatusText = '';
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
-      D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins, QOV, recallFirst
+      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst
     }));
   } catch (e) {
     console.error('Save failed:', e);
@@ -424,6 +425,7 @@ function load() {
       R = s.R || {};
       W = s.W || {};
       Q = s.Q || [];
+      QRESULTS = Array.isArray(s.QRESULTS) ? s.QRESULTS : [];
       P = s.P || 0;
       S = s.S || 1;
       A = s.A || [];
@@ -431,6 +433,7 @@ function load() {
       V = s.V || {};
       EXAM_DATE = s.EXAM_DATE || '';
       lastBackup = s.lastBackup || 0;
+      lastFreshSetDay = Number.isInteger(s.lastFreshSetDay) ? s.lastFreshSetDay : null;
       gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
       todayMins = s.todayMins || 15;
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
@@ -1582,6 +1585,7 @@ function insertRetryInSubjectBlock(key, subject) {
     insertAt = ++i;
   }
   Q.splice(insertAt, 0, key);
+  QRESULTS.splice(insertAt, 0, null);
 }
 
 const mark = (k, f, i) => {
@@ -1902,7 +1906,7 @@ function home() {
   view = 'home';
   cancelAutoAdvance();
   clearInterval(TI);
-  if (MK) { MK = null; Q = []; P = 0; }
+  if (MK) { MK = null; Q = []; QRESULTS = []; P = 0; }
   cancelRecallTimer();
 
   if (!D || loadMode) {
@@ -1943,7 +1947,13 @@ function home() {
   const un = D.filter(q => !R[q.n]).map(q => q.n);
   const wr = D.filter(q => R[q.n] === 'w').map(q => q.n);
   const sk = D.filter(q => R[q.n] === 's').map(q => q.n);
-  const quickCount = (D || []).filter(q => effQuick(q)).length;
+  const freshCount = (D || []).filter(q => !V[qk(q)]).length;
+  const bankForFresh = BANKS.find(bank => bank.id === SETBANK) || BANKS[0];
+  const isCurrentBankSet = bankForFresh && bankForFresh.id === SETBANK && SETI >= 0;
+  const currentBankSetComplete = isCurrentBankSet && D.length > 0 && D.every(q => !!R[q.n]);
+  const freshButtonText = bankForFresh
+    ? (isCurrentBankSet && !currentBankSetComplete ? `📚 Continue Set ${SETI + 1}` : `📚 Next Set · ${esc(bankForFresh.name)}`)
+    : `✨ Fresh Questions (up to ${Math.max(10, Math.round(todayMins * 60 / 50))} Q)`;
 
   $('#app').innerHTML = `
     ${renderBackupNudge()}
@@ -1981,11 +1991,15 @@ function home() {
         ▶ Start Today's Mission (${todayMins} min)
       </button>
 
-      <!-- Office Bus / Bedtime Quick Drill -->
+      <!-- Quick revision and fresh-question options -->
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
-        🚌 Quick Commute Drill (No Pen &amp; Paper · 12 Q)
+        ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">${quickCount} quick conceptual items available · ideal for bus or before sleep</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">Previously attempted questions, prioritized by spaced-repetition due date and weak areas</div>
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${bankForFresh || freshCount ? '' : 'disabled'}>
+        ${freshButtonText}
+      </button>
+      <div class="mu sm" style="text-align:center;margin-top:6px">${bankForFresh ? 'Finish the current set before advancing. One new set per day.' : `${freshCount} unseen questions available`}</div>
     </div>
 
     ${renderReadinessMeter()}
@@ -2010,7 +2024,9 @@ function home() {
             <select id="sub-sel">
               ${[...new Set(D.map(q => q.s))].map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
             </select>
-            <button onclick="start(D.filter(q=>q.s===$('#sub-sel').value).map(q=>q.n))">Diagnostic Subject Drill</button>
+            <label for="sub-count">Questions</label>
+            <input id="sub-count" type="number" min="1" max="${D.length}" value="${Math.min(10, D.length)}" style="width:90px">
+            <button onclick="startSubjectDrill()">Diagnostic Subject Drill</button>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
@@ -2042,13 +2058,144 @@ function startToday() {
   start(qList);
 }
 
+function buildRevisionSession(limit = 12) {
+  const questions = new Map();
+  (D || []).forEach(q => questions.set(qk(q), { key: q.n, q }));
+  A.forEach((attempt, ai) => (attempt.errs || []).forEach((q, qi) => {
+    const key = `${ai}:${qi}`;
+    questions.set(qk(q), { key, q });
+  }));
+
+  const subjectData = agg();
+  const currentMisses = new Set((D || [])
+    .filter(q => R[q.n] === 'w' || R[q.n] === 's')
+    .map(q => qk(q)));
+  const due = new Set(dueKeys().map(key => {
+    const q = byN(key);
+    return q ? qk(q) : null;
+  }).filter(Boolean));
+
+  const candidates = [...questions.entries()]
+    .map(([key, item]) => {
+      const history = V[key] && Array.isArray(V[key].history) ? V[key].history : [];
+      if (!history.length) return null;
+      const correct = history.filter(h => h.ok).length;
+      const subject = subjectData[canonSubj(item.q.s)];
+      const subjectAccuracy = subject && subject.c + subject.w + subject.k
+        ? subject.c / (subject.c + subject.w + subject.k)
+        : 1;
+      return {
+        key: item.key,
+        due: due.has(key),
+        missed: currentMisses.has(key) || (V[key].missCount || 0) > 0,
+        subjectAccuracy,
+        accuracy: correct / history.length,
+        lastAttempt: history[history.length - 1].t || 0
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) =>
+      Number(b.due) - Number(a.due) ||
+      Number(b.missed) - Number(a.missed) ||
+      a.subjectAccuracy - b.subjectAccuracy ||
+      a.accuracy - b.accuracy ||
+      a.lastAttempt - b.lastAttempt
+    );
+
+  return groupQuestionBlocks(candidates.slice(0, limit).map(item => item.key));
+}
+
 function startCommuteQuick() {
-  const qList = buildTodaySession(10, true);
+  const qList = buildRevisionSession(12);
   if (!qList.length) {
-    alert('No quick questions found in the deck.');
+    alert('No previously attempted questions are ready for revision yet. Answer some questions first, then come back for spaced revision.');
     return;
   }
   start(qList);
+}
+
+function startFreshSet() {
+  const day = today();
+  const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
+
+  if (BANKS.length) {
+    const bank = BANKS.find(item => item.id === SETBANK) || BANKS[0];
+    const isActiveSet = SETBANK === bank.id && SETI >= 0;
+    const currentComplete = isActiveSet && D.length > 0 && D.every(q => !!R[q.n]);
+
+    if (lastFreshSetDay === day) {
+      if (!isActiveSet || currentComplete) {
+        alert('You have already started today’s set. The next set is available tomorrow.');
+        return;
+      }
+      const remaining = D.filter(q => !R[q.n]).map(q => q.n);
+      if (!remaining.length) {
+        alert('You have finished today’s set. The next set is available tomorrow.');
+        return;
+      }
+      start(remaining);
+      return;
+    }
+
+    if (isActiveSet && !currentComplete) {
+      const remaining = D.filter(q => !R[q.n]).map(q => q.n);
+      const questions = remaining.length ? remaining : D.map(q => q.n);
+      lastFreshSetDay = day;
+      save();
+      start(questions);
+      return;
+    }
+
+    const completed = new Set(A
+      .filter(attempt => attempt.bankId === bank.id && isArchivedSetComplete(attempt))
+      .map(attempt => attempt.bi));
+    if (isActiveSet) completed.add(SETI);
+    const firstIndex = isActiveSet ? (SETI + 1) % bank.sets.length : 0;
+    let nextIndex = -1;
+    for (let offset = 0; offset < bank.sets.length; offset++) {
+      const index = (firstIndex + offset) % bank.sets.length;
+      if (!completed.has(index)) {
+        nextIndex = index;
+        break;
+      }
+    }
+    if (nextIndex < 0) {
+      alert(`You have completed all ${bank.sets.length} sets in ${bank.name}.`);
+      return;
+    }
+
+    lastFreshSetDay = day;
+    loadSet(bank.id, nextIndex, true);
+    return;
+  }
+
+  const qList = D.filter(q => !V[qk(q)]).map(q => q.n).sort(() => Math.random() - 0.5).slice(0, targetQ);
+  if (!qList.length) {
+    alert('No unseen questions are available in the current set.');
+    return;
+  }
+  start(qList);
+}
+
+function startSubjectDrill() {
+  const countInput = $('#sub-count');
+  const requestedCount = Number(countInput.value);
+  if (!Number.isInteger(requestedCount) || requestedCount < 1) {
+    alert('Enter a question count of at least 1.');
+    countInput.focus();
+    return;
+  }
+
+  const subject = $('#sub-sel').value;
+  const available = D.filter(q => q.s === subject).map(q => q.n);
+  if (!available.length) {
+    alert('No questions are available for this subject.');
+    return;
+  }
+  if (requestedCount > available.length) {
+    alert(`Only ${available.length} question(s) are available for ${subject}. Starting all available questions.`);
+  }
+  start(available.sort(() => Math.random() - 0.5).slice(0, requestedCount));
 }
 
 function startMistakes() {
@@ -2261,6 +2408,7 @@ function pick(i) {
   locked = true;
   const k = rawQ._k || rawQ.n;
   const ok = (i === CURRENT_Q.displayA);
+  QRESULTS[P] = ok ? 'c' : 'w';
   const origPickedIndex = CURRENT_Q.origO.indexOf(CURRENT_Q.displayOpts[i]);
 
   const bs = [...document.querySelectorAll('.opt')];
@@ -2351,6 +2499,7 @@ function dontKnow() {
 
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
   const k = rawQ._k || rawQ.n;
+  QRESULTS[P] = 's';
 
   const bs = [...document.querySelectorAll('.opt')];
   bs.forEach(b => b.disabled = true);
@@ -2553,7 +2702,7 @@ function done() {
   view = 'done';
   cancelRecallTimer();
   save();
-  const r = Q.map(n => typeof n === 'string' ? (A[n.split(':')[0]].errs[n.split(':')[1]].fx ? 'c' : 'w') : R[n]);
+  const r = Q.map((n, i) => QRESULTS[i] || (typeof n === 'string' ? (A[n.split(':')[0]].errs[n.split(':')[1]].fx ? 'c' : 'w') : R[n]));
   const c = r.filter(x => x === 'c').length;
   const w = r.filter(x => x === 'w').length;
   const s = r.filter(x => x === 's').length;
@@ -2562,7 +2711,11 @@ function done() {
   $('#app').innerHTML = `
     <h1>Session Complete 🎉</h1>
     <div class="card">
-      <div class="row" style="margin-bottom:12px">${stats()}</div>
+      <div class="row" style="margin-bottom:12px">
+        <span class="chip c-ok">✓ ${c}</span>
+        <span class="chip c-no">✗ ${w}</span>
+        <span class="chip c-sk">⏭ ${s}</span>
+      </div>
       <p style="font-size:18px">
         Finished <b>${Q.length} questions</b> · Accuracy: <b class="${acc >= 75 ? 'c-ok' : 'c-sk'}">${acc}%</b>
       </p>
@@ -2709,7 +2862,7 @@ function mockEnd() {
   });
 
   const pct = Math.round(c / n * 100);
-  MK = null; MK_PAUSED = false; MK_REM = 0; Q = []; P = 0;
+  MK = null; MK_PAUSED = false; MK_REM = 0; Q = []; QRESULTS = []; P = 0;
   save();
   view = 'done';
 
@@ -2796,22 +2949,31 @@ function doLoad() {
     const nd = parse(t);
     if (D && Object.keys(R).length) { A.push(compact()); S = A.length + 1; }
     else S = A.length + 1;
-    D = nd; R = {}; W = {}; Q = []; P = 0; SETBANK = null; SETI = -1; loadMode = 0;
+    D = nd; R = {}; W = {}; Q = []; QRESULTS = []; P = 0; SETBANK = null; SETI = -1; loadMode = 0;
     save(); home();
   } catch (e) {
     $('#err').textContent = e.message;
   }
 }
 
-function loadSet(bankId, k) {
+function loadSet(bankId, k, startFresh = false) {
   const bank = BANKS.find(b => b.id === bankId);
   if (!bank || !bank.sets[k]) return;
   if (D && Object.keys(R).length) { A.push(compact()); S = A.length + 1; }
   else S = A.length + 1;
   SETBANK = bankId; SETI = k;
   D = bank.sets[k].map((ix, j) => ({ n: j + 1, ...bank.q[ix] }));
-  R = {}; W = {}; Q = []; P = 0; loadMode = 0; impMode = 0;
-  save(); home();
+  R = {}; W = {}; Q = []; QRESULTS = []; P = 0; loadMode = 0; impMode = 0;
+  save();
+  if (startFresh) start(D.map(q => q.n));
+  else home();
+}
+
+function isArchivedSetComplete(attempt) {
+  if (typeof attempt.completed === 'boolean') return attempt.completed;
+  const answered = Object.values(attempt.subj || {}).reduce((total, values) =>
+    total + (values[0] || 0) + (values[1] || 0) + (values[2] || 0), 0);
+  return answered >= (attempt.total || Infinity);
 }
 
 function compact() {
@@ -2828,6 +2990,7 @@ function compact() {
     no: S,
     date: new Date().toISOString().slice(0, 10),
     total: D.length,
+    completed: D.length > 0 && D.every(q => !!R[q.n]),
     subj,
     ...(SETBANK !== null && SETI >= 0 ? { bankId: SETBANK, bi: SETI } : {}),
     errs: D.filter(q => R[q.n] === 'w' || R[q.n] === 's').map(q => ({
@@ -2842,7 +3005,7 @@ function retake() {
   if (confirm('Archive this attempt and restart this set fresh?')) {
     A.push(compact());
     S = A.length + 1;
-    R = {}; W = {}; Q = []; P = 0;
+    R = {}; W = {}; Q = []; QRESULTS = []; P = 0;
     save(); home();
   }
 }
@@ -2850,14 +3013,15 @@ function retake() {
 function start(q) {
   REV = null; RA.clear(); sessionLeechCount = 0;
   Q = MK ? q : groupQuestionBlocks(q); P = 0;
+  QRESULTS = Array(Q.length).fill(null);
   save(); show();
 }
 
 function bankCard() {
   if (!BANKS.length) return '';
   return BANKS.map(bank => {
-    const done = new Set(A.filter(a => a.bankId === bank.id && a.bi != null).map(a => a.bi));
-    if (D && SETBANK === bank.id && SETI >= 0) done.add(SETI);
+    const done = new Set(A.filter(a => a.bankId === bank.id && isArchivedSetComplete(a)).map(a => a.bi));
+    if (D && SETBANK === bank.id && SETI >= 0 && D.every(q => !!R[q.n])) done.add(SETI);
     return `
       <div class="item">
         <b>📚 ${esc(bank.name)}</b> <span class="mu">· ${bank.q.length} Q · ${bank.sets.length} sets</span>
@@ -2901,7 +3065,7 @@ function saveFile(name, text, mime) {
 function backup() {
   lastBackup = Date.now();
   save();
-  const data = JSON.stringify({ D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins });
+  const data = JSON.stringify({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins });
   saveFile('bitmcq-progress-backup.json', data, 'application/json');
   home();
 }
@@ -2913,8 +3077,9 @@ function restore(f) {
     try {
       const parsed = JSON.parse(r.result);
       const x = (parsed && parsed.appState && typeof parsed.appState === 'object') ? parsed.appState : parsed;
-      D = x.D || null; R = x.R || {}; W = x.W || {}; Q = x.Q || []; P = x.P || 0;
+      D = x.D || null; R = x.R || {}; W = x.W || {}; Q = x.Q || []; QRESULTS = Array.isArray(x.QRESULTS) ? x.QRESULTS : []; P = x.P || 0;
       S = x.S || 1; A = x.A || []; L = x.L || []; V = x.V || {};
+      lastFreshSetDay = Number.isInteger(x.lastFreshSetDay) ? x.lastFreshSetDay : null;
       EXAM_DATE = x.EXAM_DATE || ''; lastBackup = x.lastBackup || Date.now();
       gemVars = Array.isArray(x.gemVars) ? x.gemVars : [];
       restoreBanks(x);
@@ -2990,14 +3155,15 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, gemVars, todayMins, QOV }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV }),
   apply: (s) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const prevP = P;
     const prevKey = (wasQ && Array.isArray(Q) && typeof P === 'number' && Q[P] != null) ? Q[P] : null;
     D = s.D == null ? null : s.D;
-    R = s.R || {}; W = s.W || {}; Q = s.Q || []; P = s.P || 0;
+    R = s.R || {}; W = s.W || {}; Q = s.Q || []; QRESULTS = Array.isArray(s.QRESULTS) ? s.QRESULTS : []; P = s.P || 0;
     S = s.S || 1; A = s.A || []; L = s.L || []; V = s.V || {};
+    lastFreshSetDay = Number.isInteger(s.lastFreshSetDay) ? s.lastFreshSetDay : null;
     BANKS = Array.isArray(s.BANKS) ? s.BANKS : [];
     SETBANK = typeof s.SETBANK === 'number' ? s.SETBANK : null;
     SETI = typeof s.SETI === 'number' ? s.SETI : -1;
