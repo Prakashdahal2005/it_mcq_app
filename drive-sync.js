@@ -147,12 +147,20 @@
   }
 
   function sidOf(q) {
-    if (q && q.id != null && String(q.id).trim() !== '') return 'id:' + String(q.id).trim();
+    if (q && q.id != null && String(q.id).trim() !== '') {
+      return 'id:' + String(q.u || q.s || '').trim().toLowerCase() + ':' + String(q.id).trim();
+    }
     return 'h:' + contentHash(q);
   }
   function contentHash(q) {
     if (!q || typeof q !== 'object') return hashStr('null');
-    return hashStr(JSON.stringify([q.q || '', q.code || [], q.o || [], q.a, q.e || '']));
+    return hashStr(JSON.stringify([q.u || q.s || '', q.q || '', q.code || [], q.o || [], q.a, q.e || '', q.quick, q.regeneratable]));
+  }
+  function questionIdentity(q) {
+    if (q && q.id != null && String(q.id).trim() !== '') {
+      return 'id:' + String(q.u || q.s || '').trim().toLowerCase() + ':' + String(q.id).trim();
+    }
+    return q && q._sid ? q._sid : sidOf(q);
   }
 
   function appGet() {
@@ -200,12 +208,14 @@
   function pickAppState(s) {
     return {
       D: s.D == null ? null : s.D,
-      R: s.R || {}, W: s.W || {}, Q: s.Q || [], P: s.P || 0,
+      R: s.R || {}, W: s.W || {}, Q: s.Q || [],
+      QRESULTS: s.QRESULTS || [], P: s.P || 0,
       S: s.S || 1, A: s.A || [], L: s.L || [], V: s.V || {},
       BANKS: s.BANKS || [], SETBANK: s.SETBANK == null ? null : s.SETBANK,
       SETI: s.SETI == null ? -1 : s.SETI, EXAM_DATE: s.EXAM_DATE || '',
       lastBackup: s.lastBackup || 0, gemVars: s.gemVars || [],
-      todayMins: s.todayMins || 15
+      todayMins: s.todayMins || 15, lastFreshSetDay: s.lastFreshSetDay,
+      QOV: s.QOV || {}, recallFirst: s.recallFirst !== false
     };
   }
 
@@ -243,7 +253,11 @@
       EXAM_DATE: s.EXAM_DATE || '',
       lastBackup: s.lastBackup || 0,
       gemVars: Array.isArray(s.gemVars) ? s.gemVars : [],
-      todayMins: typeof s.todayMins === 'number' ? s.todayMins : 15
+      todayMins: typeof s.todayMins === 'number' ? s.todayMins : 15,
+      QRESULTS: Array.isArray(s.QRESULTS) ? s.QRESULTS : [],
+      lastFreshSetDay: Number.isInteger(s.lastFreshSetDay) ? s.lastFreshSetDay : null,
+      QOV: (s.QOV && typeof s.QOV === 'object' && !Array.isArray(s.QOV)) ? s.QOV : {},
+      recallFirst: s.recallFirst !== false
     };
     n.BANKS = n.BANKS.filter(function (b) { return b && typeof b === 'object'; }).map(function (b) {
       return { id: b.id, name: b.name || ('Bank ' + b.id), q: Array.isArray(b.q) ? b.q : [], sets: Array.isArray(b.sets) ? b.sets : [] };
@@ -344,9 +358,11 @@
     return out;
   }
 
-  function mergeAppStates(local, remote, genSets) {
+  function mergeAppStates(local, remote, genSets, options) {
+    options = options || {};
     var conflicts = [];
     var byName = {};
+    var remoteBankIds = {};
     var banks = [];
 
     function keyName(b) { return String(b.name || ('Bank ' + b.id)).trim().toLowerCase(); }
@@ -370,19 +386,42 @@
       var k = keyName(b);
       var target = byName[k];
       if (!target) {
+        var remoteQuestions = b.q || [];
+        var remoteIdentities = {};
+        remoteQuestions.forEach(function (q) { if (q) remoteIdentities[questionIdentity(q)] = 1; });
+        var minimumOverlap = Math.max(1, Math.min(5, Math.ceil(remoteQuestions.length * 0.1)));
+        target = banks.find(function (candidate) {
+          var overlap = 0;
+          candidate.q.forEach(function (q) { if (remoteIdentities[questionIdentity(q)]) overlap++; });
+          return overlap >= minimumOverlap;
+        }) || null;
+      }
+      if (!target) {
         target = { id: ++maxId, name: b.name || ('Bank ' + maxId), q: [], sets: [] };
         byName[k] = target;
         banks.push(target);
+      } else if (options.preferRemoteQuestions && b.name) {
+        target.name = b.name;
       }
+      byName[k] = target;
+      remoteBankIds[b.id] = target.id;
       var index = {};
-      target.q.forEach(function (q) { index[q._sid] = q; });
+      target.q.forEach(function (q) { index[questionIdentity(q)] = q; });
       (b.q || []).forEach(function (q) {
         if (!q) return;
         if (!q._sid) q._sid = sidOf(q);
-        var ex = index[q._sid];
-        if (!ex) { target.q.push(q); index[q._sid] = q; return; }
+        var identity = questionIdentity(q);
+        var ex = index[identity];
+        if (!ex) { target.q.push(q); index[identity] = q; return; }
         if (contentHash(ex) !== contentHash(q)) {
-          conflicts.push({ sid: q._sid, bank: target.name, localQuestion: ex.q, remoteQuestion: q.q });
+          if (options.preferRemoteQuestions) {
+            var stableId = ex._sid || q._sid;
+            Object.keys(ex).forEach(function (key) { delete ex[key]; });
+            Object.assign(ex, q);
+            ex._sid = stableId;
+          } else {
+            conflicts.push({ sid: q._sid, bank: target.name, localQuestion: ex.q, remoteQuestion: q.q });
+          }
         }
       });
     });
@@ -394,25 +433,46 @@
     }
 
     var localHas = hasLocalData(local);
-    var active = localHas ? local : remote;
+    var localHasProgress = !!((local.R && Object.keys(local.R).length) ||
+      (local.A && local.A.length) || (local.L && local.L.length) ||
+      (local.V && Object.keys(local.V).length));
+    var remoteHasProgress = !!((remote.R && Object.keys(remote.R).length) ||
+      (remote.A && remote.A.length) || (remote.L && remote.L.length) ||
+      (remote.V && Object.keys(remote.V).length));
+    var active = options.preferRemoteActive ? remote :
+      (remoteHasProgress && !localHasProgress ? remote : (localHas ? local : remote));
+    var activeBankId = active.SETBANK;
+    if (options.preferRemoteActive && activeBankId != null && remoteBankIds[activeBankId] != null) {
+      activeBankId = remoteBankIds[activeBankId];
+    }
 
     var merged = {
       D: active.D,
       R: active.R || {},
       W: active.W || {},
       Q: active.Q || [],
+      QRESULTS: active.QRESULTS || [],
       P: active.P || 0,
-      S: active.S || 1,
+      S: options.preferRemoteActive
+        ? Math.max(active.S || 1, banks.length ? mergeJsonList(local.A, remote.A).length + 1 : 1)
+        : (active.S || 1),
       A: mergeJsonList(local.A, remote.A),
       L: mergeL(local.L, remote.L),
       V: mergeV(local.V, remote.V),
       BANKS: banks,
-      SETBANK: active.SETBANK == null ? null : active.SETBANK,
+      SETBANK: activeBankId == null ? null : activeBankId,
       SETI: active.SETI == null ? -1 : active.SETI,
-      EXAM_DATE: local.EXAM_DATE || remote.EXAM_DATE || '',
+      EXAM_DATE: options.preferRemoteActive
+        ? (remote.EXAM_DATE || local.EXAM_DATE || '')
+        : (local.EXAM_DATE || remote.EXAM_DATE || ''),
       lastBackup: Math.max(local.lastBackup || 0, remote.lastBackup || 0),
       gemVars: mergeJsonList(local.gemVars, remote.gemVars),
-      todayMins: local.todayMins || remote.todayMins || 15
+      todayMins: options.preferRemoteActive
+        ? (remote.todayMins || local.todayMins || 15)
+        : (local.todayMins || remote.todayMins || 15),
+      lastFreshSetDay: active.lastFreshSetDay == null ? null : active.lastFreshSetDay,
+      QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
+      recallFirst: active.recallFirst !== false
     };
     return { appState: merged, conflicts: conflicts };
   }

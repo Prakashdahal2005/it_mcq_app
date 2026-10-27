@@ -59,7 +59,7 @@
 
 **New behavior — 5 hard safety rules:**
 
-1. **Calc/trace items only.** Factual/conceptual questions are never rewritten. Filter: `quick === false` OR `q.code.length > 0` OR tag `C/T/P`.
+1. **Regeneratable items only.** The bank's explicit `regeneratable` flag controls current questions; legacy imported questions without the flag use the older calc/code/tag fallback. The quick flag is separate: a mental-math question can be quick and still regeneratable.
 2. **Original never overwritten.** Variant stored in `q._variant` as a separate object. The original `q.q / q.o / q.a` remain untouched forever.
 3. **Dual blind-solve validation.** Two sequential Gemini API calls:
    - Call 1: Generate variant with changed numbers/variables.
@@ -69,9 +69,11 @@
 
 `prepareQuestionForDisplay()` automatically serves `q._variant` as the active source when present and `_useOriginal` is not set — transparent to the rest of the app.
 
-### 2.8 Commute Quick Drill — 4-Layer Auto-Classifier
+### 2.8 Commute Quick Drill — Explicit Per-Question Flags
 
-`isQuickQuestion` classifies any imported question automatically:
+The bundled `question_bank.json` provides `quick` and `regeneratable` booleans for each question. `quick` means it can be attempted casually without pen-and-paper work; `regeneratable` means its values or code can be varied without changing the underlying concept. These flags are independent.
+
+For imports without an explicit `quick` value, `isQuickQuestion` falls back to:
 
 | Priority | Check | Result |
 |---|---|---|
@@ -83,7 +85,13 @@
 
 Regex keywords include: `binary`, `hexadecimal`, `2's complement`, `overflow`, `k-map`, `subnet`, `/24`, `/27`, `crc`, `postfix`, `prefix`, `kruskal`, `dijkstra`, `matrix`, `determinant`, `eigenvalue`, `derivative`, `integral`, `bresenham`, `turnaround time`, `page fault`, numeric arithmetic patterns, etc.
 
-### 2.9 Leech Handling
+### 2.9 Default Bank and Backup Merge
+
+- `question_bank.json` is loaded and selected automatically when the app opens without an active set; it is also cached for offline use after first load.
+- Re-importing questions with matching subject-scoped IDs updates their latest content and flags while retaining questions not present in the import.
+- Progress-backup imports merge study history and archives, keep the imported backup's active set, and prefer its version of matching question IDs rather than replacing all local data.
+
+### 2.10 Leech Handling
 
 - After **3 misses**: item flagged `v.leech = true`, prompts own-words mnemonic input instead of looping immediately.
 - **Max 3 leeches per session** enforced in `buildTodaySession` — prevents a single session from being dominated by stuck items.
@@ -134,7 +142,10 @@ Regex keywords include: `binary`, `hexadecimal`, `2's complement`, `overflow`, `
 
 | File | Role |
 |---|---|
-| `mcq_trainer.html` | Complete self-contained trainer (HTML + CSS + JS). |
+| `index.html` | Trainer interface, session logic, local progress, and backup import/export. |
+| `drive-sync.js` | Google Drive sync and conflict-aware question/progress merging. |
+| `question_bank.json` | Bundled question bank with quick and regeneratable flags. |
+| `sw.js` | Offline cache and application-shell updates. |
 | `summary.md` | This document. Authoritative reference. |
 | `MIT_Entrance_Master_Guide_and_Syllabus.md` | Syllabus, formula sheets, exam blueprint. |
 
@@ -147,6 +158,7 @@ Regex keywords include: `binary`, `hexadecimal`, `2's complement`, `overflow`, `
 | Pre Oct-18 | Core app: spaced repetition, Today button, latency confidence, leech handling, commute drill, option shuffle, recall gate, mock exam, backup nudge. |
 | Oct 18 Session 1 | 4-layer `isQuickQuestion` auto-classifier, background AI variant generation, `_orig` preservation with toggle, subject name normalization (`canonSubj`), 0-attempt row filtering, readiness meter calibration. |
 | Oct 18 Session 2 | Safety patch: AI rewrites restricted to calc/trace only; dual blind-solve validation; `_variant` stored separately (original never overwritten); one-tap delete; 2s confidence floor; calc/trace thresholds corrected (18s/38s + reading buffer); `T0` reset when recall gate lifts; `EXAM_DATE` defaulted to `2026-10-31`; readiness projection based on first-attempt + mock scores; leech session cap (max 3). |
+| Oct 26 | Bundled `question_bank.json` loads by default; every question has independent quick/regeneratable flags; duplicate bank imports update matching subject-scoped IDs; backup imports merge history and prefer the imported active set. |
 
 ---
 

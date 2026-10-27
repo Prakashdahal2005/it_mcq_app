@@ -6,7 +6,7 @@
 <meta name="description" content="Evidence-based MCQ trainer with spaced repetition and Google Drive backup.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="favicon.png">
-<link rel="apple-touch-icon" href="favicon.png">
+<link rel="apple-touch-icon" href="pwa-icon.png">
 <meta name="theme-color" content="#3b5bdb">
 <meta name="application-name" content="BIT MCQ">
 <meta name="mobile-web-app-capable" content="yes">
@@ -394,6 +394,8 @@ let sessionLeechCount = 0;
 let recallWaiting = false;
 let recallFirst = true;
 let CURRENT_Q = null;
+let defaultBankLoading = false;
+let defaultBankLoadError = '';
 let todayMins = 15;
 let showMoreMenu = false;
 let bgGenQueue = [];
@@ -1334,6 +1336,7 @@ function parseJson(a) {
       a: an,
       e: (x.tag ? '[' + x.tag + '] ' : '') + (x.why || ''),
       quick: x.quick,
+      regeneratable: typeof x.regeneratable === 'boolean' ? x.regeneratable : undefined,
       calc: x.calc,
       needs_paper: x.needs_paper
     };
@@ -1352,17 +1355,23 @@ function parseBank(x) {
   subs.forEach((su, i) => {
     const name = canonSubj(su.subject || 'Subject ' + (i + 1));
     (Array.isArray(su.questions) ? su.questions : []).forEach(q => {
-      if (!q || !q.question || seen.has(q.question)) return;
+      if (!q || !q.question) return;
+      const questionKey = q.id == null ? name + '|' + q.question : String(su.subject_code || name) + '|' + q.id;
+      if (seen.has(questionKey)) return;
       const o = q.options || {}, opts = ['A', 'B', 'C', 'D'].map(k => o[k]), an = 'ABCD'.indexOf(String(q.answer == null ? '' : q.answer).trim().toUpperCase());
       if (opts.some(v => v == null || v === '') || an < 0) { skip++; return; }
-      seen.add(q.question);
+      seen.add(questionKey);
+      const subjectCode = su.subject_code || '';
       const item = {
-        id: q.id, s: name, u: su.subject_code || '', t: (q.tag || ''),
+        id: q.id, _sid: q.id == null ? undefined : `id:${subjectCode || name}:${q.id}`,
+        s: name, u: subjectCode, t: (q.tag || ''),
         q: String(q.question),
         code: q.code ? (Array.isArray(q.code) ? q.code : String(q.code).split('\n')) : [],
         o: opts.map(String), a: an,
         e: q.why || q.explanation || q.reason || '',
-        quick: q.quick, calc: q.calc, needs_paper: q.needs_paper
+        quick: q.quick,
+        regeneratable: typeof q.regeneratable === 'boolean' ? q.regeneratable : undefined,
+        calc: q.calc, needs_paper: q.needs_paper
       };
       item.quick = isQuickQuestion(item);
       qs.push(item);
@@ -1919,6 +1928,8 @@ function home() {
           <button class="${B ? 'p' : ''}" onclick="impMode=1;home()">② Question bank import</button>
         </div>
         <p>${B ? 'Add a whole <b>question bank</b> JSON. It is auto-split into balanced sets of ~65 questions across every subject.' : 'Load your practice file or click below to launch the built-in 80-question practice set.'}</p>
+        ${defaultBankLoading ? '<p class="mu">Loading the default question bank…</p>' : ''}
+        ${defaultBankLoadError ? `<p class="c-no">${esc(defaultBankLoadError)}</p>` : ''}
         ${!B ? `<p><button class="p" onclick="$('#t').value=LV1;doLoad()">📘 Add built-in set: Level 1 (80 Q, trap-dense)</button> <button onclick="tpl()">{ } JSON template</button></p>` : ''}
         <input type="file" id="f" accept=".txt,.md,.json,text/plain,text/markdown,application/json">
         <p class="mu">or paste the content below:</p>
@@ -2573,7 +2584,9 @@ async function triggerBackgroundVariantUpgrades(sessionKeys) {
     if (!q || seenKeys.has(qk(q))) return;
     
     // Safety Rule 1: ONLY rewrite calculation, code, or trace items. Factual items are NEVER rewritten.
-    const isCalcOrTrace = !effQuick(q) || (q.code && q.code.length > 0) || (q.t && /[CTP]/i.test(q.t));
+    const isCalcOrTrace = typeof q.regeneratable === 'boolean'
+      ? q.regeneratable
+      : (!effQuick(q) || (q.code && q.code.length > 0) || (q.t && /[CTP]/i.test(q.t)));
     if (!isCalcOrTrace) return;
 
     const lastAttempt = [...L].reverse().find(l => l.k === qk(q));
@@ -2940,8 +2953,8 @@ function doLoad() {
     const bank = !!x && !Array.isArray(x) && Array.isArray(x.subjects);
     if (impMode === 1 && !bank) throw new Error('Not a question-bank file. Expected JSON shaped like {"subjects":[...]}.');
     if (bank) {
-      const r = parseBank(x), id = BANKS.reduce((n, b) => Math.max(n, b.id), 0) + 1;
-      BANKS.push({ id, name: x.name || x.title || `Question bank ${id}`, q: r.qs, sets: genSets(r.qs) });
+      const imported = importBank(x);
+      const id = imported.id;
       loadMode = 0; impMode = 0;
       if (!D) loadSet(id, 0); else { save(); home(); }
       return;
@@ -2954,6 +2967,87 @@ function doLoad() {
   } catch (e) {
     $('#err').textContent = e.message;
   }
+}
+
+function bankQuestionKey(q) {
+  return q && q.id != null ? `${q.u || q.s}|${q.id}` : `${q.u || q.s}|${q.q}|${(q.o || []).join('|')}`;
+}
+
+function importBank(x, defaultName) {
+  const r = parseBank(x);
+  const requestedName = x.name || x.title || defaultName || '';
+  let bank = requestedName
+    ? BANKS.find(item => String(item.name || '').trim().toLowerCase() === String(requestedName).trim().toLowerCase())
+    : null;
+  if (!bank) {
+    const incomingKeys = new Set(r.qs.map(bankQuestionKey));
+    const minimumOverlap = Math.max(1, Math.min(5, Math.ceil(r.qs.length * 0.1)));
+    bank = BANKS.find(item => {
+      let overlap = 0;
+      item.q.forEach(q => { if (incomingKeys.has(bankQuestionKey(q))) overlap++; });
+      return overlap >= minimumOverlap;
+    }) || null;
+  }
+  const name = requestedName || (bank && bank.name) || `Question bank ${BANKS.length + 1}`;
+  if (!bank) {
+    const id = BANKS.reduce((n, item) => Math.max(n, item.id), 0) + 1;
+    bank = { id, name, q: [], sets: [] };
+    BANKS.push(bank);
+  }
+
+  const byKey = new Map(bank.q.map((q, index) => [bankQuestionKey(q), index]));
+  r.qs.forEach(q => {
+    const key = bankQuestionKey(q);
+    const existingIndex = byKey.get(key);
+    if (existingIndex === undefined) {
+      byKey.set(key, bank.q.length);
+      bank.q.push(q);
+    } else {
+      const stableId = bank.q[existingIndex]._sid || q._sid;
+      bank.q[existingIndex] = { ...q, ...(stableId ? { _sid: stableId } : {}) };
+    }
+  });
+  bank.name = name;
+  bank.sets = genSets(bank.q);
+
+  if (SETBANK === bank.id && SETI >= 0 && D && view !== 'q') {
+    const progress = new Map(D.map(q => [bankQuestionKey(q), { status: R[q.n], confidence: W[q.n] }]));
+    const nextR = {}, nextW = {};
+    D = (bank.sets[SETI] || []).map((ix, index) => {
+      const q = { n: index + 1, ...bank.q[ix] };
+      const saved = progress.get(bankQuestionKey(q));
+      if (saved && saved.status) nextR[q.n] = saved.status;
+      if (saved && saved.confidence != null) nextW[q.n] = saved.confidence;
+      return q;
+    });
+    R = nextR; W = nextW; Q = []; QRESULTS = []; P = 0;
+  }
+  return bank;
+}
+
+function loadDefaultBank() {
+  defaultBankLoading = true;
+  defaultBankLoadError = '';
+  if (!D && !loadMode) home();
+  fetch('./question_bank.json').then(response => {
+    if (!response.ok) throw new Error(`Question bank request failed (${response.status}).`);
+    return response.json();
+  }).then(data => {
+    const bank = importBank(data, 'Question bank');
+    if (!D && !loadMode) loadSet(bank.id, 0);
+    else {
+      if (SETBANK == null) { SETBANK = bank.id; SETI = -1; }
+      save();
+      home();
+    }
+  }).catch(error => {
+    console.error('Default question bank failed to load:', error);
+    defaultBankLoadError = `Could not load the default question bank: ${error.message}`;
+    home();
+  }).then(() => {
+    defaultBankLoading = false;
+    if (!D) home();
+  });
 }
 
 function loadSet(bankId, k, startFresh = false) {
@@ -3065,27 +3159,36 @@ function saveFile(name, text, mime) {
 function backup() {
   lastBackup = Date.now();
   save();
-  const data = JSON.stringify({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins });
+  const data = JSON.stringify({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst });
   saveFile('bitmcq-progress-backup.json', data, 'application/json');
   home();
 }
 
 function restore(f) {
-  if (!f || !confirm('Restore backup? This replaces current progress.')) return;
+  if (!f || !confirm('Merge this backup with progress on this device? Both devices’ study history will be kept; the imported bank version and active set will take precedence.')) return;
   const r = new FileReader();
   r.onload = () => {
     try {
       const parsed = JSON.parse(r.result);
-      const x = (parsed && parsed.appState && typeof parsed.appState === 'object') ? parsed.appState : parsed;
-      D = x.D || null; R = x.R || {}; W = x.W || {}; Q = x.Q || []; QRESULTS = Array.isArray(x.QRESULTS) ? x.QRESULTS : []; P = x.P || 0;
-      S = x.S || 1; A = x.A || []; L = x.L || []; V = x.V || {};
-      lastFreshSetDay = Number.isInteger(x.lastFreshSetDay) ? x.lastFreshSetDay : null;
-      EXAM_DATE = x.EXAM_DATE || ''; lastBackup = x.lastBackup || Date.now();
-      gemVars = Array.isArray(x.gemVars) ? x.gemVars : [];
-      restoreBanks(x);
-      loadMode = 0; save(); home();
+      if (!window.DriveSync || !DriveSync._validateBackup || !DriveSync._mergeAppStates) {
+        throw new Error('Backup merge support is unavailable in this app version.');
+      }
+      const x = DriveSync._validateBackup(parsed).appState;
+      const local = AppState.get();
+      local.A = (local.A || []).slice();
+      if (local.D && local.D.length && Object.keys(local.R || {}).length) {
+        local.A.push(compact());
+        local.S = local.A.length + 1;
+      }
+      const merged = DriveSync._mergeAppStates(local, x, genSets, {
+        preferRemoteActive: true,
+        preferRemoteQuestions: true
+      });
+      loadMode = 0;
+      AppState.apply(merged.appState);
     } catch (e) {
-      alert('Invalid backup file.');
+      console.error('Backup merge failed:', e);
+      alert(`Could not merge backup: ${e.message}`);
     }
   };
   r.readAsText(f);
@@ -3155,7 +3258,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst }),
   apply: (s) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const prevP = P;
@@ -3172,6 +3275,7 @@ window.AppState = {
     gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
     todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
     QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
+    recallFirst = s.recallFirst !== false;
     save();
     if (window.DriveSync) DriveSync.refreshUI();
     if (wasQ) {
@@ -3192,6 +3296,7 @@ window.AppState = {
 load();
 home();
 if (window.DriveSync) DriveSync.init();
+loadDefaultBank();
 const mathJaxScript = document.createElement('script');
 mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js';
 mathJaxScript.async = true;

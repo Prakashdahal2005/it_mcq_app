@@ -1,9 +1,11 @@
-var CACHE_NAME = 'bitmcq-v14';
+var CACHE_NAME = 'bitmcq-v16';
 var STATIC_ASSETS = [
   './',
   './index.html',
   './drive-sync.js',
+  './question_bank.json',
   './manifest.json',
+  './pwa-icon.png',
   './favicon.png'
 ];
 
