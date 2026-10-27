@@ -154,7 +154,7 @@
   }
   function contentHash(q) {
     if (!q || typeof q !== 'object') return hashStr('null');
-    return hashStr(JSON.stringify([q.u || q.s || '', q.q || '', q.code || [], q.o || [], q.a, q.e || '', q.quick, q.regeneratable]));
+    return hashStr(JSON.stringify([q.u || q.s || '', q.q || '', q.code || [], q.o || [], q.a, q.e || '', q.quick, q.regeneratable, q.level]));
   }
   function questionIdentity(q) {
     if (q && q.id != null && String(q.id).trim() !== '') {

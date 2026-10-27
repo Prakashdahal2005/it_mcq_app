@@ -1337,6 +1337,7 @@ function parseJson(a) {
       e: (x.tag ? '[' + x.tag + '] ' : '') + (x.why || ''),
       quick: x.quick,
       regeneratable: typeof x.regeneratable === 'boolean' ? x.regeneratable : undefined,
+      level: Number.isInteger(x.level) && x.level >= 0 && x.level <= 3 ? x.level : undefined,
       calc: x.calc,
       needs_paper: x.needs_paper
     };
@@ -1371,6 +1372,7 @@ function parseBank(x) {
         e: q.why || q.explanation || q.reason || '',
         quick: q.quick,
         regeneratable: typeof q.regeneratable === 'boolean' ? q.regeneratable : undefined,
+        level: Number.isInteger(q.level) && q.level >= 0 && q.level <= 3 ? q.level : undefined,
         calc: q.calc, needs_paper: q.needs_paper
       };
       item.quick = isQuickQuestion(item);
@@ -1384,7 +1386,9 @@ function parseBank(x) {
 function genSets(qs) {
   const b = {};
   qs.forEach((q, i) => (b[q.s] = b[q.s] || []).push(i));
-  const g = Object.values(b), tot = qs.length, nc = Math.max(1, Math.round(tot / 65)), base = Math.floor(tot / nc);
+  const g = Object.values(b);
+  g.forEach(indices => indices.sort((a, b) => (qs[a].level ?? 1) - (qs[b].level ?? 1)));
+  const tot = qs.length, nc = Math.max(1, Math.round(tot / 65)), base = Math.floor(tot / nc);
   const sizes = Array.from({ length: nc }, () => base);
   for (let i = 0; i < tot - nc * base; i++) sizes[i]++;
   const out = [];
@@ -2244,6 +2248,7 @@ function show() {
   const hasVariant = !!rawQ._variant;
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
+  const levelLabel = ['L0 · Core', 'L1 · Standard', 'L2 · Exact', 'L3 · Advanced'][rawQ.level];
 
   let pauseBtn = '';
   if (MK) {
@@ -2258,6 +2263,7 @@ function show() {
           ${MK ? '<span class="chip" id="tm"></span><span class="chip c-no" id="unans-chip"></span>' : stats()}
           ${pauseBtn}
           <span class="chip mu">${isQuick ? '⚡ Quick (No-pen)' : '📝 Pen &amp; Paper'}</span>
+          ${levelLabel ? `<span class="chip" title="Question priority level">${levelLabel}</span>` : ''}
           <button class="sm" style="padding:2px 8px;font-size:11px" onclick="setQuick(${rawQ.n}, ${isQuick ? 'false' : 'true'})">${isQuick ? 'Mark as Pen & Paper' : 'Mark as Quick'}</button>
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Verified Variant (Original Safe)</span>' : ''}
         </div>
@@ -2973,7 +2979,7 @@ function bankQuestionKey(q) {
   return q && q.id != null ? `${q.u || q.s}|${q.id}` : `${q.u || q.s}|${q.q}|${(q.o || []).join('|')}`;
 }
 
-function importBank(x, defaultName) {
+function importBank(x, defaultName, replaceExisting = false) {
   const r = parseBank(x);
   const requestedName = x.name || x.title || defaultName || '';
   let bank = requestedName
@@ -2995,18 +3001,22 @@ function importBank(x, defaultName) {
     BANKS.push(bank);
   }
 
-  const byKey = new Map(bank.q.map((q, index) => [bankQuestionKey(q), index]));
-  r.qs.forEach(q => {
-    const key = bankQuestionKey(q);
-    const existingIndex = byKey.get(key);
-    if (existingIndex === undefined) {
-      byKey.set(key, bank.q.length);
-      bank.q.push(q);
-    } else {
-      const stableId = bank.q[existingIndex]._sid || q._sid;
-      bank.q[existingIndex] = { ...q, ...(stableId ? { _sid: stableId } : {}) };
-    }
-  });
+  if (replaceExisting) {
+    bank.q = r.qs;
+  } else {
+    const byKey = new Map(bank.q.map((q, index) => [bankQuestionKey(q), index]));
+    r.qs.forEach(q => {
+      const key = bankQuestionKey(q);
+      const existingIndex = byKey.get(key);
+      if (existingIndex === undefined) {
+        byKey.set(key, bank.q.length);
+        bank.q.push(q);
+      } else {
+        const stableId = bank.q[existingIndex]._sid || q._sid;
+        bank.q[existingIndex] = { ...q, ...(stableId ? { _sid: stableId } : {}) };
+      }
+    });
+  }
   bank.name = name;
   bank.sets = genSets(bank.q);
 
@@ -3033,7 +3043,7 @@ function loadDefaultBank() {
     if (!response.ok) throw new Error(`Question bank request failed (${response.status}).`);
     return response.json();
   }).then(data => {
-    const bank = importBank(data, 'Question bank');
+    const bank = importBank(data, 'Question bank', true);
     if (!D && !loadMode) loadSet(bank.id, 0);
     else {
       if (SETBANK == null) { SETBANK = bank.id; SETI = -1; }
@@ -3089,7 +3099,7 @@ function compact() {
     ...(SETBANK !== null && SETI >= 0 ? { bankId: SETBANK, bi: SETI } : {}),
     errs: D.filter(q => R[q.n] === 'w' || R[q.n] === 's').map(q => ({
       n: q.n, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e, p: W[q.n] ?? -1, r: R[q.n], fx: 0,
-      quick: effQuick(q), _orig: q._orig
+      quick: effQuick(q), level: q.level, _orig: q._orig
     }))
   };
 }
