@@ -1,6 +1,6 @@
 {
-  "name": "BIT MCQ Trainer",
-  "short_name": "BIT MCQ",
+  "name": "Recall",
+  "short_name": "Recall",
   "description": "Evidence-based MCQ trainer with spaced repetition and Google Drive backup.",
   "id": "./",
   "start_url": "./",

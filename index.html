@@ -8,12 +8,12 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="pwa-icon.png">
 <meta name="theme-color" content="#3b5bdb">
-<meta name="application-name" content="BIT MCQ">
+<meta name="application-name" content="Recall">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="BIT MCQ">
-<title>BIT MCQ Trainer — Evidence-Based Learning</title>
+<meta name="apple-mobile-web-app-title" content="Recall">
+<title>Recall — Evidence-Based Learning</title>
 <style>
 :root {
   --bg: #f8f9fa;
@@ -1921,7 +1921,7 @@ function home() {
   if (!D || loadMode) {
     const B = impMode === 1;
     $('#app').innerHTML = `
-      <h1>🧠 BIT MCQ Trainer</h1>
+      <h1>🧠 Recall</h1>
       <div class="card">
         <div class="row" style="margin-bottom:12px">
           <button class="${B ? '' : 'p'}" onclick="impMode=0;home()">① Set import</button>
@@ -1969,7 +1969,7 @@ function home() {
   $('#app').innerHTML = `
     ${renderBackupNudge()}
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
-      <h1>🧠 BIT MCQ Trainer</h1>
+      <h1>🧠 Recall</h1>
       <div class="row">
         <span class="chip interactive" onclick="editExamDate()" title="Click to adjust exam date">
           🎯 Exam in <b>${daysLeft} days</b> (cap: ${maxCap}d) ✎
@@ -3212,7 +3212,7 @@ function exportLog(copy) {
   const m = $('#xm');
   const wr = D.filter(q => R[q.n] === 'w');
   const sk = D.filter(q => R[q.n] === 's');
-  let text = `# BIT MCQ Error Log - ${new Date().toISOString().slice(0, 10)}\n\n`;
+  let text = `# Recall Error Log - ${new Date().toISOString().slice(0, 10)}\n\n`;
   if (scope !== 's') {
     text += `## Mistakes (${wr.length})\n\n`;
     wr.forEach(q => {
