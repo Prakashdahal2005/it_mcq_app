@@ -2881,20 +2881,36 @@ function getCurrentMilestone() {
     .map(([k, o]) => {
       const tot = o.c + o.w + o.k;
       const acc = tot ? o.c / tot : 0;
-      const isCalibrated = tot >= 5;
-      return { k, tot, c: o.c, acc, isCalibrated };
+      // Evaluate subjects even from diagnostic mock sets (2+ attempts)
+      const isWeak = tot >= 2 && acc <= 0.40;
+      const isBorderline = tot >= 2 && acc > 0.40 && acc < 0.75;
+      return { k, tot, c: o.c, acc, isWeak, isBorderline };
     });
-  const redSubjs = rows.filter(r => r.isCalibrated && r.acc <= 0.40);
-  const amberSubjs = rows.filter(r => r.isCalibrated && r.acc > 0.40 && r.acc < 0.80);
+
+  const redSubjs = rows.filter(r => r.isWeak);
+  const amberSubjs = rows.filter(r => r.isBorderline);
   const redIncomplete = redSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 2));
   const amberIncomplete = amberSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 1));
   if (redIncomplete.length > 0 || amberIncomplete.length > 0) {
-    const remaining = redIncomplete.length + amberIncomplete.length;
-    return { id: 2, tag: 'M2', title: 'Targeted Fix Days', desc: `Reinforce weak subjects across multiple calendar days (${remaining} subject(s) pending).`, done: false };
+    const pendingNames = [...redIncomplete, ...amberIncomplete].map(s => s.k);
+    const count = pendingNames.length;
+    const sample = pendingNames.slice(0, 2).join(', ') + (count > 2 ? ` +${count - 2} more` : '');
+    return { id: 2, tag: 'M2', title: 'Targeted Fix Days', desc: `Reinforce weak subjects across calendar days (${count} pending: ${sample}).`, done: false };
   }
 
-  const mockAttempts = L.filter(r => r.mock === 1);
-  if (mockAttempts.length < 50) {
+  // Count distinct completed mock sessions
+  const mockAttempts = (L || []).filter(r => r.mock === 1);
+  const mockSessions = [];
+  mockAttempts.forEach(r => {
+    const lastSession = mockSessions[mockSessions.length - 1];
+    if (!lastSession || Math.abs((r.t || 0) - lastSession.t) > 2 * 3600 * 1000) {
+      mockSessions.push({ t: r.t || 0, count: 1 });
+    } else {
+      lastSession.count++;
+    }
+  });
+
+  if (mockSessions.length < 2) {
     return { id: 3, tag: 'M3', title: 'First Full Mock', desc: 'Complete and review your first 100-question timed mock exam.', done: false };
   }
 
@@ -2903,15 +2919,19 @@ function getCurrentMilestone() {
   }
 
   if (PB_MOCK_SCORE < 70) {
-    return { id: 5, tag: 'M5', title: '70% Threshold', desc: 'Attain 70%+ on a timed mock exam.', done: false };
+    return { id: 5, tag: 'M5', title: '70% Threshold', desc: 'Attain 70%+ on a timed mock exam to lock in your entrance qualification buffer.', done: false };
   }
 
   const days = getDaysLeft();
   if (days > 2) {
-    return { id: 6, tag: 'M6', title: 'Final 48h Rehearsal', desc: 'Comprehensive timed practice to polish recall before the exam.', done: false };
+    return { id: 6, tag: 'M6', title: 'Retention & Spaced Mastery', desc: `Maintain your ≥75% retention edge across the remaining ${days} days with daily spaced retrieval and variants.`, done: false };
   }
 
-  return { id: 7, tag: 'M7', title: 'Exam Day Ready', desc: 'All milestone targets achieved. Trust your recall and stay calm!', done: true };
+  if (days === 2) {
+    return { id: 6, tag: 'M6', title: 'Final 48h Rehearsal', desc: 'Final 48-hour countdown: Low-stress consolidation, memory anchors, and calm formula review.', done: false };
+  }
+
+  return { id: 7, tag: 'M7', title: 'Exam Day Ready', desc: 'All milestone targets achieved. Trust your recall, stay calm, and execute!', done: true };
 }
 
 function recordFixDay(subject) {
