@@ -2875,7 +2875,15 @@ function getCurrentMilestone() {
     return { id: 1, tag: 'M1', title: 'Day-1 Diagnostic Mock', desc: 'Complete a full timed mock exam with confidence tags to establish your baseline.', done: false };
   }
 
-  const rows = agg();
+  const subjData = agg();
+  const rows = Object.entries(subjData)
+    .filter(([k, o]) => (o.c + o.w + o.k) > 0)
+    .map(([k, o]) => {
+      const tot = o.c + o.w + o.k;
+      const acc = tot ? o.c / tot : 0;
+      const isCalibrated = tot >= 5;
+      return { k, tot, c: o.c, acc, isCalibrated };
+    });
   const redSubjs = rows.filter(r => r.isCalibrated && r.acc <= 0.40);
   const amberSubjs = rows.filter(r => r.isCalibrated && r.acc > 0.40 && r.acc < 0.80);
   const redIncomplete = redSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 2));
