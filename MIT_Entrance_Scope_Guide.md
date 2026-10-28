@@ -268,7 +268,7 @@ Tags: **[M]** meta-analysis, **[S]** single study, **[D]** design judgment. Deta
 
 # Part II: Active Recall Web & Confusion Traps (A ≠ B)
 
-# MIT Entrance Recall Web (BIT Syllabus)
+# MIT Entrance Recall Web
 
 Oct 13, 2026 · @prakash
 

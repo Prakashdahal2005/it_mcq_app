@@ -4759,7 +4759,7 @@ function renderMockPalette() {
     <div class="card mock-palette-card" style="margin-top:14px">
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
         <b>Question Palette</b>
-        <span class="mu sm">TU BIT Entrance</span>
+        <span class="mu sm">TU MIT Entrance</span>
       </div>
       <div class="mock-palette">
         ${Q.map((k, idx) => {
@@ -4792,7 +4792,7 @@ function jumpMock(idx) {
 function confirmSubmitMock() {
   const unans = Q.filter(n => MK.a[byN(n).n] === undefined).length;
   if (unans > 0) {
-    if (!confirm(`⚠️ You have ${unans} unanswered question(s)!\n\nThe TU BIT exam has NO negative marking — a blank answer guarantees a 0.\n\nAre you sure you want to submit now?`)) {
+    if (!confirm(`⚠️ You have ${unans} unanswered question(s)!\n\nUnanswered questions earn 0 marks. The MIT exam's negative-marking rule is unconfirmed.\n\nAre you sure you want to submit now?`)) {
       return;
     }
   }
@@ -5212,7 +5212,7 @@ function exportLog(copy) {
     });
   }
   if (!copy) {
-    saveFile(`bit-mcq-errors.${isMd ? 'md' : 'txt'}`, text, isMd ? 'text/markdown' : 'text/plain');
+    saveFile(`mit-mcq-errors.${isMd ? 'md' : 'txt'}`, text, isMd ? 'text/markdown' : 'text/plain');
     m.textContent = 'Downloaded error log.';
   } else {
     navigator.clipboard.writeText(text).then(() => m.textContent = 'Copied to clipboard.');
