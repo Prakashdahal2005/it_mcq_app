@@ -1,4 +1,4 @@
-var CACHE_NAME = 'bitmcq-v21';
+var CACHE_NAME = 'bitmcq-v22';
 var STATIC_ASSETS = [
   './',
   './index.html',
@@ -35,36 +35,20 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).then(function (response) {
-        if (response && response.ok) {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function (cache) { cache.put('./index.html', clone); });
-          return response;
-        }
-        return caches.match('./index.html').then(function (cached) { return cached || response; });
-      }).catch(function () {
-        return caches.match('./index.html').then(function (cached) {
-          return cached || new Response('Offline — please reconnect', { status: 503 });
-        });
-      })
-    );
-    return;
-  }
-
+  // Network-first for everything: serve fresh from server when online,
+  // fall back to cache only when offline. This means PWA always gets
+  // the latest index.html and assets without needing a sw.js version bump.
   event.respondWith(
-    caches.match(request).then(function (cached) {
-      var network = fetch(request).then(function (response) {
-        if (response && response.ok) {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function (cache) { cache.put(request, clone); });
-        }
-        return response;
-      }).catch(function () {
-        return cached;
+    fetch(request).then(function (response) {
+      if (response && response.ok) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function (cache) { cache.put(request, clone); });
+      }
+      return response;
+    }).catch(function () {
+      return caches.match(request).then(function (cached) {
+        return cached || new Response('Offline — please reconnect', { status: 503 });
       });
-      return cached || network;
     })
   );
 });

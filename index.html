@@ -5223,7 +5223,10 @@ function exportLog(copy) {
 function openSettings() {
   const dailyCount = getDailyApiCount();
   $('#app').innerHTML = `
-    <h1>⚙ Settings</h1>
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h1 style="margin:0">⚙ Settings</h1>
+      <button onclick="home()">← Dashboard</button>
+    </div>
     <div class="card">
       <label class="mu">Target Exam Date (used only to silently cap review intervals so all items are seen before exam)</label>
       <input type="date" id="ed" value="${EXAM_DATE || ''}" style="margin-top:6px;width:100%">
