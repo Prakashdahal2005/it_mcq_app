@@ -325,6 +325,35 @@
       base.d = Math.max(x.d || 0, y.d || 0);
       base.missCount = Math.max(x.missCount || 0, y.missCount || 0);
       if (x.confWrongRetest || y.confWrongRetest) base.confWrongRetest = Math.max(x.confWrongRetest || 0, y.confWrongRetest || 0);
+
+      // FSRS fields: stab, diff, lapses
+      if (x.stab != null || y.stab != null) {
+        var xLatest = (x.history && x.history.length) ? x.history[x.history.length - 1].t : 0;
+        var yLatest = (y.history && y.history.length) ? y.history[y.history.length - 1].t : 0;
+        var useX = xLatest >= yLatest;
+        base.stab = (useX ? (x.stab != null ? x.stab : y.stab) : (y.stab != null ? y.stab : x.stab));
+        base.diff = (useX ? (x.diff != null ? x.diff : y.diff) : (y.diff != null ? y.diff : x.diff));
+        base.lapses = Math.max(x.lapses || 0, y.lapses || 0);
+      }
+
+      // Memory anchors and variants
+      base.mnemonic = x.mnemonic || y.mnemonic || '';
+      if (x._variant || y._variant) {
+        var xDate = (x._variant && x._variant.date) || 0;
+        var yDate = (y._variant && y._variant.date) || 0;
+        base._variant = xDate >= yDate ? (x._variant || y._variant) : (y._variant || x._variant);
+        base._useOriginal = (xDate >= yDate ? x._useOriginal : y._useOriginal);
+      }
+      if (x._pastValues || y._pastValues) {
+        var pvCombined = (x._pastValues || []).concat(y._pastValues || []);
+        var pvSeen = {}, pvList = [];
+        pvCombined.forEach(function (v) {
+          var sk = typeof v === 'object' ? JSON.stringify(v) : String(v);
+          if (!pvSeen[sk]) { pvSeen[sk] = 1; pvList.push(v); }
+        });
+        base._pastValues = pvList.slice(-5);
+      }
+
       var seen = {}, hist = [];
       (x.history || []).concat(y.history || []).forEach(function (h) {
         var key = h && (h.t + '|' + (h.ok ? 1 : 0) + '|' + (h.cf == null ? '' : h.cf));
@@ -472,7 +501,14 @@
         : (local.todayMins || remote.todayMins || 15),
       lastFreshSetDay: active.lastFreshSetDay == null ? null : active.lastFreshSetDay,
       QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
-      recallFirst: active.recallFirst !== false
+      recallFirst: active.recallFirst !== false,
+      CARDS: mergeJsonList(local.CARDS, remote.CARDS),
+      RESOURCE_MARKS: Object.assign({}, local.RESOURCE_MARKS || {}, remote.RESOURCE_MARKS || {}),
+      FIX_DAYS: Object.assign({}, local.FIX_DAYS || {}, remote.FIX_DAYS || {}),
+      DIAGNOSTIC_DONE: !!(local.DIAGNOSTIC_DONE || remote.DIAGNOSTIC_DONE),
+      QUIET_MODE: local.QUIET_MODE !== undefined ? !!local.QUIET_MODE : !!remote.QUIET_MODE,
+      PB_MOCK_SCORE: Math.max(local.PB_MOCK_SCORE || 0, remote.PB_MOCK_SCORE || 0),
+      schemaVer: Math.max(local.schemaVer || 1, remote.schemaVer || 1)
     };
     return { appState: merged, conflicts: conflicts };
   }

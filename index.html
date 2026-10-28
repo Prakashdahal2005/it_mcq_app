@@ -18,9 +18,9 @@
 :root {
   --bg: #f8f9fa;
   --card: #ffffff;
-  --tx: #1f2937;
-  --mu: #6b7280;
-  --bd: #e5e7eb;
+  --tx: #0f172a;
+  --mu: #64748b;
+  --bd: #e2e8f0;
   --ac: #3b5bdb;
   --ac-hover: #364fc7;
   --ac-bg: #edf2ff;
@@ -33,21 +33,22 @@
   --sk: #d97706;
   --skb: #fffbeb;
   --sk-bd: #fde68a;
-  --code: #f3f4f6;
+  --code: #f1f5f9;
+  --font-scale: 1;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #111827;
-    --card: #1f2937;
-    --tx: #f9fafb;
-    --mu: #9ca3af;
-    --bd: #374151;
+    --bg: #0b0f19;
+    --card: #151d2e;
+    --tx: #f8fafc;
+    --mu: #94a3b8;
+    --bd: #243049;
     --ac: #60a5fa;
     --ac-hover: #93c5fd;
-    --ac-bg: #1e293b;
+    --ac-bg: #19243b;
     --ok: #22c55e;
     --okb: #052e16;
     --ok-bd: #166534;
@@ -61,14 +62,14 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #111827;
-  --card: #1f2937;
-  --tx: #f9fafb;
-  --mu: #9ca3af;
-  --bd: #374151;
+  --bg: #0b0f19;
+  --card: #151d2e;
+  --tx: #f8fafc;
+  --mu: #94a3b8;
+  --bd: #243049;
   --ac: #60a5fa;
   --ac-hover: #93c5fd;
-  --ac-bg: #1e293b;
+  --ac-bg: #19243b;
   --ok: #22c55e;
   --okb: #052e16;
   --ok-bd: #166534;
@@ -86,28 +87,44 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--tx);
-  font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font: calc(16px * var(--font-scale, 1))/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-#app { max-width: 780px; margin: 0 auto; padding: 16px; }
-h1 { font-size: 22px; font-weight: 700; margin: 6px 0 14px; letter-spacing: -0.02em; }
-h2 { font-size: 17px; font-weight: 600; margin: 18px 0 10px; }
+:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+#app {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 16px;
+  transition: max-width 0.2s ease;
+}
+@media (min-width: 1000px) {
+  #app {
+    max-width: 1040px;
+    padding: 24px 20px;
+  }
+}
+h1 { font-size: 28px; font-weight: 700; margin: 8px 0 16px; letter-spacing: -0.03em; }
+h2 { font-size: 19px; font-weight: 600; margin: 18px 0 10px; letter-spacing: -0.015em; }
 .card {
   background: var(--card);
   border: 1px solid var(--bd);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: none;
 }
 .hero-card {
   background: var(--card);
-  border: 2px solid var(--ac);
+  border: 1.5px solid var(--ac);
   border-radius: 18px;
-  padding: 22px;
-  margin-bottom: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 8px 28px -6px rgba(59, 91, 219, 0.12);
 }
 .hero-card::before {
   content: "";
@@ -115,16 +132,18 @@ h2 { font-size: 17px; font-weight: 600; margin: 18px 0 10px; }
   top: 0; left: 0; right: 0; height: 4px;
   background: var(--ac);
 }
-.mu { color: var(--mu); font-size: 14px; }
+.mu { color: var(--mu); font-size: 13.5px; }
 .sm { font-size: 13px; padding: 5px 11px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .top {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
-  background: var(--bg);
-  padding: 8px 0;
-  z-index: 10;
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 0;
+  z-index: 20;
+  border-bottom: 1px solid color-mix(in srgb, var(--bd) 70%, transparent);
 }
 .bar { height: 6px; background: var(--bd); border-radius: 9px; overflow: hidden; margin-top: 8px; }
 .bar i { display: block; height: 100%; background: var(--ac); transition: width .3s ease; }
@@ -175,25 +194,104 @@ button.big-btn {
 }
 button:disabled { opacity: .45; cursor: default; }
 
+/* Option Cards & Key Badges */
 .opt {
   display: flex;
   gap: 12px;
   width: 100%;
+  max-width: 720px;
   text-align: left;
   margin: 10px 0;
-  padding: 14px 16px;
-  align-items: flex-start;
+  padding: 14px 18px;
+  align-items: center;
   border-radius: 12px;
   border: 1px solid var(--bd);
   background: var(--card);
-  font-size: 15.5px;
+  font-size: 16px;
   line-height: 1.45;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.opt b { min-width: 24px; color: var(--mu); font-weight: 700; }
-.opt:hover:not(:disabled) { border-color: var(--ac); background: var(--ac-bg); }
-.opt.ok { background: var(--okb) !important; border-color: var(--ok) !important; color: var(--ok); font-weight: 600; }
+.opt:hover:not(:disabled) {
+  border-color: var(--ac);
+  background: var(--ac-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.opt:active:not(:disabled) {
+  transform: scale(0.995);
+}
+.opt.ok { background: var(--okb) !important; border-color: var(--ok) !important; color: var(--ok); font-weight: 600; animation: correctPulse 0.22s ease-out; }
+@keyframes correctPulse { 0% { transform: scale(1); } 50% { transform: scale(1.015); } 100% { transform: scale(1); } }
 .opt.no { background: var(--nob) !important; border-color: var(--no) !important; color: var(--no); }
+.opt.ans { border-color: var(--ac) !important; background: var(--ac-bg) !important; font-weight: 600; }
 .opt:disabled { opacity: 1; cursor: default; }
+.opt-text { flex: 1; }
+.kbd-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--bd);
+  background: var(--code);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tx);
+  flex-shrink: 0;
+}
+.kbd-badge.sm {
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+.opt.ok .kbd-badge {
+  background: var(--ok);
+  color: #fff;
+  border-color: var(--ok);
+}
+.opt.no .kbd-badge {
+  background: var(--no);
+  color: #fff;
+  border-color: var(--no);
+}
+.opt-state-icon {
+  font-weight: 700;
+  font-size: 13.5px;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding-left: 8px;
+}
+
+.subject-block-banner {
+  background: var(--ac-bg);
+  border: 1px solid var(--bd);
+  border-left: 4px solid var(--ac);
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin: 10px 0 12px;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cf-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--bd);
+  background: var(--card);
+  color: var(--tx);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.cf-btn:hover { border-color: var(--ac); background: var(--ac-bg); }
+.cf-btn.on { border-color: var(--ac) !important; background: var(--ac-bg) !important; font-weight: 700; color: var(--ac); }
 
 pre {
   background: var(--code);
@@ -205,7 +303,45 @@ pre {
   max-width: 100%;
   border: 1px solid var(--bd);
 }
-.q { font-size: 18px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; }
+.q { font-size: 20px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; }
+@media (min-width: 1000px) {
+  .q { font-size: 21px; }
+}
+
+/* Two-column Question View on Desktop */
+.study-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 920px) {
+  .study-layout {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .study-left-pane {
+    position: sticky;
+    top: 80px;
+  }
+}
+
+/* Mock Exam Desktop Sidebar */
+@media (min-width: 980px) {
+  .mock-desktop-grid {
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    gap: 20px;
+    align-items: start;
+  }
+  .mock-desktop-grid .mock-palette-card {
+    position: sticky;
+    top: 80px;
+    margin-top: 10px !important;
+  }
+}
+
 .exp {
   margin-top: 14px;
   padding: 14px 16px;
@@ -327,23 +463,272 @@ input[type=text] { width: 100%; font: inherit; color: var(--tx); background: var
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
   gap: 6px;
-  max-height: 180px;
+  max-height: 240px;
   overflow-y: auto;
   padding: 8px;
   border: 1px solid var(--bd);
   border-radius: 10px;
-  margin: 12px 0;
+  margin: 10px 0;
 }
 .mock-btn {
-  padding: 6px 0;
+  padding: 7px 0;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 6px;
   text-align: center;
+  border: 1px solid var(--bd);
+  background: var(--card);
+  color: var(--tx);
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
+.mock-btn:hover { border-color: var(--ac); }
 .mock-btn.ans { background: var(--okb); border-color: var(--ok); color: var(--ok); }
 .mock-btn.flg { background: var(--skb); border-color: var(--sk); color: var(--sk); }
-.mock-btn.cur { border: 2px solid var(--ac) !important; font-weight: 800; }
+.mock-btn.cur { outline: 2px solid var(--ac); outline-offset: 1px; font-weight: 800; }
+
+/* Memory Anchor / Mnemonic Chip */
+.anchor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #b45309;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  .anchor-chip { color: #fbbf24; }
+}
+
+/* Stuck Concept Rescue Ladder */
+.ladder-box {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.ladder-title { font-weight: 700; color: var(--no); margin-bottom: 4px; }
+
+/* Milestone Guidance Banner */
+.milestone-banner {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(147, 51, 234, 0.12));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.milestone-tag {
+  background: var(--ac);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Flashcard Review Interface */
+.fc-card {
+  perspective: 1000px;
+  min-height: 240px;
+  cursor: pointer;
+  margin: 16px 0;
+}
+.fc-inner {
+  border: 2px solid var(--bd);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 24px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.fc-inner:hover {
+  border-color: var(--ac);
+}
+.fc-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+.fc-back-content {
+  border-top: 1px solid var(--bd);
+  margin-top: 16px;
+  padding-top: 16px;
+  width: 100%;
+  text-align: left;
+}
+
+/* Session Recap Card */
+.recap-card {
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 16px 0;
+}
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.recap-item {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 12px 10px;
+  text-align: center;
+}
+.recap-val { font-size: 24px; font-weight: 800; }
+.recap-lbl { font-size: 11.5px; color: var(--mu); margin-top: 3px; font-weight: 600; }
+
+/* Circular Readiness Ring & Subject Grid */
+.readiness-container {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.readiness-ring-wrap {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  flex-shrink: 0;
+}
+.readiness-ring-wrap svg {
+  transform: rotate(-90deg);
+}
+.readiness-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.readiness-ring-val {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.readiness-ring-target {
+  font-size: 11px;
+  color: var(--mu);
+  font-weight: 600;
+}
+.subject-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.subject-card {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.subject-card:hover {
+  border-color: var(--ac);
+  background: var(--card);
+}
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.dot-green { background: var(--ok); }
+.dot-amber { background: var(--sk); }
+.dot-red { background: var(--no); }
+.dot-gray { background: var(--mu); }
+
+/* Curated Resource Suggestions */
+.res-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #065f46;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: dark) {
+  .res-pill { color: #34d399; }
+}
+
+/* Badges */
+.badge-unverified {
+  background: rgba(245, 158, 11, 0.2);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Micro-animations and Mobile Touch Targets */
+.fade-in {
+  animation: fadeIn 0.15s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+@media (max-width: 640px) {
+  .cf-btn, button.sm {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Quiet Mode */
+body.quiet-mode .hide-quiet { display: none !important; }
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -379,8 +764,20 @@ function clearMath(element) {
   }
 }
 
+// Schema Version & Pre-Migration Safety Snapshot
+const SCHEMA_VER = 2;
+try {
+  if (!localStorage.getItem('bitmcq_backup_pre_v2')) {
+    const rawPrev = localStorage.getItem('bitmcq1');
+    if (rawPrev) localStorage.setItem('bitmcq_backup_pre_v2', rawPrev);
+  }
+} catch (e) {
+  console.warn('Pre-v2 backup snapshot failed:', e);
+}
+
 // Core State
 let D = null, R = {}, W = {}, Q = [], QRESULTS = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
+let sessionHistory = [];
 let EXAM_DATE = '';
 let lastBackup = 0;
 let lastFreshSetDay = null;
@@ -389,7 +786,21 @@ let QOV = {};
 let gemLast = 0;
 let genInProgress = false;
 let GEM_KEY = localStorage.getItem('bitmcq_gem') || '';
-let GEM_MODEL = 'gemini-3.8-flash';
+// Gemini Models Configuration: gemini-3.8-flash is primary default; gemini-2.0-flash-lite is automatic fallback
+let storedGen = localStorage.getItem('bitmcq_gem_gen');
+let GEM_GEN_MODEL = (storedGen && storedGen !== 'gemini-2.0-flash-lite') ? storedGen : 'gemini-3.8-flash';
+let GEM_FALLBACK_MODEL = localStorage.getItem('bitmcq_gem_fallback') || 'gemini-2.0-flash-lite';
+let GEM_VERIFY_MODEL = localStorage.getItem('bitmcq_gem_verify') || 'gemini-3.8-flash';
+let GEM_MODEL = GEM_GEN_MODEL;
+let DAILY_API_LIMIT = parseInt(localStorage.getItem('bitmcq_daily_limit') || '150', 10);
+let CARDS = [];
+let RESOURCE_MARKS = {};
+let FIX_DAYS = {};
+let DIAGNOSTIC_DONE = false;
+let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
+let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+let ACTIVE_FC_INDEX = 0;
+let ACTIVE_FC_SHOW_BACK = false;
 let sessionLeechCount = 0;
 let recallWaiting = false;
 let recallFirst = true;
@@ -401,11 +812,32 @@ let showMoreMenu = false;
 let bgGenQueue = [];
 let bgGenStatusText = '';
 
+function getDailyApiCount() {
+  const dayKey = 'bitmcq_api_calls_' + new Date().toISOString().slice(0, 10);
+  return parseInt(localStorage.getItem(dayKey) || '0', 10);
+}
+
+function recordApiCall() {
+  const dayKey = 'bitmcq_api_calls_' + new Date().toISOString().slice(0, 10);
+  const cur = getDailyApiCount();
+  localStorage.setItem(dayKey, String(cur + 1));
+}
+
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
-      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst
+      schemaVer: SCHEMA_VER,
+      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst,
+      CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE
     }));
+    localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
+    localStorage.setItem('bitmcq_rmarks', JSON.stringify(RESOURCE_MARKS));
+    localStorage.setItem('bitmcq_fix_days', JSON.stringify(FIX_DAYS || {}));
+    localStorage.setItem('bitmcq_diag_done', DIAGNOSTIC_DONE ? '1' : '0');
+    localStorage.setItem('bitmcq_pb_mock', String(PB_MOCK_SCORE || 0));
+    localStorage.setItem('bitmcq_quiet', QUIET_MODE ? 'true' : 'false');
+    localStorage.setItem('bitmcq_session_hist', JSON.stringify(sessionHistory || []));
+    if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
   } catch (e) {
     console.error('Save failed:', e);
   }
@@ -440,6 +872,18 @@ function load() {
       todayMins = s.todayMins || 15;
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
       recallFirst = s.recallFirst !== false;
+      CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
+      RESOURCE_MARKS = (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : (JSON.parse(localStorage.getItem('bitmcq_rmarks') || '{}'));
+      FIX_DAYS = (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : (JSON.parse(localStorage.getItem('bitmcq_fix_days') || '{}'));
+      DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE || localStorage.getItem('bitmcq_diag_done') === '1';
+      QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
+      PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+      if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
+      try {
+        sessionHistory = JSON.parse(localStorage.getItem('bitmcq_session_hist') || '[]');
+      } catch (err) {
+        sessionHistory = [];
+      }
       restoreBanks(s);
       return true;
     }
@@ -1370,10 +1814,17 @@ function parseBank(x) {
         code: q.code ? (Array.isArray(q.code) ? q.code : String(q.code).split('\n')) : [],
         o: opts.map(String), a: an,
         e: q.why || q.explanation || q.reason || '',
-        quick: q.quick,
+        type: q.type || 'recall',
         regeneratable: typeof q.regeneratable === 'boolean' ? q.regeneratable : undefined,
-        level: Number.isInteger(q.level) && q.level >= 0 && q.level <= 3 ? q.level : undefined,
-        calc: q.calc, needs_paper: q.needs_paper
+        shuffle_safe: q.shuffle_safe !== false,
+        giveaway_risk: !!q.giveaway_risk,
+        unit: q.unit,
+        unit_name: q.unit_name || '',
+        unit_conf: q.unit_conf || '',
+        level: Number.isInteger(q.level) && q.level >= 0 && q.level <= 3 ? q.level : 1,
+        calc: q.type === 'calc' || !!q.calc,
+        needs_paper: q.type === 'calc' || q.type === 'trace' || !!q.needs_paper,
+        source: q.source || 'original'
       };
       item.quick = isQuickQuestion(item);
       qs.push(item);
@@ -1484,11 +1935,20 @@ function getDaysLeft() {
   return Math.max(1, Math.round((examMs - Date.now()) / 864e5));
 }
 
+const FSRS = {
+  target_r: 0.87, // 87% retention target
+  init_stab: { 1: 0.5, 2: 1.2, 3: 3.5, 4: 8.0 }
+};
+
 function getMaxInterval() {
+  if (!EXAM_DATE) return 45;
   const daysLeft = getDaysLeft();
-  if (daysLeft <= 2) return 1;
-  if (daysLeft <= 10) return 2;
-  return Math.max(1, Math.round(daysLeft * 0.22)); // Cap at 20-25% of days left
+  if (daysLeft <= 1) return 1;
+  // Guarantees every active card is seen at least once in the final 2 weeks before the exam
+  if (daysLeft <= 14) {
+    return Math.max(1, daysLeft - 1);
+  }
+  return Math.max(1, Math.min(daysLeft - 14, 45));
 }
 
 function isLockedIn(q) {
@@ -1511,61 +1971,116 @@ function isLockedIn(q) {
   return false;
 }
 
-function sr(q, ok) {
+function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
   const k = qk(q);
-  const v = V[k] || (V[k] = { b: 0, d: 0, f: 0, history: [], missCount: 0 });
+  const v = V[k] || (V[k] = { history: [], missCount: 0 });
   if (!Array.isArray(v.history)) v.history = [];
   if (!v.f) v.f = Date.now();
-  v.history.push({ t: Date.now(), ok });
 
-  if (!ok) {
-    v.b = 0;
+  // Grade 1: Wrong, Don't Know, OR Correct at Confidence 1 (lucky guess counts as a miss!)
+  // Grade 2: Correct at Confidence 2 (hesitant)
+  // Grade 3: Correct at Confidence 3 (>=15s)
+  // Grade 4: Correct at Confidence 3 in under 15 seconds (effortless recall)
+  let grade;
+  const isLuckyGuess = isCorrect && confidence === 1;
+  const effectiveOk = isCorrect && !isLuckyGuess;
+
+  if (!isCorrect || isLuckyGuess) {
+    grade = 1;
+  } else if (confidence === 2) {
+    grade = 2;
+  } else if (confidence === 3 && timeTakenMs < 15000) {
+    grade = 4;
+  } else {
+    grade = 3;
+  }
+
+  v.history.push({ t: Date.now(), ok: effectiveOk, cf: confidence, tm: Math.round(timeTakenMs / 1000) });
+
+  const isFirstReview = v.stab == null;
+  if (isFirstReview) {
+    // Bootstrap from old bucket if present, otherwise FSRS initial stability
+    if (v.b != null && v.b > 0) {
+      v.stab = [0.5, 1, 3, 7, 14][Math.min(v.b, 4)];
+    } else {
+      v.stab = FSRS.init_stab[grade] || 3.5;
+    }
+    v.diff = Math.max(1, Math.min(10, 5 - (grade - 3) * 0.4));
+  } else {
+    const elapsedDays = Math.max(0.1, today() - (v.d - Math.round(v.stab || 1)));
+    const retrievability = Math.exp(-elapsedDays / Math.max(0.5, v.stab));
+    v.diff = Math.max(1, Math.min(10, (v.diff || 5) - 0.18 * (grade - 3)));
+
+    if (grade === 1) {
+      v.lapses = (v.lapses || 0) + 1;
+      v.stab = Math.max(0.5, (v.stab || 2) * 0.2);
+    } else {
+      const bonus = grade === 4 ? 1.3 : 1.0;
+      v.stab = Math.max(1, (v.stab || 2) * (Math.exp(0.8 * (grade - 3)) * Math.pow(Math.max(0.1, retrievability), -0.3) + 1.2) * bonus);
+    }
+  }
+
+  if (grade === 1) {
     v.missCount = (v.missCount || 0) + 1;
-    v.d = today() + 1;
+    v.d = today() + 1; // Schedule for tomorrow
+    if (confidence === 3) {
+      v.confWrongRetest = Date.now(); // Top priority queue marker
+    }
+    // Track dates of misses for stuck-concept trigger (3 misses across >=2 days)
+    if (!Array.isArray(v.missDates)) v.missDates = [];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (!v.missDates.includes(todayStr)) v.missDates.push(todayStr);
     if (v.missCount >= 3) {
       v.leech = true;
     }
   } else {
     v.missCount = 0;
-    v.b = Math.min((v.b || 0) + 1, 4);
-    const ladder = [1, 3, 7, 14];
-    v.d = today() + Math.min(ladder[v.b - 1] || 1, getMaxInterval());
+    delete v.confWrongRetest;
+    const intervalDays = Math.round(v.stab * Math.log(FSRS.target_r) / Math.log(0.9));
+    v.d = today() + Math.max(1, Math.min(intervalDays, getMaxInterval()));
   }
 }
 
 function dueKeys(quickOnly = false) {
   const t = today();
-  const ks = [];
-  const daysLeft = getDaysLeft();
+  const pool = (D || []).filter(q => !quickOnly || effQuick(q));
 
-  (D || []).forEach(q => {
-    if (quickOnly && !effQuick(q)) return;
+  const dueItems = [];
+  pool.forEach(q => {
     const v = V[qk(q)];
-    if (v) {
-      if (v.d <= t) {
-        ks.push(q.n);
+    if (v && v.d <= t) {
+      // Priority ordering:
+      // 1. Wrong @ conf 3 gets top priority (+10000)
+      // 2. Wrong @ conf 2 (+5000)
+      // 3. Wrong / Lucky Guess @ conf 1 (+2000)
+      // 4. Level factor: L0 (+300), L1 (+200), L2 (+100), L3 (0)
+      let prio = 0;
+      if (v.confWrongRetest) prio += 10000;
+      else if (v.missCount > 0) {
+        const lastH = v.history && v.history.length ? v.history[v.history.length - 1] : null;
+        if (lastH && lastH.cf === 2) prio += 5000;
+        else prio += 2000;
       }
+      const lvl = q.level != null ? q.level : 1;
+      prio += (3 - lvl) * 100;
+      prio += Math.min(50, (v.missCount || 0) * 10);
+
+      dueItems.push({ n: q.n, prio });
     }
   });
 
-  if (daysLeft <= 10 && ks.length < 25) {
-    (D || []).forEach(q => {
-      if (quickOnly && !effQuick(q)) return;
-      if (!isLockedIn(q) && !ks.includes(q.n) && V[qk(q)]) {
-        ks.push(q.n);
-      }
-    });
-  }
-
+  // Archive misses that are due
   A.forEach((a, i) => a.errs.forEach((e, j) => {
     if (quickOnly && !effQuick(e)) return;
     const v = V[qk(e)];
     if (v && v.d <= t && !D.some(q => qk(q) === qk(e))) {
-      ks.push(i + ':' + j);
+      dueItems.push({ n: i + ':' + j, prio: 1500 });
     }
   }));
 
-  return ks;
+  // Sort descending by priority (wrong @ conf 3 first, then L0->L3)
+  dueItems.sort((a, b) => b.prio - a.prio);
+  return dueItems.map(item => item.n);
 }
 
 const byN = k => {
@@ -1623,14 +2138,818 @@ function streak() {
   return n;
 }
 
-// Option Shuffling with Anchored/Pinned Options
+
+// ============================================================================
+// PHASE 4: 14 Pure JS Local Calculation & Scenario Generators (CALC_FAMILIES)
+// ============================================================================
+const CALC_FAMILIES = {
+  'OS-01': (avoid = []) => {
+    const vasPool = [
+      { s: '64 KB', b: 16 }, { s: '128 KB', b: 17 }, { s: '256 KB', b: 18 },
+      { s: '512 KB', b: 19 }, { s: '1 MB', b: 20 }, { s: '2 MB', b: 21 },
+      { s: '4 MB', b: 22 }, { s: '16 MB', b: 24 }
+    ];
+    const psPool = [
+      { s: '512 B', b: 9 }, { s: '1 KB', b: 10 }, { s: '2 KB', b: 11 },
+      { s: '4 KB', b: 12 }, { s: '8 KB', b: 13 }
+    ];
+    let pick, sig;
+    for (let t = 0; t < 20; t++) {
+      const v = vasPool[Math.floor(Math.random() * vasPool.length)];
+      const p = psPool[Math.floor(Math.random() * psPool.length)];
+      if (v.b > p.b + 2) {
+        sig = v.s + ':' + p.s;
+        if (!avoid.includes(sig)) { pick = { v, p, sig }; break; }
+        if (!pick) pick = { v, p, sig };
+      }
+    }
+    const { v, p } = pick;
+    const pageBits = v.b - p.b;
+    const offsetBits = p.b;
+    const totalBits = v.b;
+    const correct = pageBits + ' bits';
+    const slips = [
+      offsetBits + ' bits',
+      totalBits + ' bits',
+      (pageBits + 1) + ' bits'
+    ];
+    const opts = [correct, ...slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'OS-01', sig: pick.sig,
+      q: 'In a paging memory management system, the virtual address space is ' + v.s + ' and the page size is ' + p.s + '. How many bits are required for the virtual page number?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'Virtual address space = ' + v.s + ' (2^' + totalBits + ' bytes, so ' + totalBits + ' address bits). Page size = ' + p.s + ' (2^' + offsetBits + ' bytes, so ' + offsetBits + ' page offset bits). Page number bits = Total bits - Offset bits = ' + totalBits + ' - ' + offsetBits + ' = ' + pageBits + ' bits.',
+      code: []
+    };
+  },
+
+  'OS-02': (avoid = []) => {
+    const configs = [
+      { bursts: [6, 8, 4, 2], names: ['P1', 'P2', 'P3', 'P4'] },
+      { bursts: [5, 3, 8, 6], names: ['P1', 'P2', 'P3', 'P4'] },
+      { bursts: [7, 4, 3, 2], names: ['P1', 'P2', 'P3', 'P4'] },
+      { bursts: [8, 4, 2, 6], names: ['P1', 'P2', 'P3', 'P4'] },
+      { bursts: [9, 3, 1, 5], names: ['P1', 'P2', 'P3', 'P4'] }
+    ];
+    let c = configs.find(x => !avoid.includes(x.bursts.join('-'))) || configs[Math.floor(Math.random() * configs.length)];
+    const bursts = [...c.bursts];
+    const sorted = [...bursts].sort((a, b) => a - b);
+    let sjfWaitSum = 0, cur = 0;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      cur += sorted[i];
+      sjfWaitSum += cur;
+    }
+    const sjfAvg = (sjfWaitSum / sorted.length).toFixed(1).replace(/\.0$/, '');
+
+    let fcfsWaitSum = 0, curF = 0;
+    for (let i = 0; i < bursts.length - 1; i++) {
+      curF += bursts[i];
+      fcfsWaitSum += curF;
+    }
+    const fcfsAvg = (fcfsWaitSum / bursts.length).toFixed(1).replace(/\.0$/, '');
+
+    const correct = sjfAvg;
+    const slips = [
+      fcfsAvg,
+      (parseFloat(sjfAvg) + 2).toFixed(1).replace(/\.0$/, ''),
+      (parseFloat(fcfsAvg) + 1.5).toFixed(1).replace(/\.0$/, '')
+    ];
+    const opts = Array.from(new Set([correct, ...slips]));
+    while (opts.length < 4) opts.push((parseFloat(sjfAvg) + opts.length).toFixed(1).replace(/\.0$/, ''));
+    opts.sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'OS-02', sig: c.bursts.join('-'),
+      q: 'Consider four processes P1, P2, P3, P4 arriving at time t=0 with burst times ' + bursts.map((b, i) => 'P' + (i+1) + '=' + b).join(', ') + ' ms. Under non-preemptive Shortest Job First (SJF) scheduling, what is the average waiting time?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'In SJF, processes execute in ascending order of burst time: ' + sorted.join(', ') + '. Waiting times: 1st=0, 2nd=' + sorted[0] + ', 3rd=' + (sorted[0]+sorted[1]) + ', 4th=' + (sorted[0]+sorted[1]+sorted[2]) + '. Total waiting time = ' + sjfWaitSum + ' ms. Average wait = ' + sjfWaitSum + ' / 4 = ' + sjfAvg + ' ms. (FCFS average would be ' + fcfsAvg + ' ms).',
+      code: []
+    };
+  },
+
+  'DL-01': (avoid = []) => {
+    const list = [7, 9, 11, 13, 15, 18, 20, 25, 30, 35, 48, 60, 65, 90, 100];
+    let n = list.find(x => !avoid.includes(String(x))) || list[Math.floor(Math.random() * list.length)];
+    const k = Math.ceil(Math.log2(n));
+    const correct = String(k);
+    const slips = [String(k - 1), String(k + 1), String(Math.ceil(n / 2))];
+    const opts = Array.from(new Set([correct, ...slips]));
+    while (opts.length < 4) opts.push(String(k + opts.length));
+    opts.sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'DL-01', sig: String(n),
+      q: 'How many flip-flops are required to construct a synchronous Mod-' + n + ' counter?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'A counter with k flip-flops provides 2^k distinct states. To count Mod-' + n + ', we need 2^k >= ' + n + '. Since 2^' + (k-1) + ' = ' + Math.pow(2, k-1) + ' < ' + n + ' <= 2^' + k + ' = ' + Math.pow(2, k) + ', exactly ' + k + ' flip-flops are required.',
+      code: []
+    };
+  },
+
+  'DL-02': (avoid = []) => {
+    const bits = [5, 6, 7, 8, 9, 10, 12, 16];
+    let b = bits.find(x => !avoid.includes(String(x))) || bits[Math.floor(Math.random() * bits.length)];
+    const min = -Math.pow(2, b - 1);
+    const max = Math.pow(2, b - 1) - 1;
+    const correct = min + ' to +' + max;
+    const slips = [
+      (-max) + ' to +' + max,
+      (-Math.pow(2, b)) + ' to +' + (Math.pow(2, b) - 1),
+      '0 to ' + (Math.pow(2, b) - 1)
+    ];
+    const opts = [correct, ...slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'DL-02', sig: String(b),
+      q: 'What is the integer representation range for a ' + b + '-bit signed integer in 2\'s complement form?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'The range of an n-bit 2\'s complement number is -2^(n-1) to +(2^(n-1) - 1). For n=' + b + ', this is -2^' + (b-1) + ' to +(2^' + (b-1) + ' - 1), which equals ' + min + ' to +' + max + '. (1\'s complement would be ' + (-max) + ' to +' + max + ').',
+      code: []
+    };
+  },
+
+  'MP-01': (avoid = []) => {
+    const configs = [
+      { k: 4, n: 100 }, { k: 5, n: 50 }, { k: 5, n: 100 },
+      { k: 4, n: 200 }, { k: 6, n: 80 }, { k: 5, n: 200 }
+    ];
+    let c = configs.find(x => !avoid.includes(x.k + ':' + x.n)) || configs[Math.floor(Math.random() * configs.length)];
+    const total = c.k + (c.n - 1);
+    const correct = total + ' cycles';
+    const slips = [
+      (c.k * c.n) + ' cycles',
+      (c.k + c.n) + ' cycles',
+      ((c.k - 1) * c.n) + ' cycles'
+    ];
+    const opts = [correct, ...slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'MP-01', sig: c.k + ':' + c.n,
+      q: 'A ' + c.k + '-stage instruction pipeline executes ' + c.n + ' independent instructions without stalls or branches. Assuming 1 clock cycle per stage, how many clock cycles are required to complete all instructions?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'In a k-stage pipeline, the 1st instruction takes k clock cycles. Each subsequent (n - 1) instruction finishes in 1 cycle each. Total clock cycles = k + (n - 1) = ' + c.k + ' + (' + c.n + ' - 1) = ' + total + ' cycles.',
+      code: []
+    };
+  },
+
+  'DSA-01': (avoid = []) => {
+    const arrays = [
+      [5, 2, 4, 1, 3],
+      [4, 5, 1, 2, 3],
+      [3, 5, 2, 4, 1],
+      [5, 1, 4, 2, 8],
+      [6, 3, 1, 5, 2],
+      [4, 1, 5, 3, 2]
+    ];
+    let arr = arrays.find(a => !avoid.includes(a.join(','))) || arrays[Math.floor(Math.random() * arrays.length)];
+    let inv = 0;
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        if (arr[i] > arr[j]) inv++;
+      }
+    }
+    const correct = String(inv);
+    const slips = [String(inv + 1), String(Math.max(1, inv - 1)), String(inv + 2)];
+    const opts = Array.from(new Set([correct, ...slips]));
+    while (opts.length < 4) opts.push(String(inv + opts.length));
+    opts.sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'DSA-01', sig: arr.join(','),
+      q: 'How many total swaps (adjacent exchanges) are performed by standard Bubble Sort to sort the array [' + arr.join(', ') + '] in ascending order?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'The number of swaps performed by bubble sort is equal to the number of inversions in the array (pairs where i < j and A[i] > A[j]). The number of inversions in [' + arr.join(', ') + '] is ' + inv + ', so exactly ' + inv + ' swaps are performed.',
+      code: []
+    };
+  },
+
+  'DSA-02': (avoid = []) => {
+    const pool = [
+      { infix: 'A + B * C - D', postfix: 'A B C * + D -', slips: ['A B + C * D -', 'A B C + * D -', 'A B + C D - *'] },
+      { infix: '(A + B) * (C - D)', postfix: 'A B + C D - *', slips: ['A B + C * D -', 'A B C D - * +', 'A B + C - D *'] },
+      { infix: 'A * B + C / D', postfix: 'A B * C D / +', slips: ['A B * C + D /', 'A B C * + D /', 'A B C D / + *'] },
+      { infix: 'A + B * C ^ D', postfix: 'A B C D ^ * +', slips: ['A B + C D ^ *', 'A B C * D ^ +', 'A B + C * D ^'] },
+      { infix: '(A + B * C) / D', postfix: 'A B C * + D /', slips: ['A B + C * D /', 'A B C + * D /', 'A B C * D / +'] }
+    ];
+    let item = pool.find(p => !avoid.includes(p.infix)) || pool[Math.floor(Math.random() * pool.length)];
+    const opts = [item.postfix, ...item.slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'DSA-02', sig: item.infix,
+      q: 'What is the equivalent postfix (Reverse Polish) expression for the infix expression: ' + item.infix + '?',
+      o: opts, a: opts.indexOf(item.postfix),
+      e: 'Following standard operator precedence (parentheses > exponentiation ^ > multiplication/division * / > addition/subtraction + - with left-to-right associativity), ' + item.infix + ' converts to postfix as ' + item.postfix + '.',
+      code: []
+    };
+  },
+
+  'LA-01': (avoid = []) => {
+    const pool = [
+      { m: [[3, 2], [1, 4]], det: 10, slips: [14, -10, 8] },
+      { m: [[4, 3], [2, 5]], det: 14, slips: [26, -14, 11] },
+      { m: [[5, -2], [3, 4]], det: 26, slips: [14, -26, 20] },
+      { m: [[2, 7], [1, 5]], det: 3, slips: [17, -3, 9] },
+      { m: [[6, 1], [4, 2]], det: 8, slips: [16, -8, 10] },
+      { m: [[3, 5], [2, 4]], det: 2, slips: [22, -2, 7] }
+    ];
+    let item = pool.find(p => !avoid.includes(p.m.flat().join(','))) || pool[Math.floor(Math.random() * pool.length)];
+    const correct = String(item.det);
+    const opts = [correct, ...item.slips.map(String)].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'LA-01', sig: item.m.flat().join(','),
+      q: 'What is the determinant of the 2x2 matrix: [[' + item.m[0].join(', ') + '], [' + item.m[1].join(', ') + ']]?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'For matrix [[a, b], [c, d]], det(M) = (a * d) - (b * c). Here: (' + item.m[0][0] + ' * ' + item.m[1][1] + ') - (' + item.m[0][1] + ' * ' + item.m[1][0] + ') = ' + (item.m[0][0] * item.m[1][1]) + ' - ' + (item.m[0][1] * item.m[1][0]) + ' = ' + item.det + '.',
+      code: []
+    };
+  },
+
+  'STAT-01': (avoid = []) => {
+    const pool = [
+      { mu: 10, va: 4, a: 3, b: 5 },
+      { mu: 15, va: 9, a: 2, b: 8 },
+      { mu: 20, va: 16, a: 2, b: 6 },
+      { mu: 12, va: 5, a: 4, b: 3 }
+    ];
+    let p = pool.find(x => !avoid.includes(x.mu + ':' + x.va + ':' + x.a)) || pool[Math.floor(Math.random() * pool.length)];
+    const newMu = p.a * p.mu + p.b;
+    const newVa = (p.a * p.a) * p.va;
+    const correct = 'Mean = ' + newMu + ', Variance = ' + newVa;
+    const slips = [
+      'Mean = ' + newMu + ', Variance = ' + (p.a * p.va),
+      'Mean = ' + newMu + ', Variance = ' + (newVa + p.b),
+      'Mean = ' + (p.mu + p.b) + ', Variance = ' + newVa
+    ];
+    const opts = [correct, ...slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'STAT-01', sig: p.mu + ':' + p.va + ':' + p.a,
+      q: 'A random variable X has mean E[X] = ' + p.mu + ' and variance Var(X) = ' + p.va + '. If Y = ' + p.a + 'X + ' + p.b + ', what are the mean and variance of Y?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'Linear expectation: E[aX + b] = a*E[X] + b = ' + p.a + '*' + p.mu + ' + ' + p.b + ' = ' + newMu + '. Variance scaling: Var(aX + b) = a^2 * Var(X) = ' + p.a + '^2 * ' + p.va + ' = ' + (p.a*p.a) + ' * ' + p.va + ' = ' + newVa + '. The additive constant b does not affect variance.',
+      code: []
+    };
+  },
+
+  'CAL-01': (avoid = []) => {
+    const pool = [
+      { k: 3, a: 2, val: 3 * Math.pow(2, 2) },
+      { k: 4, a: 2, val: 4 * Math.pow(2, 3) },
+      { k: 3, a: 3, val: 3 * Math.pow(3, 2) },
+      { k: 4, a: 3, val: 4 * Math.pow(3, 3) },
+      { k: 5, a: 2, val: 5 * Math.pow(2, 4) }
+    ];
+    let p = pool.find(x => !avoid.includes(x.k + ':' + x.a)) || pool[Math.floor(Math.random() * pool.length)];
+    const correct = String(p.val);
+    const ak = Math.pow(p.a, p.k);
+    const slips = [
+      String(ak),
+      String(p.k * ak),
+      String((p.k - 1) * Math.pow(p.a, p.k - 1))
+    ];
+    const opts = Array.from(new Set([correct, ...slips]));
+    while (opts.length < 4) opts.push(String(p.val + opts.length * 2));
+    opts.sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'CAL-01', sig: p.k + ':' + p.a,
+      q: 'What is the value of the limit: lim (x -> ' + p.a + ') of (x^' + p.k + ' - ' + ak + ') / (x - ' + p.a + ')?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'Using standard algebraic limit formula lim (x->a) (x^n - a^n)/(x - a) = n * a^(n-1), or by L\'Hopital\'s rule: d/dx (x^' + p.k + ' - ' + ak + ') / d/dx (x - ' + p.a + ') = ' + p.k + ' * x^' + (p.k - 1) + '. Evaluating at x = ' + p.a + ' gives ' + p.k + ' * (' + p.a + '^' + (p.k - 1) + ') = ' + p.val + '.',
+      code: []
+    };
+  },
+
+  'CN-01': (avoid = []) => {
+    // Exam key syllabus rule: Class A is 0–127!
+    const pool = [
+      { ip: '10.25.1.8', cls: 'Class A', mask: '255.0.0.0', why: 'First octet 10 is in range 0–127' },
+      { ip: '115.180.2.14', cls: 'Class A', mask: '255.0.0.0', why: 'First octet 115 is in range 0–127' },
+      { ip: '126.100.5.1', cls: 'Class A', mask: '255.0.0.0', why: 'First octet 126 is in range 0–127' },
+      { ip: '130.45.10.22', cls: 'Class B', mask: '255.255.0.0', why: 'First octet 130 is in range 128–191' },
+      { ip: '172.16.50.4', cls: 'Class B', mask: '255.255.0.0', why: 'First octet 172 is in range 128–191' },
+      { ip: '190.200.12.8', cls: 'Class B', mask: '255.255.0.0', why: 'First octet 190 is in range 128–191' },
+      { ip: '195.10.20.30', cls: 'Class C', mask: '255.255.255.0', why: 'First octet 195 is in range 192–223' },
+      { ip: '210.45.60.1', cls: 'Class C', mask: '255.255.255.0', why: 'First octet 210 is in range 192–223' },
+      { ip: '220.100.1.5', cls: 'Class C', mask: '255.255.255.0', why: 'First octet 220 is in range 192–223' }
+    ];
+    let p = pool.find(x => !avoid.includes(x.ip)) || pool[Math.floor(Math.random() * pool.length)];
+    const correct = p.cls + ' with default mask ' + p.mask;
+    const slips = [
+      (p.cls === 'Class A' ? 'Class B' : 'Class A') + ' with default mask ' + (p.cls === 'Class A' ? '255.255.0.0' : '255.0.0.0'),
+      p.cls + ' with default mask ' + (p.mask === '255.0.0.0' ? '255.255.0.0' : '255.255.255.0'),
+      (p.cls === 'Class C' ? 'Class B' : 'Class C') + ' with default mask 255.255.255.0'
+    ];
+    const opts = Array.from(new Set([correct, ...slips])).sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'CN-01', sig: p.ip,
+      q: 'To which IPv4 address class does the IP address ' + p.ip + ' belong, and what is its default subnet mask?',
+      o: opts, a: opts.indexOf(correct),
+      e: p.why + '. In the entrance syllabus/exam key: Class A is 0–127 (mask 255.0.0.0), Class B is 128–191 (mask 255.255.0.0), Class C is 192–223 (mask 255.255.255.0), and Class D is 224–239 (multicast). Therefore ' + p.ip + ' is ' + correct + '.',
+      code: []
+    };
+  },
+
+  'SE-01': (avoid = []) => {
+    const scenarios = [
+      {
+        scenario: 'Testing conducted at the developer site by internal software engineering and QA staff before any external release',
+        ans: 'Alpha Testing',
+        slips: ['Beta Testing', 'Acceptance Testing', 'Unit Testing'],
+        why: 'Alpha testing is performed in-house at the developer site by internal staff.'
+      },
+      {
+        scenario: 'Testing performed by actual end users at their own client locations in a real operational environment before product sign-off',
+        ans: 'Beta Testing',
+        slips: ['Alpha Testing', 'Unit Testing', 'White-box Testing'],
+        why: 'Beta testing is performed by external end-users in their real environment.'
+      },
+      {
+        scenario: 'Evaluating work products (such as requirements, design, and code inspections) without executing the software to determine whether development phase specifications are satisfied',
+        ans: 'Verification',
+        slips: ['Validation', 'Dynamic Testing', 'Beta Testing'],
+        why: 'Verification refers to static checks without execution to ensure building the product right according to specification.'
+      },
+      {
+        scenario: 'Executing the completed software system to determine whether it satisfies customer operational needs and business requirements',
+        ans: 'Validation',
+        slips: ['Verification', 'Static Analysis', 'Code Walkthrough'],
+        why: 'Validation involves running the software to evaluate if it fulfills customer expectations (building the right product).'
+      },
+      {
+        scenario: 'Re-running previous test suites after modifying code to verify that bug fixes or feature additions have not broken existing working features',
+        ans: 'Regression Testing',
+        slips: ['Smoke Testing', 'Stress Testing', 'Alpha Testing'],
+        why: 'Regression testing ensures that new changes do not introduce unintended side effects in previously functioning modules.'
+      }
+    ];
+    let s = scenarios.find(x => !avoid.includes(x.ans + ':' + x.scenario.slice(0, 20))) || scenarios[Math.floor(Math.random() * scenarios.length)];
+    const opts = [s.ans, ...s.slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'SE-01', sig: s.ans + ':' + s.scenario.slice(0, 20),
+      q: 'Which software engineering testing activity is described by the following scenario?\n"' + s.scenario + '"',
+      o: opts, a: opts.indexOf(s.ans),
+      e: s.why,
+      code: []
+    };
+  },
+
+  'DBMS-01': (avoid = []) => {
+    const scenarios = [
+      {
+        q: 'Given relation R(A, B, C, D) with candidate key {A, B} and functional dependency A -> C. Which normal form is VIOLATED?',
+        ans: 'Second Normal Form (2NF)',
+        slips: ['First Normal Form (1NF)', 'Third Normal Form (3NF)', 'Boyce-Codd Normal Form (BCNF)'],
+        why: 'In A -> C, non-prime attribute C is dependent on A, which is a proper subset of candidate key {A, B}. This is a partial dependency, which violates 2NF.'
+      },
+      {
+        q: 'Given relation R(A, B, C, D) with candidate key {A} and functional dependencies A -> B and B -> C. Which normal form is VIOLATED?',
+        ans: 'Third Normal Form (3NF)',
+        slips: ['Second Normal Form (2NF)', 'First Normal Form (1NF)', 'Fourth Normal Form (4NF)'],
+        why: 'Since candidate key is {A}, all non-prime attributes {B, C, D} depend fully on A (satisfying 2NF). However, A -> B and B -> C creates a transitive dependency A -> C through non-superkey B, violating 3NF.'
+      },
+      {
+        q: 'Given relation R(A, B, C) with candidate keys {A, B} and {A, C}, and functional dependencies AB -> C and C -> B. What is the HIGHEST normal form satisfied by R?',
+        ans: '3NF (violates BCNF)',
+        slips: ['BCNF', '2NF only', '1NF only'],
+        why: 'In C -> B, B is a prime attribute (part of candidate key AB), so it satisfies the 3NF condition. However, C is not a superkey, which violates BCNF. Thus the highest normal form satisfied is 3NF.'
+      }
+    ];
+    let s = scenarios.find(x => !avoid.includes(x.q.slice(0, 25))) || scenarios[Math.floor(Math.random() * scenarios.length)];
+    const opts = [s.ans, ...s.slips].sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'DBMS-01', sig: s.q.slice(0, 25),
+      q: s.q,
+      o: opts, a: opts.indexOf(s.ans),
+      e: s.why,
+      code: []
+    };
+  },
+
+  'AI-01': (avoid = []) => {
+    const scenarios = [
+      {
+        p: { name: 'P', g: 4, h: 2 },
+        q: { name: 'Q', g: 1, h: 4 },
+        r: { name: 'R', g: 3, h: 5 }
+      },
+      {
+        p: { name: 'P', g: 5, h: 1 },
+        q: { name: 'Q', g: 2, h: 3 },
+        r: { name: 'R', g: 1, h: 6 }
+      },
+      {
+        p: { name: 'P', g: 6, h: 2 },
+        q: { name: 'Q', g: 2, h: 4 },
+        r: { name: 'R', g: 3, h: 5 }
+      }
+    ];
+    let s = scenarios.find(x => !avoid.includes(x.p.g + ':' + x.q.g)) || scenarios[Math.floor(Math.random() * scenarios.length)];
+    const nodes = [s.p, s.q, s.r];
+    const greedyPick = [...nodes].sort((a, b) => a.h - b.h)[0].name;
+    const aStarPick = [...nodes].sort((a, b) => (a.g + a.h) - (b.g + b.h))[0].name;
+
+    const correct = 'Greedy expands Node ' + greedyPick + ', A* expands Node ' + aStarPick;
+    const slips = [
+      'Greedy expands Node ' + aStarPick + ', A* expands Node ' + greedyPick,
+      'Both Greedy and A* expand Node ' + greedyPick,
+      'Both Greedy and A* expand Node ' + aStarPick
+    ];
+    const opts = Array.from(new Set([correct, ...slips]));
+    while (opts.length < 4) opts.push('Greedy expands Node ' + nodes[2].name + ', A* expands Node ' + nodes[0].name);
+    opts.sort(() => Math.random() - 0.5);
+    return {
+      fam_id: 'AI-01', sig: s.p.g + ':' + s.q.g,
+      q: 'In an informed heuristic search, the priority queue fringe has three nodes with path cost g(n) and heuristic estimate h(n):\nNode P: g=' + s.p.g + ', h=' + s.p.h + ' (f=' + (s.p.g+s.p.h) + ')\nNode Q: g=' + s.q.g + ', h=' + s.q.h + ' (f=' + (s.q.g+s.q.h) + ')\nNode R: g=' + s.r.g + ', h=' + s.r.h + ' (f=' + (s.r.g+s.r.h) + ')\nWhich node will be expanded next by Greedy Best-First Search and A* Search respectively?',
+      o: opts, a: opts.indexOf(correct),
+      e: 'Greedy Best-First search orders strictly by minimum heuristic value h(n), picking Node ' + greedyPick + ' (h=' + nodes.find(x => x.name === greedyPick).h + '). A* search orders by minimum total estimated cost f(n) = g(n) + h(n), picking Node ' + aStarPick + ' (f=' + (nodes.find(x => x.name === aStarPick).g + nodes.find(x => x.name === aStarPick).h) + ').',
+      code: []
+    };
+  }
+};
+
+function matchQuestionFamily(q) {
+  if (!q) return null;
+  if (q.fam_id && CALC_FAMILIES[q.fam_id]) return q.fam_id;
+  const s = String(q.s || '').toLowerCase();
+  const text = String(q.q || '').toLowerCase();
+
+  if ((s.includes('operating') || s.includes('os')) && /page\s*(size|number|table|offset)|virtual\s*address/i.test(text)) return 'OS-01';
+  if ((s.includes('operating') || s.includes('os')) && /fcfs|sjf|waiting time|turnaround/i.test(text)) return 'OS-02';
+  if ((s.includes('digital') || s.includes('dl')) && /mod(ulo)?[- ]?\d+|flip[- ]?flop|counter/i.test(text) && /how many|number of/i.test(text)) return 'DL-01';
+  if ((s.includes('digital') || s.includes('dl')) && /2'?s complement|two'?s complement/i.test(text)) return 'DL-02';
+  if ((s.includes('micro') || s.includes('arch') || s.includes('mp')) && /pipeline|clock cycle|speedup|stages/i.test(text)) return 'MP-01';
+  if ((s.includes('data structure') || s.includes('dsa') || s.includes('algorithm')) && /bubble sort|inversion|swap/i.test(text)) return 'DSA-01';
+  if ((s.includes('data structure') || s.includes('dsa') || s.includes('algorithm')) && /infix|postfix|prefix/i.test(text)) return 'DSA-02';
+  if ((s.includes('linear algebra') || s.includes('math')) && /matrix|determinant|inverse/i.test(text)) return 'LA-01';
+  if ((s.includes('stat') || s.includes('prob')) && /variance|standard deviation|mean|var\(/i.test(text) && /shift|scale|constant|\+/i.test(text)) return 'STAT-01';
+  if ((s.includes('calculus') || s.includes('math')) && /limit|derivative|\blim\b/i.test(text)) return 'CAL-01';
+  if ((s.includes('network') || s.includes('cn')) && /ipv4|class [a-e]|ip address|subnet mask/i.test(text)) return 'CN-01';
+  if (s.includes('software') && /alpha test|beta test|verification|validation|regression/i.test(text)) return 'SE-01';
+  if (s.includes('database') && /normal form|2nf|3nf|bcnf|functional dependenc/i.test(text)) return 'DBMS-01';
+  if ((s.includes('ai') || s.includes('artificial')) && /greedy best|a\*|heuristic|h\(n\)|g\(n\)/i.test(text)) return 'AI-01';
+
+  return null;
+}
+
+function generateLocalFamilyVariant(rawQ) {
+  const famId = matchQuestionFamily(rawQ);
+  if (!famId || !CALC_FAMILIES[famId]) return null;
+  const k = qk(rawQ);
+  const vRec = V[k] = V[k] || {};
+  const past = Array.isArray(vRec._pastValues) ? vRec._pastValues : [];
+  const gen = CALC_FAMILIES[famId](past);
+  if (!gen) return null;
+
+  vRec._pastValues = [...past.slice(-4), gen.sig];
+  vRec._variant = {
+    q: gen.q,
+    o: gen.o,
+    a: gen.a,
+    e: gen.e,
+    code: gen.code || [],
+    fam_id: gen.fam_id,
+    verified: true,
+    date: Date.now()
+  };
+  vRec._useOriginal = false;
+  save();
+  return vRec._variant;
+}
+
+function regenerateCurrentQuestion() {
+  if (!CURRENT_Q || P >= Q.length) return;
+  const rawQ = byN(Q[P]);
+  if (!rawQ) return;
+
+  if (matchQuestionFamily(rawQ)) {
+    generateLocalFamilyVariant(rawQ);
+    sessionHistory[P] = null;
+    show();
+    return;
+  }
+
+  if (GEM_KEY && (rawQ.regeneratable || !effQuick(rawQ))) {
+    const qStem = $('#q-stem');
+    if (qStem) qStem.innerHTML = '<span class="c-sk">✨ Generating verified AI variant with blind validation...</span>';
+    rewriteQuestionWithGemini(rawQ).then(() => {
+      sessionHistory[P] = null;
+      show();
+    }).catch(err => {
+      alert('AI variant generation failed: ' + (err.message || err));
+      show();
+    });
+    return;
+  }
+
+  alert('This question cannot be regenerated without a Gemini API key or matching calculation template.');
+}
+
+function quarantineCurrentQuestion() {
+  if (!confirm('Quarantine this question/variant? It will be marked as questionable and excluded from future study sets.')) return;
+  const rawQ = byN(Q[P]);
+  if (!rawQ) return;
+  const k = qk(rawQ);
+  V[k] = V[k] || {};
+  V[k]._quarantined = true;
+  rawQ.quarantined = true;
+  delete V[k]._variant;
+  save();
+  alert('Question quarantined.');
+  next();
+}
+
+function saveMnemonicForCurrent() {
+  const rawQ = byN(Q[P]);
+  if (!rawQ) return;
+  const inp = $('#in-mnemonic');
+  const val = inp ? inp.value.trim() : '';
+  if (!val) return;
+  const k = qk(rawQ);
+  V[k] = V[k] || {};
+  V[k].mnemonic = val;
+  save();
+  alert('Memory anchor saved! It will appear whenever you encounter this question.');
+  show();
+}
+
+// ============================================================================
+// PHASE 5: Curated Resource Library & Flashcard Spaced Repetition System
+// ============================================================================
+const RESOURCE_LIBRARY = [
+  { id: 'neso-dl', title: 'Digital Logic & Counters', provider: 'Neso Academy', subject: 'Digital Logic', url: 'https://www.youtube.com/playlist?list=PLBlnK6fEyqRjMH3mWf6kwqiTbT798eAOm', desc: 'Bite-sized visual lectures on Mod-N counters and K-maps.' },
+  { id: 'neso-coa', title: 'Pipelining & Cache Mapping', provider: 'Neso Academy', subject: 'Computer Organization and Architecture', url: 'https://www.youtube.com/playlist?list=PLBlnK6fEyqRgLLlzdgiTUKULKJPYc0A4q', desc: 'Step-by-step pipeline cycle calculations and memory hierarchy.' },
+  { id: 'neso-os', title: 'Paging & Memory Management', provider: 'Neso Academy', subject: 'Operating Systems', url: 'https://www.youtube.com/playlist?list=PLBlnK6fEyqRiVhbXDGLXDk_OQAeuVcp2O', desc: 'Clear visual breakdowns of virtual address spaces and page frames.' },
+  { id: 'gs-dbms', title: 'Normalization (1NF to BCNF)', provider: 'Gate Smashers', subject: 'Database Management Systems', url: 'https://www.youtube.com/playlist?list=PLxCzCOWd7aiFAN6I8C9XdK_UBbGHW17_z', desc: 'Fast, practical identification of candidate keys and normal forms.' },
+  { id: 'gs-cn', title: 'IPv4 Subnetting & Addressing', provider: 'Gate Smashers', subject: 'Computer Networks', url: 'https://www.youtube.com/playlist?list=PLxCzCOWd7aiGFBD2-2joCpWOLUrDLvVV_', desc: 'Short shortcuts for IP classes, CIDR subnet masks, and broadcast IPs.' },
+  { id: 'gs-os-sched', title: 'CPU Scheduling (FCFS vs SJF)', provider: 'Gate Smashers', subject: 'Operating Systems', url: 'https://www.youtube.com/playlist?list=PLxCzCOWd7aiGz9donHRrE9I3Mwn6XdPvP', desc: 'Waiting time Gantt chart walkthroughs with exam shortcuts.' },
+  { id: 'visualgo-sort', title: 'Sorting Algorithm Visualizer', provider: 'VisuAlgo', subject: 'Data Structures and Algorithms', url: 'https://visualgo.net/en/sorting', desc: 'Watch Bubble sort swaps and inversions animate step-by-step.' },
+  { id: 'visualgo-bst', title: 'BST & Tree Traversal', provider: 'VisuAlgo', subject: 'Data Structures and Algorithms', url: 'https://visualgo.net/en/bst', desc: 'Interactive BST insertion, deletion, and inorder/preorder animations.' },
+  { id: 'pythontutor', title: 'Pointer & Memory Visualizer', provider: 'Python Tutor (C)', subject: 'C Programming', url: 'https://pythontutor.com/c.html', desc: 'Live execution diagram of arrays, pointers, and memory addresses.' },
+  { id: 'sqlbolt', title: 'Interactive SQL Queries', provider: 'SQLBolt', subject: 'Database Management Systems', url: 'https://sqlbolt.com/', desc: '10-minute interactive browser exercises for joins and aggregations.' },
+  { id: 'circuitverse', title: 'Logic Gate & Counter Simulator', provider: 'CircuitVerse', subject: 'Digital Logic', url: 'https://circuitverse.org/simulator', desc: 'Wire up flip-flops and test clock cycles in your browser.' },
+  { id: '3b1b-la', title: 'Essence of Linear Algebra', provider: '3Blue1Brown', subject: 'Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab', desc: 'Visual intuition for determinants and matrix transformations.' },
+  { id: '3b1b-calc', title: 'Essence of Calculus', provider: '3Blue1Brown', subject: 'Calculus', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr', desc: 'Visual explanation of limits and derivative definitions.' },
+  { id: 'statquest-stat', title: 'Variance & Standard Deviation', provider: 'StatQuest', subject: 'Statistics', url: 'https://www.youtube.com/watch?v=SzZ6G434EPo', desc: 'Clear intuitive guide to shift/scale transformations of variance.' },
+  { id: 'statquest-prob', title: 'Probability Distributions', provider: 'StatQuest', subject: 'Probability', url: 'https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9', desc: 'Simple, visual breakdowns of binomial and normal probabilities.' },
+  { id: 'gfg-infix', title: 'Infix to Postfix Precedence', provider: 'GeeksforGeeks', subject: 'Data Structures and Algorithms', url: 'https://www.geeksforgeeks.org/convert-infix-expression-to-postfix-expression/', desc: 'Operator precedence table and stack conversion rules.' },
+  { id: 'gfg-8085', title: '8085 Microprocessor Flags', provider: 'GeeksforGeeks', subject: 'Microprocessors', url: 'https://www.geeksforgeeks.org/flag-register-8085-microprocessor/', desc: 'Quick cheat-sheet for Sign, Zero, Auxiliary Carry, Parity, Carry.' },
+  { id: 'guru99-testing', title: 'Alpha vs Beta Testing', provider: 'Guru99', subject: 'Software Engineering', url: 'https://www.guru99.com/alpha-beta-testing-demystified.html', desc: 'Clear comparison table: Who tests, where, and when.' },
+  { id: 'khan-limits', title: 'Evaluating Limits Graphically', provider: 'Khan Academy', subject: 'Calculus', url: 'https://www.khanacademy.org/math/calculus-1/cs1-limits-and-continuity', desc: 'Interactive practice for algebraic and derivative limit rules.' },
+  { id: 'falstad-circuits', title: 'Logic Gate Timing Simulator', provider: 'Falstad', subject: 'Digital Logic', url: 'https://www.falstad.com/circuit/e-counter.html', desc: 'Interactive Mod-N ripple and synchronous counter simulation.' },
+  { id: 'w3-sql-drills', title: 'SQL Joins & Group By Exercises', provider: 'W3Schools', subject: 'Database Management Systems', url: 'https://www.w3schools.com/sql/sql_exercises.asp', desc: 'Targeted single-table and multi-table query practice.' },
+  { id: 'javatpoint-cg', title: 'Bresenham Algorithm Walkthrough', provider: 'JavaTpoint', subject: 'Computer Graphics', url: 'https://www.javatpoint.com/computer-graphics-bresenhams-line-algorithm', desc: 'Decision parameter derivation and integer arithmetic steps.' },
+  { id: 'tutorialspoint-ai', title: 'Greedy Best-First vs A* Search', provider: 'TutorialsPoint', subject: 'Artificial Intelligence', url: 'https://www.tutorialspoint.com/artificial_intelligence/artificial_intelligence_popular_search_algorithms.htm', desc: 'Comparison of path cost g(n) vs heuristic h(n) evaluation.' },
+  { id: 'neso-toc', title: 'DFA Minimization & Regular Grammars', provider: 'Neso Academy', subject: 'Theory of Computation', url: 'https://www.youtube.com/playlist?list=PLBlnK6fEyqRgp46KUv4ZY64ZgK90DZj_v', desc: 'Concise state-table reduction and Chomsky hierarchy review.' },
+  { id: 'geeks-twos', title: '2\'s Complement Range & Overflow', provider: 'GeeksforGeeks', subject: 'Digital Logic', url: 'https://www.geeksforgeeks.org/2s-complement-notation-in-digital-logic/', desc: 'Signed integer range formulas and overflow detection rules.' },
+  { id: 'geeks-deadlock', title: 'Deadlock Conditions & Prevention', provider: 'GeeksforGeeks', subject: 'Operating Systems', url: 'https://www.geeksforgeeks.org/introduction-of-deadlock-in-operating-system/', desc: 'The 4 necessary Coffman conditions and safe state checks.' }
+];
+
+function getRecommendedResource(subj, isStuck = false) {
+  if (!subj) return null;
+  const s = subj.toLowerCase();
+  const now = Date.now();
+  const cooldownMs = 14 * 864e5;
+
+  const candidates = RESOURCE_LIBRARY.filter(r => {
+    if (r.subject.toLowerCase() !== s && !s.includes(r.subject.toLowerCase()) && !r.subject.toLowerCase().includes(s)) return false;
+    const mark = RESOURCE_MARKS[r.id];
+    if (mark) {
+      if (mark.status === 'not_for_me' || mark.status === 'done') return false;
+      if (now - (mark.date || 0) < cooldownMs) return false;
+    }
+    return true;
+  });
+
+  return candidates.length ? candidates[0] : null;
+}
+
+function markResource(id, status) {
+  RESOURCE_MARKS[id] = { status, date: Date.now() };
+  save();
+  home();
+}
+
+function createCardForMissed(rawQ, chosenOptIndex = -1) {
+  if (!rawQ) return null;
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const createdToday = CARDS.filter(c => c.createdDate === todayDate).length;
+  if (createdToday >= 20) return null;
+
+  const cardQk = qk(rawQ);
+  if (CARDS.some(c => c.qk === cardQk && !c.grad)) return null;
+
+  const chosenText = (chosenOptIndex >= 0 && rawQ.o && rawQ.o[chosenOptIndex]) ? rawQ.o[chosenOptIndex] : '';
+  const correctText = (rawQ.o && rawQ.o[rawQ.a]) ? rawQ.o[rawQ.a] : '';
+
+  let front = '<b>' + esc(rawQ.s) + '</b><br><br>' + renderQuestionStem(rawQ.q);
+  let back = '<b>Correct Answer:</b> ' + esc(correctText);
+  if (chosenText && chosenOptIndex !== rawQ.a) {
+    back += '<br><span class="c-no sm">⚠️ Trapped by: ' + esc(chosenText) + '</span>';
+  }
+  if (rawQ.e) back += '<br><br>' + explanationHtml(rawQ.e);
+
+  const card = {
+    id: 'fc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    qk: cardQk,
+    qId: rawQ.n,
+    subject: rawQ.s,
+    type: rawQ.calc ? 'calc' : (chosenOptIndex >= 0 ? 'lure' : 'concept'),
+    front,
+    back,
+    stab: 1.0,
+    diff: 5.0,
+    due: today() + 1,
+    lapses: 0,
+    consecOk: 0,
+    grad: false,
+    created: Date.now(),
+    createdDate: todayDate
+  };
+
+  CARDS.push(card);
+  save();
+  return card;
+}
+
+function startFlashcardReview() {
+  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
+  if (!due.length) {
+    alert('No flashcards are currently due for review. Great work!');
+    return;
+  }
+  ACTIVE_FC_INDEX = 0;
+  ACTIVE_FC_SHOW_BACK = false;
+  view = 'cards';
+  renderFlashcardView();
+}
+
+function renderFlashcardView() {
+  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
+  if (ACTIVE_FC_INDEX >= due.length) {
+    $('#app').innerHTML = `
+      <div class="card" style="text-align:center;padding:36px">
+        <h2>🃏 Flashcard Review Complete!</h2>
+        <p class="mu">You have reviewed all ${due.length} due flashcard(s) for today.</p>
+        <p style="margin-top:20px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
+      </div>
+    `;
+    return;
+  }
+
+  const curCard = due[ACTIVE_FC_INDEX];
+  clearMath($('#app'));
+  $('#app').innerHTML = `
+    <div class="top">
+      <div class="row" style="justify-content:space-between">
+        <b>🃏 Flashcard Review (${ACTIVE_FC_INDEX + 1} of ${due.length})</b>
+        <button onclick="home()">☰ Dashboard</button>
+      </div>
+      <div class="bar"><i style="width:${(ACTIVE_FC_INDEX / due.length) * 100}%"></i></div>
+    </div>
+
+    <div class="fc-card" onclick="flipCard()">
+      <div class="fc-inner">
+        <span class="fc-badge ${curCard.type === 'calc' ? 'c-sk' : (curCard.type === 'lure' ? 'c-no' : 'c-ok')}">
+          ${esc(curCard.type || 'Concept')} · ${esc(curCard.subject)}
+        </span>
+        <div style="font-size:16px;line-height:1.5">${curCard.front}</div>
+        ${ACTIVE_FC_SHOW_BACK ? `
+          <div class="fc-back-content">
+            ${curCard.back}
+          </div>
+        ` : `
+          <button class="p big-btn" style="margin-top:24px" onclick="event.stopPropagation();flipCard()">🔍 Show Answer</button>
+        `}
+      </div>
+    </div>
+
+    ${ACTIVE_FC_SHOW_BACK ? `
+      <div class="card" style="margin-top:14px">
+        <div class="mu sm" style="text-align:center;margin-bottom:8px">Rate your active recall quality:</div>
+        <div class="row" style="justify-content:center;gap:8px">
+          <button class="sm" style="background:var(--no-bg);color:var(--no);border-color:var(--no-bd)" onclick="rateCard(1)">1 · Again (+0d)</button>
+          <button class="sm" style="background:var(--sk-bg);color:var(--sk);border-color:var(--sk-bd)" onclick="rateCard(2)">2 · Hard (+1d)</button>
+          <button class="sm p" onclick="rateCard(3)">3 · Good (+3d)</button>
+          <button class="sm" style="background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)" onclick="rateCard(4)">4 · Easy (+7d)</button>
+        </div>
+      </div>
+    ` : ''}
+  `;
+  typesetMath($('#app'));
+}
+
+function flipCard() {
+  ACTIVE_FC_SHOW_BACK = true;
+  renderFlashcardView();
+}
+
+function rateCard(grade) {
+  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
+  if (ACTIVE_FC_INDEX >= due.length) return home();
+  const card = due[ACTIVE_FC_INDEX];
+
+  if (grade === 1) {
+    card.lapses = (card.lapses || 0) + 1;
+    card.consecOk = 0;
+    card.stab = Math.max(0.5, (card.stab || 1.0) * 0.6);
+    card.due = today();
+  } else if (grade === 2) {
+    card.consecOk = (card.consecOk || 0) + 1;
+    card.stab = (card.stab || 1.0) * 1.2;
+    card.due = today() + Math.max(1, Math.round(card.stab * 1.2));
+  } else if (grade === 3) {
+    card.consecOk = (card.consecOk || 0) + 1;
+    card.stab = (card.stab || 1.0) * 2.0;
+    card.due = today() + Math.max(2, Math.round(card.stab * 2.0));
+  } else if (grade === 4) {
+    card.consecOk = (card.consecOk || 0) + 1;
+    card.stab = (card.stab || 1.0) * 3.0;
+    card.due = today() + Math.max(4, Math.round(card.stab * 3.0));
+  }
+
+  if (card.consecOk >= 3) {
+    card.grad = true;
+  }
+
+  save();
+  ACTIVE_FC_INDEX++;
+  ACTIVE_FC_SHOW_BACK = false;
+  renderFlashcardView();
+}
+
+// Milestone Management (M1 to M7)
+function getCurrentMilestone() {
+  if (!DIAGNOSTIC_DONE) {
+    return { id: 1, tag: 'M1', title: 'Day-1 Diagnostic Mock', desc: 'Complete a full timed mock exam with confidence tags to establish your baseline.', done: false };
+  }
+
+  const rows = agg();
+  const redSubjs = rows.filter(r => r.isCalibrated && r.acc <= 0.40);
+  const amberSubjs = rows.filter(r => r.isCalibrated && r.acc > 0.40 && r.acc < 0.80);
+  const redIncomplete = redSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 2));
+  const amberIncomplete = amberSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 1));
+  if (redIncomplete.length > 0 || amberIncomplete.length > 0) {
+    const remaining = redIncomplete.length + amberIncomplete.length;
+    return { id: 2, tag: 'M2', title: 'Targeted Fix Days', desc: `Reinforce weak subjects across multiple calendar days (${remaining} subject(s) pending).`, done: false };
+  }
+
+  const mockAttempts = L.filter(r => r.mock === 1);
+  if (mockAttempts.length < 50) {
+    return { id: 3, tag: 'M3', title: 'First Full Mock', desc: 'Complete and review your first 100-question timed mock exam.', done: false };
+  }
+
+  if (PB_MOCK_SCORE <= 0) {
+    return { id: 4, tag: 'M4', title: 'Score Growth', desc: 'Beat your previous mock exam score on a fresh mock attempt.', done: false };
+  }
+
+  if (PB_MOCK_SCORE < 70) {
+    return { id: 5, tag: 'M5', title: '70% Threshold', desc: 'Attain 70%+ on a timed mock exam.', done: false };
+  }
+
+  const days = getDaysLeft();
+  if (days > 2) {
+    return { id: 6, tag: 'M6', title: 'Final 48h Rehearsal', desc: 'Comprehensive timed practice to polish recall before the exam.', done: false };
+  }
+
+  return { id: 7, tag: 'M7', title: 'Exam Day Ready', desc: 'All milestone targets achieved. Trust your recall and stay calm!', done: true };
+}
+
+function recordFixDay(subject) {
+  if (!subject) return;
+  const s = canonSubj(subject);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  FIX_DAYS[s] = FIX_DAYS[s] || [];
+  if (!FIX_DAYS[s].includes(todayStr)) {
+    FIX_DAYS[s].push(todayStr);
+    save();
+  }
+}
+
+function toggleQuietMode(val) {
+  QUIET_MODE = typeof val === 'boolean' ? val : !QUIET_MODE;
+  save();
+  home();
+}
+
+// Option Shuffling with Anchored/Pinned Options & Shuffle-Safe Enforcement
 function prepareQuestionForDisplay(rawQ) {
-  // If a verified alternate variant exists and user hasn't explicitly toggled to original, present the variant
-  const activeSource = (rawQ._variant && !rawQ._useOriginal) ? rawQ._variant : rawQ;
+  const vRec = V[qk(rawQ)];
+  const variant = (vRec && vRec._variant) ? vRec._variant : rawQ._variant;
+  const useOrig = (vRec && vRec._useOriginal != null) ? vRec._useOriginal : rawQ._useOriginal;
+  const activeSource = (variant && !useOrig) ? variant : rawQ;
 
   const origOpts = (activeSource.o || []).slice();
   const rawAnsIndex = activeSource.a !== undefined ? activeSource.a : 0;
   const correctText = origOpts[rawAnsIndex];
+
+  // If shuffle_safe === false, DO NOT SHUFFLE OPTIONS (keeps order intact)
+  if (rawQ.shuffle_safe === false || activeSource.shuffle_safe === false) {
+    return {
+      ...rawQ,
+      q: activeSource.q,
+      code: activeSource.code,
+      e: activeSource.e,
+      origQ: rawQ,
+      origO: origOpts,
+      origA: rawAnsIndex,
+      displayOpts: origOpts.slice(),
+      displayA: rawAnsIndex,
+      isShowingVariant: !!(variant && !useOrig)
+    };
+  }
 
   const isPinned = origOpts.map(opt => {
     const s = String(opt || '').trim().toLowerCase();
@@ -1666,11 +2985,11 @@ function prepareQuestionForDisplay(rawQ) {
     origA: rawAnsIndex,
     displayOpts,
     displayA: displayA >= 0 ? displayA : 0,
-    isShowingVariant: !!(rawQ._variant && !rawQ._useOriginal)
+    isShowingVariant: !!(variant && !useOrig)
   };
 }
 
-// Probabilistic Spaced Session Construction
+// Probabilistic Spaced Session Construction (FSRS-scheduled, unbroken subject runs, easy L0 first item)
 function buildTodaySession(minutes = 15, quickOnly = false) {
   if (!D || !D.length) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
@@ -1680,23 +2999,30 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   const due = dueKeys(quickOnly);
   const lockedSet = new Set(pool.filter(q => isLockedIn(q)).map(q => q.n));
 
-  // Include previously answered questions to reinforce retained knowledge.
-  const sureWins = pool.filter(q => {
-    const v = V[qk(q)];
-    return v && (v.history || []).some(h => h.ok) && !due.includes(q.n);
-  }).map(q => q.n).sort(() => Math.random() - 0.5);
+  // Easy first question: pick an L0 item with highest historical accuracy (eliminates startup anxiety)
+  const easyFirstCandidates = pool.filter(q => (q.level === 0 || q.level == null) && V[qk(q)]?.history?.some(h => h.ok));
+  let easyFirst = null;
+  if (easyFirstCandidates.length) {
+    easyFirstCandidates.sort((a, b) => {
+      const va = V[qk(a)]?.history || [];
+      const vb = V[qk(b)]?.history || [];
+      const accA = va.filter(h => h.ok).length / (va.length || 1);
+      const accB = vb.filter(h => h.ok).length / (vb.length || 1);
+      return accB - accA;
+    });
+    easyFirst = easyFirstCandidates[0].n;
+  } else {
+    const l0Item = pool.find(q => q.level === 0);
+    if (l0Item) easyFirst = l0Item.n;
+  }
 
-  // 2. Identify Weakest Subject (Calibrated with >= 8 attempts)
+  // Identify Red/Weak subjects (accuracy <= 40%)
   const subjMap = agg();
-  const qualifiedWeak = Object.entries(subjMap)
-    .filter(([k, o]) => (o.c + o.w + o.k) >= 8 && (o.c / (o.c + o.w + o.k)) < 0.60)
-    .sort((a, b) => (a[1].c / (a[1].c + a[1].w + a[1].k)) - (b[1].c / (b[1].c + b[1].w + b[1].k)));
-
-  const weakestSubjName = qualifiedWeak.length ? qualifiedWeak[0][0] : null;
-  const weakItems = weakestSubjName ? pool.filter(q => cl(q.s) === weakestSubjName && !lockedSet.has(q.n)).map(q => q.n) : [];
-
-  // 3. Fresh unattempted items
-  const unseenItems = pool.filter(q => !V[qk(q)]).map(q => q.n).sort(() => Math.random() - 0.5);
+  const redSubjects = new Set(
+    Object.entries(subjMap)
+      .filter(([k, o]) => (o.c + o.w + o.k) >= 5 && (o.c / (o.c + o.w + o.k)) <= 0.40)
+      .map(([k]) => k)
+  );
 
   const session = [];
   const added = new Set();
@@ -1709,31 +3035,34 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     return false;
   }
 
-  // Include up to two previously answered questions.
-  for (let i = 0; i < 2 && sureWins.length; i++) add(sureWins.pop());
+  if (easyFirst) add(easyFirst);
 
-  // Due items (probabilistically weighted, max 3 leeches per session to avoid burnout)
+  // Due items (priority-sorted from dueKeys, max 3 leeches per session)
   let leechCountInSession = 0;
-  const shuffledDue = due.slice().sort(() => Math.random() - 0.5);
-  while (shuffledDue.length && session.length < targetQ - 4) {
-    const candidateN = shuffledDue.pop();
+  for (const candidateN of due) {
+    if (session.length >= targetQ - 3) break;
     const candQ = byN(candidateN);
     const v = candQ ? V[qk(candQ)] : null;
     const isLeech = v && v.missCount >= 3;
     if (isLeech) {
-      if (leechCountInSession >= 3) continue; // Allow at most 3 leeches per session
+      if (leechCountInSession >= 3) continue;
       leechCountInSession++;
     }
     add(candidateN);
   }
 
-  // Weakest subject items
-  const shuffledWeak = weakItems.slice().sort(() => Math.random() - 0.5);
-  for (let i = 0; i < 3 && shuffledWeak.length && session.length < targetQ - 2; i++) {
-    add(shuffledWeak.pop());
+  // Red/Weak subjects: pull L0/L1 items heavily (75% L0, 20% L1)
+  if (redSubjects.size > 0) {
+    const redPool = pool.filter(q => redSubjects.has(cl(q.s)) && (q.level === 0 || q.level === 1));
+    redPool.sort(() => Math.random() - 0.5);
+    for (const q of redPool) {
+      if (session.length >= targetQ - 2) break;
+      add(q.n);
+    }
   }
 
-  // Fresh items
+  // Fresh unattempted items (exclude L3 unless L0-L2 are mastered)
+  const unseenItems = pool.filter(q => !V[qk(q)] && (q.level == null || q.level < 3)).map(q => q.n).sort(() => Math.random() - 0.5);
   while (unseenItems.length && session.length < targetQ - 1) {
     add(unseenItems.pop());
   }
@@ -1745,7 +3074,17 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     add(n);
   }
 
-  return groupQuestionBlocks(session);
+  // Appendix Rule 12: Ensure unbroken subject runs, with easyFirst's subject run placed first
+  const blocked = groupQuestionBlocks(session);
+  if (easyFirst && blocked.includes(easyFirst)) {
+    const easyQ = byN(easyFirst);
+    const easySubj = easyQ ? cl(easyQ.s) : '';
+    const subjRun = blocked.filter(k => cl(byN(k)?.s) === easySubj);
+    const otherRuns = blocked.filter(k => cl(byN(k)?.s) !== easySubj);
+    const reorderedSubjRun = [easyFirst, ...subjRun.filter(k => k !== easyFirst)];
+    return [...reorderedSubjRun, ...otherRuns];
+  }
+  return blocked;
 }
 
 // Honest Readiness Meter
@@ -1785,38 +3124,35 @@ function renderReadinessMeter() {
     });
   }
 
-  // Filter out phantom 0-attempt entries and sort actionable subjects first
+  // Calibrated thresholds per MIT Entrance Scope Guide:
+  // Red <= 40%, Amber 41-79%, Green >= 80%, Calibrating < 5 attempts
   const rows = Object.entries(subjData)
     .filter(([k, o]) => (o.c + o.w + o.k) > 0)
     .map(([k, o]) => {
       const tot = o.c + o.w + o.k;
       const acc = tot ? o.c / tot : 0;
-      const isCalibrated = tot >= 8;
+      const isCalibrated = tot >= 5;
       const gap = acc - 0.75;
       return { k, tot, c: o.c, acc, isCalibrated, gap };
     }).sort((a, b) => {
       const priority = r => {
-        if (r.isCalibrated && r.acc < 0.60) return 1; // Needs focus at the top
-        if (r.isCalibrated && r.acc < 0.75) return 2; // Getting there
-        if (!r.isCalibrated) return 3;                // Calibrating in progress
-        return 4;                                     // On target
+        if (r.isCalibrated && r.acc <= 0.40) return 1; // Red
+        if (r.isCalibrated && r.acc < 0.80) return 2;  // Amber
+        if (!r.isCalibrated) return 3;                 // Calibrating
+        return 4;                                      // Green (>=80%)
       };
       return priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
     });
   const calibratedRows = rows.filter(r => r.isCalibrated);
 
-  // Base readiness strictly on First-Attempt Accuracy + Timed Mock performance
-  // Never inflate with repeated memory practice!
   const mockAttempts = L.filter(r => r.mock === 1);
   const mockOk = mockAttempts.filter(r => r.ok).length;
   const mockTot = mockAttempts.length;
   const mockAcc = mockTot >= 10 ? (mockOk / mockTot) : null;
-
   const fsAcc = fsTot ? (fsOk / fsTot) : 0;
   
   let projectedAcc = fsAcc;
   if (mockAcc !== null && fsTot >= 10) {
-    // 60% weight on full timed mock performance, 40% on first-attempt accuracy across all sets
     projectedAcc = (mockAcc * 0.60) + (fsAcc * 0.40);
   } else if (mockAcc !== null) {
     projectedAcc = mockAcc;
@@ -1827,66 +3163,97 @@ function renderReadinessMeter() {
   const projectedMark = Math.round(projectedAcc * 1000) / 10;
   const markGap = Math.round((projectedMark - 75) * 10) / 10;
 
-  // Track any subjects in active D that haven't been touched yet
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
   const unattemptedInDeck = [...activeDeckSubjs].filter(s => {
     const o = subjData[s];
     return !o || (o.c + o.w + o.k) === 0;
   });
 
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, projectedMark)) / 100) * circumference;
+  const ringColor = projectedMark >= 75 ? 'var(--ok)' : (projectedMark >= 50 ? 'var(--sk)' : 'var(--no)');
+
   return `
   <div class="card">
-    <div class="row" style="justify-content:space-between">
-      <h2 style="margin:0">📊 Honest Readiness Meter</h2>
-      <span class="chip ${projectedMark >= 75 ? 'c-ok' : 'c-no'}">
-        Target: 75% | Projected: <b>${projectedMark}%</b> (${markGap >= 0 ? '+' : ''}${markGap} marks)
-      </span>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2 style="margin:0">📊 Calibrated Readiness Meter</h2>
+      <div class="row" style="gap:6px">
+        ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
+      </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">Based on calibrated subjects (≥8 attempts) &amp; first-attempt accuracy. Repeat accuracy is memory-inflated.</p>
+    <p class="mu" style="margin:6px 0 14px">Honest projection based on first-attempts and timed mocks. Repeat memory practice is excluded.</p>
     
-    <div class="row" style="margin-bottom:14px">
-      <span class="chip">🔒 Locked in: <b>${lockedCount}/${D.length}</b> (${lockedPct}%)</span>
-      <span class="chip">🎯 First-attempt signal: <b>${fsTot ? Math.round(fsOk / fsTot * 100) : 0}%</b> (${fsOk}/${fsTot})</span>
-      <span class="chip mu">Repeat memory: ${rpTot ? Math.round(rpOk / rpTot * 100) : 0}% (${rpOk}/${rpTot})</span>
+    <div class="readiness-container">
+      <div class="readiness-ring-wrap">
+        <svg width="104" height="104">
+          <circle cx="52" cy="52" r="${radius}" stroke="var(--bd)" stroke-width="8" fill="none"/>
+          <circle cx="52" cy="52" r="${radius}" stroke="${ringColor}" stroke-width="8" stroke-dasharray="${circumference}" stroke-dashoffset="${strokeDashoffset}" stroke-linecap="round" fill="none" style="transition:stroke-dashoffset 0.6s ease"/>
+        </svg>
+        <div class="readiness-ring-center">
+          <span class="readiness-ring-val" style="color:${ringColor}">${projectedMark}%</span>
+          <span class="readiness-ring-target">Target 75%</span>
+        </div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div class="row" style="gap:6px;margin-bottom:8px">
+          <span class="chip">🔒 Locked in: <b>${lockedCount}/${D.length}</b> (${lockedPct}%)</span>
+          <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">Gap: <b>${markGap >= 0 ? '+' : ''}${markGap} marks</b></span>
+        </div>
+        <div class="row sm mu" style="gap:10px">
+          <span>🎯 First attempt: <b>${fsTot ? Math.round(fsOk / fsTot * 100) : 0}%</b> (${fsOk}/${fsTot})</span>
+          <span>Repeat memory: ${rpTot ? Math.round(rpOk / rpTot * 100) : 0}% (${rpOk}/${rpTot})</span>
+        </div>
+      </div>
     </div>
 
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Subject</th>
-          <th>Attempts</th>
-          <th>Accuracy</th>
-          <th>Gap to 75%</th>
-          <th>Diagnostic Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.map(r => {
-          let statusBadge = '';
-          if (!r.isCalibrated) {
-            statusBadge = `<span class="mu sm">Calibrating (${r.tot}/8)</span>`;
-          } else if (r.acc >= 0.75) {
-            statusBadge = `<span class="c-ok sm" style="font-weight:600">✓ On target</span>`;
-          } else if (r.acc < 0.60) {
-            statusBadge = `<span class="c-no sm" style="font-weight:600">⚠ Needs focus</span>`;
-          } else {
-            statusBadge = `<span class="c-sk sm">Getting there</span>`;
-          }
-          return `
-            <tr>
-              <td><b>${esc(r.k)}</b></td>
-              <td>${r.tot}</td>
-              <td>${r.tot ? Math.round(r.acc * 100) + '%' : '–'}</td>
-              <td class="${r.gap >= 0 ? 'c-ok' : 'c-no'}">${r.isCalibrated ? (r.gap >= 0 ? '+' : '') + Math.round(r.gap * 100) + '%' : '–'}</td>
-              <td>${statusBadge}</td>
-            </tr>
-          `;
-        }).join('')}
-      </tbody>
-    </table>
-    ${unattemptedInDeck.length ? `<p class="mu sm" style="margin-top:10px">📚 <b>Not yet attempted in active deck:</b> ${unattemptedInDeck.map(s => esc(s)).join(' · ')}</p>` : ''}
+    <div class="row" style="justify-content:space-between;align-items:center;margin-top:18px">
+      <b>Subject Status &amp; Targeted Drills</b>
+      <span class="mu sm">Tap any subject to launch targeted drill</span>
+    </div>
+
+    <div class="subject-card-grid">
+      ${rows.map(r => {
+        const fixCount = (FIX_DAYS[r.k] || []).length;
+        let dotClass = 'dot-gray';
+        let statusText = `Calibrating (${r.tot}/5)`;
+        if (r.isCalibrated) {
+          if (r.acc >= 0.80) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
+          else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
+          else { dotClass = 'dot-amber'; statusText = `${Math.round(r.acc * 100)}% · Borderline`; }
+        }
+        return `
+          <div class="subject-card" onclick="startSubjectDrillFromBank('${esc(r.k)}')">
+            <div class="row" style="justify-content:space-between;align-items:center">
+              <b style="font-size:13px">${esc(r.k)}</b>
+              <span class="mu sm">↗</span>
+            </div>
+            <div class="row sm" style="align-items:center;font-size:12px;margin-top:2px">
+              <span class="status-dot ${dotClass}"></span>
+              <b>${statusText}</b>
+              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    ${unattemptedInDeck.length ? `<p class="mu sm" style="margin-top:14px">📚 <b>Not yet attempted in active deck:</b> ${unattemptedInDeck.map(s => esc(s)).join(' · ')}</p>` : ''}
   </div>
   `;
+}
+
+function startSubjectDrillFromBank(subjectName) {
+  const norm = canonSubj(subjectName);
+  const pool = (D || []).filter(q => canonSubj(q.s) === norm).map(q => q.n);
+  if (!pool.length) {
+    alert('No questions found for subject: ' + subjectName);
+    return;
+  }
+  const un = pool.filter(n => !R[n]);
+  const due = pool.filter(n => R[n] === 'w' || (V[qk(byN(n))] && V[qk(byN(n))].due <= today()));
+  const rest = pool.filter(n => !un.includes(n) && !due.includes(n));
+  const list = [...un.sort(() => Math.random() - 0.5), ...due.sort(() => Math.random() - 0.5), ...rest.sort(() => Math.random() - 0.5)].slice(0, 15);
+  start(list);
 }
 
 // Backup Nudge
@@ -1914,13 +3281,42 @@ function dismissBackup() {
   home();
 }
 
+function toggleMoreMenu() {
+  showMoreMenu = !showMoreMenu;
+  const content = $('#more-drawer-content');
+  const arrow = $('#more-toggle-arrow');
+  if (content && arrow) {
+    content.style.display = showMoreMenu ? 'block' : 'none';
+    arrow.textContent = showMoreMenu ? '▲' : '▼';
+    if (showMoreMenu) {
+      setTimeout(() => {
+        content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  } else {
+    home(true);
+  }
+}
+
 // Home View
-function home() {
+function home(preserveScroll = false) {
+  if (!preserveScroll) {
+    window.scrollTo(0, 0);
+  }
   view = 'home';
   cancelAutoAdvance();
   clearInterval(TI);
   if (MK) { MK = null; Q = []; QRESULTS = []; P = 0; }
   cancelRecallTimer();
+
+  const daysLeft = getDaysLeft();
+  if (daysLeft <= 7 && !localStorage.getItem('bitmcq_quiet_seen')) {
+    QUIET_MODE = true;
+    localStorage.setItem('bitmcq_quiet', 'true');
+    localStorage.setItem('bitmcq_quiet_seen', '1');
+  }
+
+  if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
 
   if (!D || loadMode) {
     const B = impMode === 1;
@@ -1956,7 +3352,6 @@ function home() {
     return;
   }
 
-  const daysLeft = getDaysLeft();
   const maxCap = getMaxInterval();
   const due = dueKeys();
   const un = D.filter(q => !R[q.n]).map(q => q.n);
@@ -1970,16 +3365,54 @@ function home() {
     ? (isCurrentBankSet && !currentBankSetComplete ? `📚 Continue Set ${SETI + 1}` : `📚 Next Set · ${esc(bankForFresh.name)}`)
     : `✨ Fresh Questions (up to ${Math.max(10, Math.round(todayMins * 60 / 50))} Q)`;
 
+  const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
+  const milestone = getCurrentMilestone();
+
+  let resumeMockBanner = '';
+  try {
+    const rawMock = localStorage.getItem('bitmcq_mock_state');
+    if (rawMock) {
+      const parsed = JSON.parse(rawMock);
+      if (parsed.MK && parsed.MK.end > Date.now()) {
+        const minsLeft = Math.round((parsed.MK.end - Date.now()) / 60000);
+        resumeMockBanner = `
+          <div class="milestone-banner" style="border-color:var(--ac);background:var(--ac-bg);margin-bottom:12px">
+            <div>
+              <b>⏱ Active Mock Exam in Progress</b>
+              <div class="mu sm">${minsLeft} min remaining · ${parsed.Q.length} questions</div>
+            </div>
+            <div class="row" style="gap:6px">
+              <button class="p sm" onclick="resumeActiveMock()">▶ Resume Mock</button>
+              <button class="sm" onclick="cancelActiveMock()">Cancel</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+  } catch (e) {}
+
   $('#app').innerHTML = `
     ${renderBackupNudge()}
+    ${resumeMockBanner}
+
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <h1>🧠 Recall</h1>
-      <div class="row">
-        <span class="chip interactive" onclick="editExamDate()" title="Click to adjust exam date">
-          🎯 Exam in <b>${daysLeft} days</b> (cap: ${maxCap}d) ✎
-        </span>
+      <div class="row" style="gap:6px">
+        <button class="sm" onclick="toggleQuietMode()" title="Toggle quiet mode without streak/advice">${QUIET_MODE ? '🤫 Quiet' : '🔔 Normal'}</button>
         <button class="sm" onclick="openSettings()">⚙</button>
       </div>
+    </div>
+
+    <!-- Milestone Guidance Banner -->
+    <div class="milestone-banner hide-quiet">
+      <div class="row" style="gap:10px;align-items:center">
+        <span class="milestone-tag">${milestone.tag}</span>
+        <div>
+          <b>${esc(milestone.title)}</b>
+          <div class="mu sm">${esc(milestone.desc)}</div>
+        </div>
+      </div>
+      ${milestone.id === 1 ? `<button class="p sm" onclick="startDiagnosticMock()">Start Diagnostic</button>` : ''}
     </div>
 
     <!-- Hero Card: Default Today Mission -->
@@ -1987,9 +3420,9 @@ function home() {
       <div class="row" style="justify-content:space-between">
         <div>
           <h2 style="margin:0 0 4px">🎯 Today's Mission</h2>
-          <div class="mu">Interleaved · due items first, weakest subject, new concepts</div>
+          <div class="mu">Interleaved · easy first question, due items, weakest subject</div>
         </div>
-        <div class="row">
+        <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
           <span class="chip c-ok">Due: <b>${due.length}</b></span>
         </div>
@@ -1997,39 +3430,48 @@ function home() {
 
       <div class="row" style="margin:14px 0 16px">
         <span class="mu" style="font-weight:600">Session length:</span>
-        <button class="${todayMins === 10 ? 'p' : ''} sm" onclick="todayMins=10;save();home()">10 min (12 Q)</button>
-        <button class="${todayMins === 15 ? 'p' : ''} sm" onclick="todayMins=15;save();home()">15 min (18 Q) ★</button>
-        <button class="${todayMins === 25 ? 'p' : ''} sm" onclick="todayMins=25;save();home()">25 min (28 Q)</button>
+        <button class="${todayMins === 10 ? 'p' : ''} sm" onclick="todayMins=10;save();home(true)">10 min (12 Q)</button>
+        <button class="${todayMins === 15 ? 'p' : ''} sm" onclick="todayMins=15;save();home(true)">15 min (18 Q) ★</button>
+        <button class="${todayMins === 25 ? 'p' : ''} sm" onclick="todayMins=25;save();home(true)">25 min (28 Q)</button>
       </div>
 
       <button class="p big-btn" onclick="startToday()">
-        ▶ Start Today's Mission (${todayMins} min)
+        ▶ Continue Today's Practice (${todayMins} min)
       </button>
 
-      <!-- Quick revision and fresh-question options -->
+      ${dueCards.length ? `
+        <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFlashcardReview()">
+          🃏 Review Due Flashcards (<b>${dueCards.length}</b> due)
+        </button>
+      ` : ''}
+
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">Previously attempted questions, prioritized by spaced-repetition due date and weak areas</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">Prioritized by spaced-repetition due date and weak areas</div>
+
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${bankForFresh || freshCount ? '' : 'disabled'}>
         ${freshButtonText}
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">${bankForFresh ? 'Finish the current set before advancing. One new set per day.' : `${freshCount} unseen questions available`}</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">${bankForFresh ? 'Finish current set before advancing.' : `${freshCount} unseen questions available`}</div>
     </div>
 
     ${renderReadinessMeter()}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
     <div class="card" style="margin-top:14px">
-      <button class="drawer-toggle" onclick="showMoreMenu=!showMoreMenu;home()">
+      <button class="drawer-toggle" onclick="toggleMoreMenu()">
         <span>📚 More Study Modes &amp; Decks</span>
-        <span>${showMoreMenu ? '▲' : '▼'}</span>
+        <span id="more-toggle-arrow">${showMoreMenu ? '▲' : '▼'}</span>
       </button>
 
-      ${showMoreMenu ? `
-        <div style="margin-top:16px">
-          <div class="row" style="margin-bottom:12px">
-            <button class="p sm" onclick="mock()">⏱ Timed Full Mock Exam (80–100 Q)</button>
+      <div id="more-drawer-content" style="display:${showMoreMenu ? 'block' : 'none'};margin-top:16px">
+          <div class="row" style="margin-bottom:12px;gap:6px">
+            <button class="p sm" onclick="mock(100)">⏱ Full Mock (100 Q, 120m)</button>
+            <button class="sm" onclick="mock(50)">⏱ Half Mock (50 Q, 60m)</button>
+            <button class="sm" onclick="startDiagnosticMock()">🎯 Day-1 Diagnostic Mock</button>
+          </div>
+          <div class="row" style="margin-bottom:12px;gap:6px">
             <button class="sm" onclick="startMistakes()" ${wr.length ? '' : 'disabled'}>Retry mistakes (capped at 5)</button>
             <button class="sm" onclick="start(${JSON.stringify(un)})" ${un.length ? '' : 'disabled'}>Unattempted (${un.length})</button>
             <button class="sm" onclick="start(${JSON.stringify(sk)})" ${sk.length ? '' : 'disabled'}>Skipped (${sk.length})</button>
@@ -2059,7 +3501,6 @@ function home() {
             <input type="file" id="rb" accept=".json" style="display:none" onchange="restore(this.files[0])">
           </div>
         </div>
-      ` : ''}
     </div>
   `;
 }
@@ -2229,6 +3670,29 @@ function editExamDate() {
   }
 }
 
+// Navigation Stack Controls (Back B / Forward N)
+function navBack() {
+  if (P <= 0) return;
+  cancelAutoAdvance();
+  P--;
+  save();
+  show();
+}
+
+function navForward() {
+  if (P >= Q.length - 1) {
+    const hist = sessionHistory[P];
+    if (hist && (hist.locked || (MK && MK.a[byN(Q[P])?.n] !== undefined))) {
+      return next();
+    }
+    return;
+  }
+  cancelAutoAdvance();
+  P++;
+  save();
+  show();
+}
+
 // Question Screen & Presentation
 function show() {
   view = 'q';
@@ -2242,13 +3706,60 @@ function show() {
   }
 
   const rawQ = byN(Q[P]);
-  CURRENT_Q = prepareQuestionForDisplay(rawQ);
+  const vRec = V[qk(rawQ)];
 
-  const isReview = !!V[qk(rawQ)] && Array.isArray(V[qk(rawQ)].history) && V[qk(rawQ)].history.length > 0;
-  const hasVariant = !!rawQ._variant;
+  // Auto-generate fresh variant if regeneratable/calc and student previously got it right
+  if ((rawQ.regeneratable || matchQuestionFamily(rawQ)) && (R[rawQ.n] === 'c' || (vRec && vRec.stab > 1)) && !vRec?._variant && !rawQ._variant) {
+    if (matchQuestionFamily(rawQ)) {
+      generateLocalFamilyVariant(rawQ);
+    }
+  }
+
+  // Session History Stack: restore exact options and answer if navigated back
+  let hist = sessionHistory[P];
+  if (!hist || hist.qKey !== qk(rawQ)) {
+    CURRENT_Q = prepareQuestionForDisplay(rawQ);
+    hist = {
+      qKey: qk(rawQ),
+      CURRENT_Q: CURRENT_Q,
+      locked: false,
+      chosenIdx: undefined,
+      origPickedIndex: undefined,
+      ok: undefined,
+      recordedFirstAttempt: false,
+      feedbackHtml: ''
+    };
+    sessionHistory[P] = hist;
+  } else {
+    CURRENT_Q = hist.CURRENT_Q;
+    locked = !!hist.locked;
+  }
+
+  const isReview = !!vRec && Array.isArray(vRec.history) && vRec.history.length > 0;
+  const activeVariant = vRec?._variant || rawQ._variant;
+  const hasVariant = !!activeVariant;
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
   const levelLabel = ['L0 · Core', 'L1 · Standard', 'L2 · Exact', 'L3 · Advanced'][rawQ.level];
+  const canRegen = !!(rawQ.regeneratable || matchQuestionFamily(rawQ) || (GEM_KEY && !isQuick));
+
+  // Memory Anchor
+  const mnemonicAnchor = vRec?.mnemonic ? `
+    <div class="anchor-chip">
+      🧠 Memory Anchor: <i>"${esc(vRec.mnemonic)}"</i>
+    </div>
+  ` : '';
+
+  // Appendix Rule 12: Visual banner at start of each unbroken subject run
+  const prevQ = P > 0 ? byN(Q[P - 1]) : null;
+  const isSubjectStart = !prevQ || cl(prevQ.s) !== cl(rawQ.s);
+  const remainingInSubject = Q.slice(P).filter(k => cl(byN(k)?.s) === cl(rawQ.s)).length;
+  const subjectBannerHtml = isSubjectStart ? `
+    <div class="subject-block-banner">
+      <span>📚 Subject Block: <b>${esc(rawQ.s)}</b></span>
+      <span class="mu sm">${remainingInSubject} Q in this block</span>
+    </div>
+  ` : '';
 
   let pauseBtn = '';
   if (MK) {
@@ -2258,83 +3769,110 @@ function show() {
   clearMath($('#app'));
   $('#app').innerHTML = `
     <div class="top">
-      <div class="row" style="justify-content:space-between">
-        <div class="row">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="row" style="gap:6px;align-items:center">
           ${MK ? '<span class="chip" id="tm"></span><span class="chip c-no" id="unans-chip"></span>' : stats()}
           ${pauseBtn}
-          <span class="chip mu">${isQuick ? '⚡ Quick (No-pen)' : '📝 Pen &amp; Paper'}</span>
+          <span class="chip mu">${isQuick ? '⚡ Quick' : '📝 Pen &amp; Paper'}</span>
           ${levelLabel ? `<span class="chip" title="Question priority level">${levelLabel}</span>` : ''}
-          <button class="sm" style="padding:2px 8px;font-size:11px" onclick="setQuick(${rawQ.n}, ${isQuick ? 'false' : 'true'})">${isQuick ? 'Mark as Pen & Paper' : 'Mark as Quick'}</button>
-          ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Verified Variant (Original Safe)</span>' : ''}
+          ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
+          ${isShowingVariant && activeVariant && activeVariant.verified === false ? '<span class="badge-unverified" title="Generated single-pass without blind verify">unverified</span>' : ''}
         </div>
-        <button onclick="confirmExit()">☰ Menu</button>
+        <div class="row" style="gap:6px;align-items:center">
+          <button class="sm" id="btn-back" onclick="navBack()" ${P <= 0 ? 'disabled' : ''} title="Previous question (B)">← Back <kbd class="kbd-badge sm">B</kbd></button>
+          <button class="sm" id="btn-fwd" onclick="navForward()" ${P >= Q.length - 1 && !hist.locked && !MK ? 'disabled' : ''} title="Next question (N)">Forward → <kbd class="kbd-badge sm">N</kbd></button>
+          <button onclick="confirmExit()">☰ Menu</button>
+        </div>
       </div>
       <div class="bar"><i style="width:${P / Q.length * 100}%"></i></div>
-      <div class="row" style="justify-content:space-between;margin-top:4px">
+      <div class="row" style="justify-content:space-between;margin-top:4px;align-items:center">
         <span class="mu">Question ${P + 1} of ${Q.length} · Q${rawQ.n} · ${esc(rawQ.s)}</span>
         <div class="row" style="gap:6px">
-          ${hasVariant ? `
-            <button class="sm" style="padding:2px 8px;font-size:11px" onclick="toggleOriginalStem(${rawQ.n})">
-              ${isShowingVariant ? '↺ View original question' : '✨ View AI variant'}
-            </button>
-            <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="if(confirm('Delete this AI variant and keep original forever?')) deleteVariant(${rawQ.n})" title="One-tap delete variant">
-              ✕ Variant wrong
+          ${canRegen ? `
+            <button class="sm" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate fresh values/scenario for this question">
+              ✨ New Numbers
             </button>
           ` : ''}
+          ${hasVariant ? `
+            <button class="sm" style="padding:2px 8px;font-size:11px" onclick="toggleOriginalStem(${rawQ.n})">
+              ${isShowingVariant ? '↺ View original' : '✨ View variant'}
+            </button>
+          ` : ''}
+          <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
+            🚩 Looks wrong
+          </button>
         </div>
       </div>
     </div>
 
-    <div class="card" style="margin-top:10px">
-      <div class="q" id="q-stem">${renderQuestionStem(CURRENT_Q.q)}</div>
-      ${CURRENT_Q.code && CURRENT_Q.code.length ? `<pre id="q-code">${esc(CURRENT_Q.code.join('\n'))}</pre>` : ''}
+    ${subjectBannerHtml}
 
-      <!-- Recall-First Block for Review Items -->
-      ${(isReview && !MK && recallFirst) ? `
-        <div class="recall-container" id="recall-box" onclick="revealRecallOptions()">
-          <div class="recall-overlay" id="recall-prompt">
-            <span class="recall-pulse"></span>
-            <b>Recall-First: Think of the answer before looking at the choices.</b>
-            <div class="mu" style="margin:8px 0">Reveal choices whenever you're ready. Press any key to skip.</div>
-            <button class="p sm" onclick="event.stopPropagation();revealRecallOptions()">Show choices now</button>
-            <button class="sm" onclick="event.stopPropagation();setRecallFirst(false)">Turn off recall-first</button>
+    <div class="${MK ? 'mock-desktop-grid' : ''}">
+      <div class="card fade-in" style="margin-top:10px">
+        <div class="study-layout">
+          <div class="study-left-pane">
+            ${mnemonicAnchor}
+            <div class="q" id="q-stem">${renderQuestionStem(CURRENT_Q.q)}</div>
+            ${CURRENT_Q.code && CURRENT_Q.code.length ? `<pre id="q-code">${esc(CURRENT_Q.code.join('\n'))}</pre>` : ''}
           </div>
-          <div id="opts-container" class="recall-hidden">
-            ${renderOptionsHtml(CURRENT_Q)}
+          <div class="study-right-pane">
+            <!-- Recall-First Block for Review Items -->
+            ${(isReview && !MK && recallFirst && !hist.locked) ? `
+              <div class="recall-container" id="recall-box" onclick="revealRecallOptions()">
+                <div class="recall-overlay" id="recall-prompt">
+                  <span class="recall-pulse"></span>
+                  <b>Recall-First: Think of the answer before looking at the choices.</b>
+                  <div class="mu" style="margin:8px 0">Reveal choices whenever you're ready. Press any key to skip.</div>
+                  <button class="p sm" onclick="event.stopPropagation();revealRecallOptions()">Show choices now</button>
+                  <button class="sm" onclick="event.stopPropagation();setRecallFirst(false)">Turn off recall-first</button>
+                </div>
+                <div id="opts-container" class="recall-hidden">
+                  ${renderOptionsHtml(CURRENT_Q, hist)}
+                </div>
+              </div>
+            ` : `
+              ${isReview && !MK && !hist.locked ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
+              <div id="opts-container">
+                ${renderOptionsHtml(CURRENT_Q, hist)}
+              </div>
+            `}
+
+            <div id="fb">${hist.locked ? (hist.feedbackHtml || '') : ''}</div>
           </div>
         </div>
-      ` : `
-        ${isReview && !MK ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
-        <div id="opts-container">
-          ${renderOptionsHtml(CURRENT_Q)}
-        </div>
-      `}
 
-      <div id="fb"></div>
-
-      <!-- Clean Footer: Zero Button Friction -->
-      <div class="row" style="margin-top:14px;justify-content:space-between">
-        <div>
-          ${MK ? `
-            <button id="flag-btn" class="sm ${MK.flagged && MK.flagged[rawQ.n] ? 'p' : ''}" onclick="toggleFlag()">
-              🚩 Flag for Review
+        <!-- Footer Navigation and Submission -->
+        <div class="row" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bd);justify-content:space-between;align-items:center">
+          <div>
+            ${MK ? `
+              <button id="flag-btn" class="sm ${MK.flagged && MK.flagged[rawQ.n] ? 'p' : ''}" onclick="toggleFlag()">
+                🚩 Flag <kbd class="kbd-badge sm">F</kbd>
+              </button>
+            ` : (hist.locked ? `
+              <span class="mu sm">Answered (Read-only)</span>
+            ` : `
+              <button id="dontknow-btn" class="sm" onclick="dontKnow()">
+                🤷 Don't know <kbd class="kbd-badge sm">S</kbd>
+              </button>
+            `)}
+          </div>
+          <div class="row" style="gap:6px">
+            <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back <kbd class="kbd-badge sm">B</kbd></button>
+            <button class="sm ${hist.locked ? 'p' : ''}" id="nx" onclick="navForward()" ${P >= Q.length - 1 && !hist.locked && !MK ? 'disabled' : ''}>
+              ${P >= Q.length - 1 ? (MK ? 'Finish' : 'Complete Session →') : 'Forward → <kbd class="kbd-badge sm">N</kbd>'}
             </button>
-          ` : `
-            <button id="dontknow-btn" class="sm" onclick="dontKnow()">
-              🤷 Don't know (S)
-            </button>
-          `}
+            ${MK ? `<button class="p sm" onclick="confirmSubmitMock()">Submit Mock</button>` : ''}
+          </div>
         </div>
-        ${MK ? `<button class="p sm" onclick="confirmSubmitMock()">Submit Mock Exam</button>` : ''}
       </div>
-    </div>
 
-    ${MK ? renderMockPalette() : ''}
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>S</b> don't know · <b>Enter</b> continue</p>
+      ${MK ? renderMockPalette() : ''}
+    </div>
+    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b> back · <b>N</b> forward · <b>S</b> don't know · <b>Enter</b> continue</p>
   `;
   typesetMath($('#app'));
 
-  if (isReview && !MK && recallFirst) {
+  if (isReview && !MK && recallFirst && !hist.locked) {
     recallWaiting = true;
   }
 
@@ -2348,18 +3886,47 @@ function show() {
 
 function toggleOriginalStem(n) {
   const q = byN(n);
-  if (!q || !q._variant) return;
-  q._useOriginal = !q._useOriginal;
+  if (!q) return;
+  const k = qk(q);
+  const vRec = V[k] || (V[k] = {});
+  const variant = vRec._variant || q._variant;
+  if (!variant) return;
+  vRec._useOriginal = !vRec._useOriginal;
+  q._useOriginal = vRec._useOriginal;
+  if (sessionHistory[P]) delete sessionHistory[P];
   save();
   show();
 }
 
-function renderOptionsHtml(q) {
-  return q.displayOpts.map((o, i) => `
-    <button class="opt" id="opt-${i}" onclick="pick(${i})">
-      <b>${'ABCD'[i]}</b><span>${esc(o)}</span>
-    </button>
-  `).join('');
+function renderOptionsHtml(q, hist) {
+  const isMock = !!MK;
+  const rawQ = q.origQ || byN(Q[P]);
+  const mockAnswer = isMock ? MK.a[rawQ.n] : undefined;
+
+  return q.displayOpts.map((o, i) => {
+    let cls = 'opt';
+    let disabled = false;
+    let stateIcon = '';
+    if (isMock) {
+      if (mockAnswer === i) cls += ' ans';
+    } else if (hist && hist.locked) {
+      disabled = true;
+      if (i === q.displayA) {
+        cls += ' ok';
+        stateIcon = '<span class="opt-state-icon c-ok">✓ Correct</span>';
+      } else if (i === hist.chosenIdx) {
+        cls += ' no';
+        stateIcon = '<span class="opt-state-icon c-no">✗ Picked</span>';
+      }
+    }
+    return `
+      <button class="${cls}" id="opt-${i}" onclick="pick(${i})" ${disabled ? 'disabled' : ''}>
+        <kbd class="kbd-badge">${'ABCD'[i]}</kbd>
+        <span class="opt-text">${esc(o)}</span>
+        ${stateIcon}
+      </button>
+    `;
+  }).join('');
 }
 
 function renderQuestionStem(stem) {
@@ -2408,7 +3975,25 @@ function confirmExit() {
   home();
 }
 
-let REC = null;
+let questionStartTime = Date.now();
+
+function updateConfidence(cf) {
+  if (!REC || !CURRENT_Q) return;
+  const rawQ = CURRENT_Q.origQ || byN(Q[P]);
+  const timeTakenMs = Math.max(500, Date.now() - (questionStartTime || Date.now()));
+  REC.cf = cf;
+  sr(rawQ, REC.ok, cf, timeTakenMs);
+  const hist = sessionHistory[P];
+  if (hist) {
+    hist.cf = cf;
+    const fbEl = $('#fb');
+    if (fbEl) hist.feedbackHtml = fbEl.innerHTML;
+  }
+  document.querySelectorAll('.cf-btn').forEach(b => {
+    b.classList.toggle('on', +b.dataset.cf === cf);
+  });
+  save();
+}
 
 function pick(i) {
   if (locked) return;
@@ -2418,6 +4003,11 @@ function pick(i) {
 
   if (MK) {
     MK.a[CURRENT_Q.origQ.n] = i;
+    let hist = sessionHistory[P];
+    if (!hist) hist = sessionHistory[P] = { qKey: qk(rawQ), CURRENT_Q };
+    hist.chosenIdx = i;
+    localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q, P }));
+    save();
     next();
     return;
   }
@@ -2427,42 +4017,102 @@ function pick(i) {
   const ok = (i === CURRENT_Q.displayA);
   QRESULTS[P] = ok ? 'c' : 'w';
   const origPickedIndex = CURRENT_Q.origO.indexOf(CURRENT_Q.displayOpts[i]);
+  const timeTakenMs = Math.max(500, Date.now() - (questionStartTime || Date.now()));
 
   const bs = [...document.querySelectorAll('.opt')];
   bs.forEach(b => b.disabled = true);
   const dk = $('#dontknow-btn');
   if (dk) dk.disabled = true;
 
-  REC = {
-    k: qk(rawQ),
-    t: Date.now(),
-    s: cl(rawQ.s),
-    u: rawQ.u || '',
-    q: rawQ.q.slice(0, 120),
-    ch: origPickedIndex,
-    ok,
-    set: S
-  };
-  L.push(REC);
-  sr(rawQ, ok);
+  let hist = sessionHistory[P];
+  if (!hist) hist = sessionHistory[P] = { qKey: qk(rawQ), CURRENT_Q };
+  hist.locked = true;
+  hist.chosenIdx = i;
+  hist.origPickedIndex = origPickedIndex;
+  hist.ok = ok;
+
+  // PRACTICE MODE: Only first attempt counts for stats & FSRS!
+  if (!hist.recordedFirstAttempt) {
+    hist.recordedFirstAttempt = true;
+    REC = {
+      k: qk(rawQ),
+      t: Date.now(),
+      s: cl(rawQ.s),
+      u: rawQ.u || '',
+      q: rawQ.q.slice(0, 120),
+      ch: origPickedIndex,
+      ok,
+      cf: 3,
+      tm: Math.round(timeTakenMs / 1000),
+      set: S
+    };
+    L.push(REC);
+    sr(rawQ, ok, 3, timeTakenMs);
+  }
+
+  const vRec = V[qk(rawQ)];
+  const isLeech = vRec && (vRec.lapses >= 3 || vRec.missCount >= 3);
+  const recRes = getRecommendedResource(rawQ.s, isLeech);
+
+  const resourceHtml = recRes ? `
+    <div class="hide-quiet" style="margin-top:10px;padding:8px 12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="sm"><b>See it →</b> ${esc(recRes.title)} (${esc(recRes.provider)})</span>
+        <div class="row" style="gap:4px">
+          <a href="${recRes.url}" target="_blank" rel="noopener noreferrer" class="res-pill" onclick="markResource('${recRes.id}','visited')">Open ↗</a>
+          <button class="sm" onclick="markResource('${recRes.id}','not_for_me')">Not for me</button>
+          <button class="sm" onclick="markResource('${recRes.id}','done')">Done</button>
+        </div>
+      </div>
+      <div class="mu sm" style="margin-top:4px">${esc(recRes.desc)}</div>
+    </div>
+  ` : '';
+
+  const rescueLadderHtml = isLeech ? `
+    <div class="ladder-box">
+      <div class="ladder-title">🧗 Stuck-Concept Rescue Ladder (Rung ${Math.min(4, vRec.lapses || 3)})</div>
+      <div class="mu sm">
+        ${vRec.lapses <= 3 ? 'Rung 1: Card created from alternate angle.' : (vRec.lapses === 4 ? 'Rung 2: Review worked analogy & formula.' : 'Rung 3: Curated video/visualizer recommended.')}
+      </div>
+      <div style="margin-top:8px">
+        <label class="mu sm" style="font-weight:600">🧠 Save your own memory anchor / mnemonic:</label>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <input type="text" id="in-mnemonic" value="${esc(vRec.mnemonic || '')}" placeholder="e.g. My phrase or anchor for this" style="flex:1">
+          <button class="sm p" onclick="saveMnemonicForCurrent()">Save Anchor</button>
+        </div>
+      </div>
+    </div>
+  ` : '';
 
   if (ok) {
     if (rawQ._k) mark(rawQ._k, 1, origPickedIndex);
     else { R[rawQ.n] = 'c'; delete W[rawQ.n]; }
     bs[i].classList.add('ok');
+    const isFastMastery = timeTakenMs < 15000;
     $('#fb').innerHTML = `
       <div class="exp">
-        <b class="c-ok">Correct.</b>
+        <b class="c-ok">${isFastMastery ? '⚡ Correct in <15s (Mastery Recall)' : 'Correct.'}</b>
+        <div class="row" style="margin-top:6px;gap:6px;align-items:center">
+          <span class="mu sm">Confidence:</span>
+          <button type="button" class="cf-btn" data-cf="1" onclick="updateConfidence(1)" title="Count as lucky guess (miss)">1 · Guess (Miss)</button>
+          <button type="button" class="cf-btn" data-cf="2" onclick="updateConfidence(2)">2 · Unsure</button>
+          <button type="button" class="cf-btn on" data-cf="3" onclick="updateConfidence(3)">3 · Sure</button>
+        </div>
         ${explanationHtml(rawQ.e)}
+        ${resourceHtml}
       </div>
-      <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
+      <p class="row" style="margin-top:12px;gap:8px">
+        <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
+        <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
+      </p>
     `;
+    hist.feedbackHtml = $('#fb').innerHTML;
     typesetMath($('#fb'));
     save();
     AUTO_ADVANCE_TIMER = setTimeout(() => {
       AUTO_ADVANCE_TIMER = null;
       fin();
-    }, 500);
+    }, 1400);
   } else {
     // Wrong Answer
     if (rawQ._k) mark(rawQ._k, 0, origPickedIndex);
@@ -2470,41 +4120,26 @@ function pick(i) {
     bs[i].classList.add('no');
     if (bs[CURRENT_Q.displayA]) bs[CURRENT_Q.displayA].classList.add('ok');
 
-    const v = V[qk(rawQ)];
-    const isLeech = v && v.missCount >= 3;
+    createCardForMissed(rawQ, origPickedIndex);
+    recordFixDay(rawQ.s);
 
-    if (isLeech) {
-      sessionLeechCount++;
-      $('#fb').innerHTML = `
-        <div class="exp leech">
-          <b style="color:#d9480f">⚠️ Leech Item (Missed 3 times):</b> Parked until tomorrow to prevent burnout.
-          <div style="margin-top:6px">Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
-          ${explanationHtml(rawQ.e)}
-        </div>
-        <p class="mu" style="margin:10px 0 4px">Write an own-words mnemonic or memory anchor (optional):</p>
-        <input type="text" id="fx" placeholder="e.g. Deferred update means NO-UNDO on crash" onkeydown="if(event.key==='Enter')fin()">
-        <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Park &amp; Continue → (Enter)</button></p>
-      `;
-      typesetMath($('#fb'));
-    } else {
-      if (!RA.has(k)) {
-        RA.add(k);
-        insertRetryInSubjectBlock(k, rawQ.s);
-      }
-      $('#fb').innerHTML = `
-        <div class="exp">
-          <b class="c-no">Wrong.</b> Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>. Scheduled for tomorrow.
-          ${explanationHtml(rawQ.e)}
-        </div>
-        <p class="mu" style="margin:10px 0 4px">Error category (optional, Enter to continue):</p>
-        <div class="row">
-          ${['Knowledge gap', 'Conceptual', 'Confusion', 'Careless'].map((n, x) => `<button class="et sm" aria-pressed="false" onclick="setEt(${x})">${n}</button>`).join('')}
-        </div>
-        <input type="text" id="fx" placeholder="Optional one-line fix: why did you pick that?" style="margin-top:8px" onkeydown="if(event.key==='Enter')fin()">
-        <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
-      `;
-      typesetMath($('#fb'));
-    }
+    if (isLeech) sessionLeechCount++;
+
+    $('#fb').innerHTML = `
+      <div class="exp ${isLeech ? 'leech' : ''}">
+        <b style="color:var(--no)">✗ Incorrect.</b>
+        <div style="margin-top:6px">Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
+        ${explanationHtml(rawQ.e)}
+        ${rescueLadderHtml}
+        ${resourceHtml}
+      </div>
+      <p class="row" style="margin-top:12px;gap:8px">
+        <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
+        <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
+      </p>
+    `;
+    hist.feedbackHtml = $('#fb').innerHTML;
+    typesetMath($('#fb'));
     save();
   }
 }
@@ -2522,30 +4157,43 @@ function dontKnow() {
   bs.forEach(b => b.disabled = true);
   if (bs[CURRENT_Q.displayA]) bs[CURRENT_Q.displayA].classList.add('ok');
 
-  REC = {
-    k: qk(rawQ),
-    t: Date.now(),
-    s: cl(rawQ.s),
-    u: rawQ.u || '',
-    q: rawQ.q.slice(0, 120),
-    ch: -1,
-    ok: false,
-    set: S
-  };
-  L.push(REC);
-  if (rawQ._k) mark(rawQ._k, 0, -1);
-  else { R[rawQ.n] = 's'; }
-  sr(rawQ, false);
-  save();
+  let hist = sessionHistory[P];
+  if (!hist) hist = sessionHistory[P] = { qKey: qk(rawQ), CURRENT_Q };
+  hist.locked = true;
+  hist.chosenIdx = -1;
+  hist.ok = false;
+
+  if (!hist.recordedFirstAttempt) {
+    hist.recordedFirstAttempt = true;
+    REC = {
+      k: qk(rawQ),
+      t: Date.now(),
+      s: cl(rawQ.s),
+      u: rawQ.u || '',
+      q: rawQ.q.slice(0, 120),
+      ch: -1,
+      ok: false,
+      set: S
+    };
+    L.push(REC);
+    if (rawQ._k) mark(rawQ._k, 0, -1);
+    else { R[rawQ.n] = 's'; }
+    sr(rawQ, false);
+  }
 
   $('#fb').innerHTML = `
     <div class="exp">
       <b class="c-no">Scheduled for tomorrow.</b> Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>
       ${explanationHtml(rawQ.e)}
     </div>
-    <p class="row" style="margin-top:12px"><button class="p" id="nx" onclick="fin()">Continue → (Enter)</button></p>
+    <p class="row" style="margin-top:12px;gap:8px">
+      <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
+      <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
+    </p>
   `;
+  hist.feedbackHtml = $('#fb').innerHTML;
   typesetMath($('#fb'));
+  save();
 }
 
 function setEt(x) {
@@ -2619,11 +4267,74 @@ async function triggerBackgroundVariantUpgrades(sessionKeys) {
   });
 }
 
-const MATH_PROMPT = 'You are an expert STEM exam writer. Solve the ORIGINAL question step by step, then create ONE new variant with DIFFERENT numbers/variables preserving the identical method. Return 4 plausible choices and the exact 0-indexed answer. Return ONLY valid JSON: {"subject":"string","stem":"string","code":["string"],"options":["a","b","c","d"],"answer":0,"why":"string"}';
-const BLIND_SOLVE_PROMPT = 'Solve this multiple choice question step by step. Identify the single correct option index (0 for A, 1 for B, 2 for C, 3 for D). Return ONLY valid JSON: {"answer":0,"why":"string"}';
+// Gemini Prompts A, B, C Implementation with Automatic Fallback (gemini_prompts.md)
+// Primary: gemini-3.8-flash. If exhausted (429) or errors -> automatically falls back to gemini-2.0-flash-lite
+async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = null) {
+  const models = [
+    preferredModel || GEM_GEN_MODEL || 'gemini-3.8-flash',
+    GEM_FALLBACK_MODEL || 'gemini-2.0-flash-lite'
+  ].filter((m, i, a) => m && a.indexOf(m) === i);
+
+  let lastError = null;
+  for (const m of models) {
+    try {
+      recordApiCall();
+      const cleanM = m.replace(/^models\//, '');
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cleanM)}:generateContent?key=${encodeURIComponent(GEM_KEY)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: { temperature: temp }
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || `HTTP ${res.status}`);
+      }
+      const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!txt) throw new Error('Empty response from model');
+      return { text: txt, modelUsed: cleanM };
+    } catch (err) {
+      console.warn(`Model ${m} error or quota exhausted (${err.message}). Trying fallback if available...`);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All configured Gemini models failed.');
+}
+
+async function fillExplanationsWithGemini() {
+  if (!GEM_KEY || !D || !D.length) return;
+  const missing = D.filter(q => !q.e || q.e.trim() === '').slice(0, 15);
+  if (!missing.length) return;
+
+  const promptA = 'You explain MCQ answers for a BSc CSIT graduate preparing for the MIT entrance exam. Rusty, not a beginner. For each question return ONE explanation of 1-3 sentences: why the key is right, then name the specific mistake that each wrong option represents. No new topics. Do not change the key. Return JSON array: [{"id": 1, "explanation": "string"}]';
+  const inputList = missing.map(q => ({ id: q.n, question: q.q, options: q.o, answer: q.a }));
+
+  try {
+    const res = await fetchGeminiWithFallback(promptA + '\n\nInput Questions:\n' + JSON.stringify(inputList), 0.3, GEM_GEN_MODEL);
+    const clean = res.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+    const list = JSON.parse(clean);
+    if (Array.isArray(list)) {
+      list.forEach(item => {
+        const q = byN(item.id);
+        if (q && item.explanation) q.e = item.explanation;
+      });
+      save();
+    }
+  } catch (err) {
+    console.warn('Background explanation fill error:', err);
+  }
+}
 
 async function rewriteQuestionWithGemini(targetQ) {
+  if (!GEM_KEY) return;
   try {
+    const k = qk(targetQ);
+    const vRec = V[k] = V[k] || {};
+    const pastValues = Array.isArray(vRec._pastValues) ? vRec._pastValues : [];
+
     const source = {
       subject: targetQ.s,
       unit: targetQ.u || '',
@@ -2631,79 +4342,75 @@ async function rewriteQuestionWithGemini(targetQ) {
       code: targetQ.code || [],
       options: targetQ.o,
       answer: targetQ.a,
-      why: targetQ.e || ''
+      why: targetQ.e || '',
+      avoid: pastValues
     };
 
-    // Step 1: Generate variant
-    const payloadGen = {
-      contents: [{
-        parts: [{
-          text: MATH_PROMPT + '\n\nOriginal Question:\n' + JSON.stringify(source)
-        }]
-      }]
-    };
+    // Prompt B & C from gemini_prompts.md
+    const promptB = 'You are an expert STEM exam writer. Create ONE new MCQ testing the SAME concept and reasoning as the source question. Change the numbers/values AND the scenario. Rules: 1. Same type, same level, one fact or small step. 2. Solve it step by step yourself first in "working". 3. Each wrong option is a specific slip named in "slips". 4. Four options within ~20% of same length. The correct option must not be the longest. 5. Avoid degenerate values (0, 1, equal numbers) and a key that appears in the stem. 6. Do not reuse any numbers in "avoid". Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
 
-    const resGen = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEM_MODEL}:generateContent?key=${GEM_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payloadGen)
-    });
-    const jGen = await resGen.json();
-    const txtGen = jGen.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txtGen) return;
-
-    const cleanGen = txtGen.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Primary call uses GEM_GEN_MODEL (default gemini-3.8-flash) with fallback to gemini-2.0-flash-lite
+    const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL);
+    const cleanGen = genResult.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
     const v = JSON.parse(cleanGen);
     if (!v.stem || !Array.isArray(v.options) || v.options.length !== 4 || typeof v.answer !== 'number') return;
 
-    // Step 2: Blind Second Solve Validation (Pass only the variant stem & options without revealing intended answer)
-    const blindPayload = {
-      contents: [{
-        parts: [{
-          text: BLIND_SOLVE_PROMPT + '\n\nSolve this question:\n' + JSON.stringify({
-            stem: v.stem,
-            code: v.code || [],
-            options: v.options
-          })
-        }]
-      }]
-    };
-
-    const resBlind = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEM_MODEL}:generateContent?key=${GEM_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(blindPayload)
-    });
-    const jBlind = await resBlind.json();
-    const txtBlind = jBlind.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txtBlind) return;
-
-    const cleanBlind = txtBlind.replace(/```json/g, '').replace(/```/g, '').trim();
-    const blindResult = JSON.parse(cleanBlind);
-
-    // Strict Agreement Check: only accept if blind second solve yields the identical answer
-    if (blindResult.answer !== v.answer) {
-      console.warn(`[AI Variant Discarded] Blind solve mismatch for Q${targetQ.n}: Gen=${v.answer}, Blind=${blindResult.answer}`);
+    // App-side check: reject if correct option is the longest option by >30%
+    const correctOpt = v.options[v.answer];
+    const lens = v.options.map(o => String(o).length);
+    const maxLen = Math.max(...lens);
+    if (String(correctOpt).length === maxLen && maxLen > Math.min(...lens) * 1.5) {
+      console.warn('[AI Variant Discarded] Correct option is excessively long giveaway.');
       return;
     }
 
-    // Safety Rule 2: NEVER overwrite original. Store as alternate variant object.
-    targetQ._variant = {
+    // Step 2: Dual Blind Second Solve Validation
+    const blindPrompt = 'Solve this multiple choice question step by step without bias. Identify the single correct option index (0 for first, 1 for second, 2 for third, 3 for fourth). Return ONLY valid JSON: {"answer":0,"why":"string"}';
+    let isVerified = false;
+    try {
+      const blindResultRaw = await fetchGeminiWithFallback(
+        blindPrompt + '\n\nQuestion to solve:\n' + JSON.stringify({ stem: v.stem, code: v.code || [], options: v.options }),
+        0.2,
+        GEM_VERIFY_MODEL || GEM_GEN_MODEL
+      );
+      const cleanBlind = blindResultRaw.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+      const blindResult = JSON.parse(cleanBlind);
+      if (blindResult.answer === v.answer) {
+        isVerified = true;
+      } else {
+        console.warn(`[AI Variant Blind Mismatch] Gen=${v.answer}, Verify=${blindResult.answer}`);
+        return;
+      }
+    } catch (verErr) {
+      console.warn('Blind verification call error:', verErr);
+    }
+
+    // App-side randomization of key position
+    const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+    const randomizedOpts = origIndices.map(idx => v.options[idx]);
+    const newAnswerIdx = origIndices.indexOf(v.answer);
+
+    vRec._pastValues = [...pastValues.slice(-4), String(v.stem).slice(0, 20)];
+    vRec._variant = {
       q: String(v.stem),
-      o: v.options.map(String),
-      a: v.answer,
-      e: v.why || targetQ.e || '',
+      o: randomizedOpts.map(String),
+      a: newAnswerIdx,
+      e: v.why || v.working || targetQ.e || '',
       code: Array.isArray(v.code) ? v.code.map(String) : [],
+      verified: isVerified,
+      modelUsed: genResult.modelUsed,
       date: Date.now()
     };
+    vRec._useOriginal = false;
     save();
 
     const bgBox = $('#bg-gen-box');
     if (bgBox) {
-      bgBox.innerHTML = `<span>✓ Q${targetQ.n} (${esc(targetQ.s)}): Verified variant saved as alternate (original safe).</span>`;
+      bgBox.style.display = 'flex';
+      bgBox.innerHTML = `<span>✓ Q${targetQ.n} (${esc(targetQ.s)}): Variant generated via ${esc(genResult.modelUsed)} ${isVerified ? '(verified)' : '(unverified)'}.</span>`;
     }
   } catch (err) {
-    console.warn('Auto variant validation error:', err);
+    console.warn('AI variant generation error:', err);
   }
 }
 
@@ -2711,7 +4418,13 @@ async function rewriteQuestionWithGemini(targetQ) {
 function deleteVariant(n) {
   const q = byN(n);
   if (!q) return;
+  const k = qk(q);
+  if (V[k]) {
+    delete V[k]._variant;
+    delete V[k]._useOriginal;
+  }
   delete q._variant;
+  delete q._useOriginal;
   save();
   show();
 }
@@ -2727,56 +4440,236 @@ function done() {
   const s = r.filter(x => x === 's').length;
   const acc = Math.round(c / (Q.length || 1) * 100);
 
+  // Recovery calculation: questions correct today that had a prior miss in L on an earlier calendar day
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+  let recoveredCount = 0;
+  Q.forEach((k, idx) => {
+    if (r[idx] === 'c') {
+      const q = byN(k);
+      const priorMiss = L.find(item => item.k === qk(q) && !item.ok && new Date(item.t).toISOString().slice(0, 10) !== todayDateStr);
+      if (priorMiss) recoveredCount++;
+    }
+  });
+
+  // Concepts known today
+  const knownConcepts = [];
+  Q.forEach((k, idx) => {
+    if (r[idx] === 'c') {
+      const q = byN(k);
+      const label = q.unit_name ? `${q.s}: ${q.unit_name}` : q.s;
+      if (!knownConcepts.includes(label)) knownConcepts.push(label);
+    }
+  });
+
+  // Concepts to revisit
+  const revisitConcepts = [];
+  const revisitKeys = [];
+  Q.forEach((k, idx) => {
+    if (r[idx] === 'w' || r[idx] === 's') {
+      const q = byN(k);
+      const label = q.unit_name ? `${q.s}: ${q.unit_name}` : q.s;
+      if (!revisitConcepts.includes(label)) {
+        revisitConcepts.push(label);
+        revisitKeys.push(q.n);
+      }
+    }
+  });
+
+  // Flashcards created count
+  let cardsCreated = 0;
+  Q.forEach((k, idx) => {
+    if (r[idx] === 'w') {
+      const hist = sessionHistory[idx];
+      const card = createCardForMissed(byN(k), hist ? hist.origPickedIndex : -1);
+      if (card) cardsCreated++;
+    }
+  });
+
+  // Record fix days for practiced subjects
+  Q.forEach(k => {
+    const q = byN(k);
+    if (q) recordFixDay(q.s);
+  });
+
   $('#app').innerHTML = `
     <h1>Session Complete 🎉</h1>
-    <div class="card">
-      <div class="row" style="margin-bottom:12px">
-        <span class="chip c-ok">✓ ${c}</span>
-        <span class="chip c-no">✗ ${w}</span>
-        <span class="chip c-sk">⏭ ${s}</span>
+    <div class="recap-card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <h2 style="margin:0 0 4px">Calm, Focused Practice Complete</h2>
+          <div class="mu sm">Every active retrieval strengthens your neural recall pathways.</div>
+        </div>
+        <span class="chip ${acc >= 75 ? 'c-ok' : 'c-sk'}">
+          Accuracy: <b>${acc}%</b>
+        </span>
       </div>
-      <p style="font-size:18px">
-        Finished <b>${Q.length} questions</b> · Accuracy: <b class="${acc >= 75 ? 'c-ok' : 'c-sk'}">${acc}%</b>
-      </p>
-      <p class="mu">
-        ${c} correct · ${w} wrong · ${s} don't know / skipped
-        ${sessionLeechCount ? `<br>⚠️ ${sessionLeechCount} leech question(s) parked until tomorrow to prevent fatigue.` : ''}
-      </p>
+
+      <div class="recap-grid">
+        <div class="recap-item">
+          <div class="recap-val">${Q.length}</div>
+          <div class="recap-lbl">Questions Completed</div>
+        </div>
+        <div class="recap-item">
+          <div class="recap-val c-ok">✓ ${c}</div>
+          <div class="recap-lbl">Solid Recalls</div>
+        </div>
+        <div class="recap-item">
+          <div class="recap-val ${w > 0 ? 'c-no' : 'mu'}">✗ ${w}</div>
+          <div class="recap-lbl">Missteps</div>
+        </div>
+        <div class="recap-item">
+          <div class="recap-val" style="color:#0ea5e9">↑ ${recoveredCount}</div>
+          <div class="recap-lbl">Recovered from Past</div>
+        </div>
+      </div>
+
+      ${recoveredCount > 0 ? `
+        <div class="chip c-ok" style="width:100%;padding:8px 14px;border-radius:10px;margin:10px 0;display:flex;align-items:center;gap:8px;font-size:13.5px">
+          <span>↑</span> <b>${recoveredCount} previously missed item(s) successfully recovered today!</b>
+        </div>
+      ` : ''}
+
+      <div style="margin-top:14px;background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:14px">
+        <b style="font-size:13.5px">📊 Subject Accuracy This Session:</b>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+          ${Object.entries(recapSubj).map(([s, data]) => {
+            const pct = Math.round((data.correct / data.total) * 100);
+            return `
+              <div>
+                <div class="row sm" style="justify-content:space-between;margin-bottom:3px">
+                  <span><b>${esc(s)}</b></span>
+                  <span class="mu">${data.correct}/${data.total} (${pct}%)</span>
+                </div>
+                <div class="mini"><i style="width:${pct}%;background:${pct >= 75 ? 'var(--ok)' : (pct >= 50 ? 'var(--sk)' : 'var(--no)')}"></i></div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px">
+          <b>✓ Solidified Concepts:</b>
+          <ul style="margin:6px 0 0;padding-left:18px;font-size:13px">
+            ${knownConcepts.slice(0, 3).map(c => `<li>${esc(c)}</li>`).join('') || '<li class="mu">General practice</li>'}
+          </ul>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px">
+          <b>🎯 Concepts to Revisit:</b>
+          <ul style="margin:6px 0 0;padding-left:18px;font-size:13px">
+            ${revisitConcepts.slice(0, 2).map(c => `<li>${esc(c)}</li>`).join('') || '<li class="c-ok">Clean run! Nothing missed.</li>'}
+          </ul>
+          ${revisitKeys.length ? `<button class="sm p" style="margin-top:8px" onclick="start(${JSON.stringify(revisitKeys)})">⚡ Drill These (${revisitKeys.length} Q)</button>` : ''}
+        </div>
+      </div>
+
+      ${cardsCreated ? `<p class="mu sm" style="margin-top:14px">🃏 <b>${cardsCreated}</b> flashcard(s) created for your spaced review queue.</p>` : ''}
       <div id="bg-gen-box" class="bg-gen-banner" style="display:none"></div>
-      <p class="row" style="margin-top:16px">
-        <button class="p" onclick="home()">Back to Dashboard</button>
+
+      <p class="row" style="margin-top:20px;justify-content:space-between">
+        <button class="p big-btn" onclick="home()">Back to Dashboard</button>
+        ${revisitKeys.length ? `<button class="big-btn" onclick="start(${JSON.stringify(revisitKeys)})">Retry Missteps Now</button>` : ''}
       </p>
     </div>
   `;
 
-  // Automatically trigger background AI upgrades for weak/slow questions
+  // Trigger background AI upgrades for weak/slow questions
   triggerBackgroundVariantUpgrades(Q);
+  if (GEM_KEY) fillExplanationsWithGemini();
 }
 
 // Timed Mock Exam Fix
 let MK_PAUSED = false, MK_REM = 0;
 
-function mock() {
-  const by = {};
-  D.forEach(q => (by[cl(q.s)] = by[cl(q.s)] || []).push(q.n));
-  const ks = [];
-  Object.values(by).forEach(g => {
-    g.sort(() => Math.random() - .5);
-    ks.push(...g.slice(0, 5));
+function mock(count = 100, isDiagnostic = false) {
+  const mathSubjs = new Set(['Engineering Mathematics', 'Linear Algebra', 'Calculus', 'Statistics', 'Probability', 'Discrete Mathematics'].map(canonSubj));
+  const mathPool = [];
+  const csPool = {};
+
+  D.forEach(q => {
+    const s = canonSubj(q.s);
+    if (mathSubjs.has(s)) {
+      mathPool.push(q.n);
+    } else {
+      csPool[s] = csPool[s] || [];
+      csPool[s].push(q.n);
+    }
   });
-  ks.sort(() => Math.random() - .5);
-  const k = ks.slice(0, 100);
-  if (!k.length) return;
+
+  const mathCount = count === 50 ? 15 : 30;
+  const csCount = count - mathCount;
+
+  // Shuffle math
+  mathPool.sort(() => Math.random() - 0.5);
+  const selectedMath = mathPool.slice(0, mathCount);
+
+  // Group computing subjects in blocks of 5
+  const selectedCs = [];
+  const csKeys = Object.keys(csPool).sort(() => Math.random() - 0.5);
+  while (selectedCs.length < csCount && csKeys.some(k => csPool[k].length > 0)) {
+    for (const k of csKeys) {
+      if (selectedCs.length >= csCount) break;
+      const available = csPool[k];
+      if (available && available.length) {
+        available.sort(() => Math.random() - 0.5);
+        selectedCs.push(...available.splice(0, Math.min(5, csCount - selectedCs.length)));
+      }
+    }
+  }
+
+  const k = [...selectedMath, ...selectedCs];
+  if (!k.length) {
+    alert('No questions available in question bank to assemble mock exam.');
+    return;
+  }
+
+  const durationMin = count === 50 ? 60 : 120;
+  const durationMs = durationMin * 60000;
 
   MK = {
     a: {},
     flagged: {},
     n: k.length,
-    end: Date.now() + k.length * 60000
+    end: Date.now() + durationMs,
+    isDiagnostic: !!isDiagnostic,
+    isHalf: count === 50,
+    durationMs
   };
   MK_PAUSED = false;
   MK_REM = 0;
+  localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q: k, P: 0 }));
   start(k);
+}
+
+function startDiagnosticMock() {
+  if (!confirm('Start the Day-1 Diagnostic Mock Exam?\n\n• 100 questions (Math & Stats first, then Computing subjects in blocks of 5)\n• 120 minutes\n• Requires confidence tags on your answers to calibrate your spaced repetition ladder.')) {
+    return;
+  }
+  mock(100, true);
+}
+
+function resumeActiveMock() {
+  try {
+    const rawMock = localStorage.getItem('bitmcq_mock_state');
+    if (!rawMock) return;
+    const parsed = JSON.parse(rawMock);
+    MK = parsed.MK;
+    Q = parsed.Q;
+    P = parsed.P || 0;
+    MK_PAUSED = false;
+    MK_REM = 0;
+    start(Q);
+  } catch (e) {
+    console.error('Failed to resume mock:', e);
+  }
+}
+
+function cancelActiveMock() {
+  if (confirm('Cancel active mock exam? Unsubmitted answers will be discarded.')) {
+    localStorage.removeItem('bitmcq_mock_state');
+    MK = null;
+    home();
+  }
 }
 
 function toggleFlag() {
@@ -2784,6 +4677,7 @@ function toggleFlag() {
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
   MK.flagged = MK.flagged || {};
   MK.flagged[rawQ.n] = !MK.flagged[rawQ.n];
+  localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q, P }));
   const b = $('#flag-btn');
   if (b) b.classList.toggle('p', !!MK.flagged[rawQ.n]);
   const btn = document.getElementById('pal-' + P);
@@ -2820,10 +4714,10 @@ function tick() {
 
 function renderMockPalette() {
   return `
-    <div class="card" style="margin-top:14px">
-      <div class="row" style="justify-content:space-between">
+    <div class="card mock-palette-card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
         <b>Question Palette</b>
-        <span class="mu sm">TU BIT Entrance: No negative marking!</span>
+        <span class="mu sm">TU BIT Entrance</span>
       </div>
       <div class="mock-palette">
         ${Q.map((k, idx) => {
@@ -2838,12 +4732,18 @@ function renderMockPalette() {
           return `<button class="${cls}" id="pal-${idx}" onclick="jumpMock(${idx})">${idx + 1}</button>`;
         }).join('')}
       </div>
+      <div class="row sm mu" style="margin-top:8px;gap:10px;font-size:11px">
+        <span><i style="display:inline-block;width:7px;height:7px;border-radius:2px;background:var(--ok);margin-right:3px"></i>Ans</span>
+        <span><i style="display:inline-block;width:7px;height:7px;border-radius:2px;background:var(--sk);margin-right:3px"></i>Flag</span>
+        <span><i style="display:inline-block;width:7px;height:7px;border-radius:2px;background:var(--ac);margin-right:3px"></i>Current</span>
+      </div>
     </div>
   `;
 }
 
 function jumpMock(idx) {
   P = idx;
+  localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q, P }));
   show();
 }
 
@@ -2860,6 +4760,9 @@ function confirmSubmitMock() {
 function mockEnd() {
   clearInterval(TI);
   if (!MK) return;
+  const isDiag = !!MK.isDiagnostic;
+  localStorage.removeItem('bitmcq_mock_state');
+
   const sub = {}, bad = [], n = Q.length;
   let c = 0;
 
@@ -2870,7 +4773,7 @@ function mockEnd() {
       k: qk(q), t: Date.now(), s, u: q.u || '', q: q.q.slice(0, 120),
       ch: a === undefined ? -1 : a, ok, set: S, mock: 1, unfixed: !ok
     });
-    try { sr(q, ok); } catch (e) { }
+    try { sr(q, ok, 3, 30000); } catch (e) { }
     if (ok) {
       c++; x[0]++; R[q.n] = 'c'; delete W[q.n];
     } else {
@@ -2878,27 +4781,41 @@ function mockEnd() {
       if (a !== undefined) W[q.n] = a;
       bad.push([q, a]);
     }
+    recordFixDay(q.s);
   });
 
   const pct = Math.round(c / n * 100);
+
+  if (isDiag) {
+    DIAGNOSTIC_DONE = true;
+    localStorage.setItem('bitmcq_diag_done', '1');
+  }
+
+  if (pct > PB_MOCK_SCORE) {
+    PB_MOCK_SCORE = pct;
+    localStorage.setItem('bitmcq_pb_mock', String(PB_MOCK_SCORE));
+  }
+
   MK = null; MK_PAUSED = false; MK_REM = 0; Q = []; QRESULTS = []; P = 0;
   save();
   view = 'done';
 
   $('#app').innerHTML = `
-    <h1>Mock Exam Result</h1>
+    <h1>Mock Exam Result ${isDiag ? '(Day-1 Diagnostic)' : ''}</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
         Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%) 🎉</span>' : '<span class="c-no">Below 75% target</span>'}
       </p>
+      ${pct >= PB_MOCK_SCORE && PB_MOCK_SCORE > 0 ? `<p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score!</p>` : ''}
+      ${isDiag ? `<p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>` : ''}
       <table class="tbl">
         <tr><th>Subject</th><th>Score</th><th>Accuracy</th></tr>
         ${Object.entries(sub).map(([s, x]) => `<tr><td>${esc(s)}</td><td>${x[0]}/${x[1]}</td><td>${Math.round(x[0] / x[1] * 100) || 0}%</td></tr>`).join('')}
       </table>
-      <p class="row" style="margin-top:16px"><button class="p" onclick="home()">Back to Menu</button></p>
+      <p class="row" style="margin-top:16px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
     </div>
     <div class="card">
-      <h2 style="margin-top:0">Missed Questions (${bad.length})</h2>
+      <h2 style="margin-top:0">Review Missed Questions (${bad.length})</h2>
       ${bad.map(([q, a]) => `
         <div class="item">
           <b>Q${q.n}</b> ${esc(q.q)}<br>
@@ -2916,6 +4833,23 @@ document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (view !== 'q' || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
+
+  // Navigation shortcuts
+  if (k === 'b') {
+    e.preventDefault();
+    navBack();
+    return;
+  }
+  if (k === 'n') {
+    e.preventDefault();
+    navForward();
+    return;
+  }
+  if (k === 'f' && MK) {
+    e.preventDefault();
+    toggleFlag();
+    return;
+  }
 
   if (recallWaiting) {
     revealRecallOptions();
@@ -2939,7 +4873,7 @@ document.addEventListener('keydown', e => {
     else if (j >= 0) pick(j);
   } else if ((k === 'enter' || k === ' ') && $('#nx')) {
     e.preventDefault();
-    fin();
+    navForward();
   }
 });
 
@@ -3118,6 +5052,7 @@ function start(q) {
   REV = null; RA.clear(); sessionLeechCount = 0;
   Q = MK ? q : groupQuestionBlocks(q); P = 0;
   QRESULTS = Array(Q.length).fill(null);
+  sessionHistory = [];
   save(); show();
 }
 
@@ -3239,17 +5174,62 @@ function exportLog(copy) {
 
 // Settings
 function openSettings() {
+  const dailyCount = getDailyApiCount();
   $('#app').innerHTML = `
     <h1>⚙ Settings</h1>
     <div class="card">
-      <label class="mu">Target Exam Date</label>
+      <label class="mu">Target Exam Date (used only to silently cap review intervals so all items are seen before exam)</label>
       <input type="date" id="ed" value="${EXAM_DATE || ''}" style="margin-top:6px;width:100%">
-      
-      <label class="mu" style="margin-top:14px;display:block">Gemini API Key (for auto-rewriting weak questions into fresh variants)</label>
-      <input type="password" id="gk" value="${esc(GEM_KEY)}" placeholder="Paste AI Studio Key" style="margin-top:6px;width:100%">
-      <p class="mu sm">When set, questions you miss or hesitate on are automatically upgraded in the background into fresh variants with different numbers/variables so you never learn by answer position memory.</p>
 
-      <p class="row" style="margin-top:18px">
+      <label class="mu" style="margin-top:16px;display:block">Gemini API Key</label>
+      <div class="row" style="margin-top:6px;gap:8px">
+        <input type="password" id="gk" value="${esc(GEM_KEY)}" placeholder="Paste AI Studio Key" style="flex:1">
+        <button type="button" class="sm" id="btn-test-conn" onclick="testGeminiConnection()">⚡ Test Connection</button>
+      </div>
+      <div id="test-conn-res" style="margin-top:6px;font-size:13px"></div>
+      <p class="mu sm" style="margin-top:4px">When set, questions you miss or hesitate on are automatically upgraded in the background into fresh variants with different numbers/variables.</p>
+
+      <div class="row" style="margin-top:16px;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label class="mu sm">Primary Model (Default: gemini-3.8-flash)</label>
+          <input type="text" id="gm_gen" value="${esc(GEM_GEN_MODEL)}" placeholder="gemini-3.8-flash" style="margin-top:4px;width:100%">
+        </div>
+        <div style="flex:1;min-width:200px">
+          <label class="mu sm">Fallback Model (If primary quota exhausted/errors)</label>
+          <input type="text" id="gm_fb" value="${esc(GEM_FALLBACK_MODEL)}" placeholder="gemini-2.0-flash-lite" style="margin-top:4px;width:100%">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label class="mu sm">Blind Verifier Model</label>
+          <input type="text" id="gm_ver" value="${esc(GEM_VERIFY_MODEL)}" placeholder="gemini-3.8-flash" style="margin-top:4px;width:100%">
+        </div>
+        <div style="flex:1;min-width:200px">
+          <label class="mu sm">Daily Request Limit</label>
+          <input type="number" id="gm_lim" value="${DAILY_API_LIMIT}" min="10" max="1500" style="margin-top:4px;width:100%">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:14px;justify-content:space-between;align-items:center">
+        <span class="mu sm">API calls today: <b>${dailyCount}</b> / ${DAILY_API_LIMIT}</span>
+      </div>
+
+      <div style="margin-top:18px">
+        <label class="mu sm" style="display:block;margin-bottom:6px">Font Size Scaling</label>
+        <div class="row" style="gap:8px">
+          <button type="button" class="sm" onclick="setFontScale(0.9)">A- Small</button>
+          <button type="button" class="sm" onclick="setFontScale(1)">A Default</button>
+          <button type="button" class="sm" onclick="setFontScale(1.15)">A+ Large</button>
+        </div>
+      </div>
+
+      <label class="row" style="margin-top:18px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="qm" ${QUIET_MODE ? 'checked' : ''}>
+        <span style="margin-left:8px"><b>Quiet Mode</b> — hides streaks, interest breaks, and unsolicited resource chips (focus only)</span>
+      </label>
+
+      <p class="row" style="margin-top:22px">
         <button class="p" onclick="saveSettings()">Save Settings</button>
         <button onclick="home()">Cancel</button>
       </p>
@@ -3258,17 +5238,72 @@ function openSettings() {
   `;
 }
 
+async function testGeminiConnection() {
+  const key = ($('#gk')?.value || '').trim() || GEM_KEY;
+  const primaryModel = ($('#gm_gen')?.value || '').trim() || GEM_GEN_MODEL || 'gemini-3.8-flash';
+  const fallbackModel = ($('#gm_fb')?.value || '').trim() || GEM_FALLBACK_MODEL || 'gemini-2.0-flash-lite';
+  const verModel = ($('#gm_ver')?.value || '').trim() || GEM_VERIFY_MODEL || 'gemini-3.8-flash';
+  const resEl = $('#test-conn-res');
+  if (!resEl) return;
+  if (!key) {
+    resEl.innerHTML = '<span class="c-no">✗ Please paste an API key first.</span>';
+    return;
+  }
+  resEl.innerHTML = '<span class="mu">Testing models via zero-quota GET endpoint...</span>';
+
+  try {
+    const checkModel = async (m) => {
+      const clean = m.replace(/^models\//, '');
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(clean)}?key=${encodeURIComponent(key)}`);
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.error?.message || `HTTP ${resp.status}`);
+      }
+      return data;
+    };
+
+    const primData = await checkModel(primaryModel);
+    let fbMsg = '';
+    try {
+      if (fallbackModel !== primaryModel) {
+        const fbData = await checkModel(fallbackModel);
+        fbMsg = ` & fallback <b>${esc(fbData.displayName || fallbackModel)}</b>`;
+      }
+    } catch (e) {
+      fbMsg = ` (fallback notice: ${esc(e.message)})`;
+    }
+
+    resEl.innerHTML = `<span class="c-ok">✓ Connected! Primary <b>${esc(primData.displayName || primaryModel)}</b>${fbMsg} verified ready. (0 tokens used)</span>`;
+  } catch (err) {
+    resEl.innerHTML = `<span class="c-no">✗ Connection failed: ${esc(err.message)}</span>`;
+  }
+}
+
 function saveSettings() {
   EXAM_DATE = $('#ed').value;
   GEM_KEY = $('#gk').value.trim();
+  GEM_GEN_MODEL = $('#gm_gen').value.trim() || 'gemini-3.8-flash';
+  GEM_FALLBACK_MODEL = $('#gm_fb').value.trim() || 'gemini-2.0-flash-lite';
+  GEM_VERIFY_MODEL = $('#gm_ver').value.trim() || 'gemini-3.8-flash';
+  GEM_MODEL = GEM_GEN_MODEL;
+  DAILY_API_LIMIT = parseInt($('#gm_lim').value || '150', 10);
+  QUIET_MODE = $('#qm') ? $('#qm').checked : false;
+
   localStorage.setItem('bitmcq_gem', GEM_KEY);
+  localStorage.setItem('bitmcq_gem_gen', GEM_GEN_MODEL);
+  localStorage.setItem('bitmcq_gem_fallback', GEM_FALLBACK_MODEL);
+  localStorage.setItem('bitmcq_gem_verify', GEM_VERIFY_MODEL);
+  localStorage.setItem('bitmcq_gem_model', GEM_VERIFY_MODEL);
+  localStorage.setItem('bitmcq_daily_limit', String(DAILY_API_LIMIT));
+  localStorage.setItem('bitmcq_quiet', String(QUIET_MODE));
+
   save();
   home();
 }
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, schemaVer: SCHEMA_VER }),
   apply: (s) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const prevP = P;
@@ -3286,6 +5321,12 @@ window.AppState = {
     todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
     QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
     recallFirst = s.recallFirst !== false;
+    CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
+    RESOURCE_MARKS = (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : (JSON.parse(localStorage.getItem('bitmcq_rmarks') || '{}'));
+    FIX_DAYS = (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : {};
+    DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE;
+    QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
+    PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
     save();
     if (window.DriveSync) DriveSync.refreshUI();
     if (wasQ) {
@@ -3302,6 +5343,16 @@ window.AppState = {
   home: home,
   genSets: genSets
 };
+
+
+function setFontScale(scale) {
+  document.documentElement.style.setProperty('--font-scale', String(scale));
+  localStorage.setItem('bitmcq_font_scale', String(scale));
+}
+try {
+  const savedFontScale = localStorage.getItem('bitmcq_font_scale') || '1';
+  document.documentElement.style.setProperty('--font-scale', savedFontScale);
+} catch (e) {}
 
 load();
 home();
