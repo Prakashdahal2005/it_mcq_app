@@ -1931,6 +1931,7 @@ function getDaysLeft() {
     save();
   }
   const examMs = new Date(EXAM_DATE + 'T23:59:59').getTime();
+  if (isNaN(examMs)) return 45;
   return Math.max(1, Math.round((examMs - Date.now()) / 864e5));
 }
 
