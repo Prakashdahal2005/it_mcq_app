@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Evidence-based MCQ trainer with spaced repetition and Google Drive backup.">
+<meta name="description" content="Evidence-based MCQ trainer with spaced repetition and cloud sync (Upstash Redis & Vercel).">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="pwa-icon.png">
@@ -730,12 +730,11 @@ input[type=text] { width: 100%; font: inherit; color: var(--tx); background: var
 /* Quiet Mode */
 body.quiet-mode .hide-quiet { display: none !important; }
 </style>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div id="app"></div>
 
-<script src="drive-sync.js"></script>
+<script src="cloud-sync.js"></script>
 <script>
 window.MathJax = {
   tex: {
@@ -841,7 +840,7 @@ function save() {
   } catch (e) {
     console.error('Save failed:', e);
   }
-  try { if (window.DriveSync) window.DriveSync.onLocalSave(); } catch (e) {}
+  try { if (window.CloudSync) window.CloudSync.onLocalSave(); } catch (e) {}
 }
 
 function restoreBanks(s) {
@@ -3341,7 +3340,7 @@ function home(preserveScroll = false) {
         <div id="err" class="c-no"></div>
         <p class="mu">Have an existing backup? <input type="file" accept=".json" onchange="restore(this.files[0])"></p>
       </div>
-      ${window.DriveSync ? `<p class="mu" style="margin-top:14px">Already have progress in the cloud? Connect Google Drive below and it will restore automatically — no backup file needed.</p>${DriveSync.settingsHTML()}` : ''}
+      ${window.CloudSync ? `<p class="mu" style="margin-top:14px">Already have progress in the cloud? Connect Cloud Sync below and it will restore automatically — no backup file needed.</p>${CloudSync.settingsHTML()}` : ''}
       ${BANKS.length ? bankCard() : ''}
     `;
     $('#f').onchange = e => {
@@ -5115,17 +5114,18 @@ function restore(f) {
   r.onload = () => {
     try {
       const parsed = JSON.parse(r.result);
-      if (!window.DriveSync || !DriveSync._validateBackup || !DriveSync._mergeAppStates) {
+      const syncHelper = window.CloudSync || window.DriveSync;
+      if (!syncHelper || !syncHelper._validateBackup || !syncHelper._mergeAppStates) {
         throw new Error('Backup merge support is unavailable in this app version.');
       }
-      const x = DriveSync._validateBackup(parsed).appState;
+      const x = (window.CloudSync || window.DriveSync)._validateBackup(parsed).appState;
       const local = AppState.get();
       local.A = (local.A || []).slice();
       if (local.D && local.D.length && Object.keys(local.R || {}).length) {
         local.A.push(compact());
         local.S = local.A.length + 1;
       }
-      const merged = DriveSync._mergeAppStates(local, x, genSets, {
+      const merged = (window.CloudSync || window.DriveSync)._mergeAppStates(local, x, genSets, {
         preferRemoteActive: true,
         preferRemoteQuestions: true
       });
@@ -5234,7 +5234,7 @@ function openSettings() {
         <button onclick="home()">Cancel</button>
       </p>
     </div>
-    ${window.DriveSync ? DriveSync.settingsHTML() : ''}
+    ${window.CloudSync ? CloudSync.settingsHTML() : ''}
   `;
 }
 
@@ -5328,7 +5328,7 @@ window.AppState = {
     QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
     PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
     save();
-    if (window.DriveSync) DriveSync.refreshUI();
+    if (window.CloudSync) CloudSync.refreshUI();
     if (wasQ) {
       const nowKey = (Array.isArray(Q) && typeof P === 'number' && P >= 0 && Q[P] != null) ? Q[P] : null;
       if (nowKey !== prevKey || P !== prevP) {
@@ -5356,7 +5356,7 @@ try {
 
 load();
 home();
-if (window.DriveSync) DriveSync.init();
+if (window.CloudSync) CloudSync.init();
 loadDefaultBank();
 const mathJaxScript = document.createElement('script');
 mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js';

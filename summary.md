@@ -143,7 +143,8 @@ Regex keywords include: `binary`, `hexadecimal`, `2's complement`, `overflow`, `
 | File | Role |
 |---|---|
 | `index.html` | Trainer interface, session logic, local progress, and backup import/export. |
-| `drive-sync.js` | Google Drive sync and conflict-aware question/progress merging. |
+| `cloud-sync.js` | Upstash Redis cloud sync and conflict-aware question/progress merging. |
+| `api/state.js` | Vercel Serverless Function interfacing with Upstash Redis (GET/POST with optional APP_SECRET lock). |
 | `question_bank.json` | Bundled question bank with quick and regeneratable flags. |
 | `sw.js` | Offline cache and application-shell updates. |
 | `summary.md` | This document. Authoritative reference. |
