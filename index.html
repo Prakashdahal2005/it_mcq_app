@@ -3421,7 +3421,6 @@ function home(preserveScroll = false) {
   } catch (e) {}
 
   $('#app').innerHTML = `
-    ${renderMockRepairBanner()}
     ${renderBackupNudge()}
     ${resumeMockBanner}
 
@@ -4859,7 +4858,7 @@ function mockEnd() {
         <tr><th>Subject</th><th>Score</th><th>Accuracy</th></tr>
         ${Object.entries(sub).map(([s, x]) => `<tr><td>${esc(s)}</td><td>${x[0]}/${x[1]}</td><td>${Math.round(x[0] / x[1] * 100) || 0}%</td></tr>`).join('')}
       </table>
-      <p class="row" style="margin-top:16px;gap:8px"><button class="p big-btn" onclick="home()">Back to Dashboard</button><button class="sm" style="border-color:var(--ac);color:var(--ac)" onclick="fixMockOptionScrambleBug()">🛠️ Recalculate & Fix Missed Questions</button></p>
+      <p class="row" style="margin-top:16px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
     </div>
     <div class="card">
       <h2 style="margin-top:0">Review Missed Questions (${bad.length})</h2>
@@ -5276,12 +5275,6 @@ function openSettings() {
         <input type="checkbox" id="qm" ${QUIET_MODE ? 'checked' : ''}>
         <span style="margin-left:8px"><b>Quiet Mode</b> — hides streaks, interest breaks, and unsolicited resource chips (focus only)</span>
       </label>
-
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)">
-        <label class="mu sm" style="font-weight:600">🛠️ Data Diagnostics & Repair</label>
-        <p class="mu sm" style="margin:4px 0 10px">If a mock exam suffered from the option-shuffling display bug, recalculate and restore your genuine score and FSRS memory stability.</p>
-        <button type="button" class="sm" onclick="fixMockOptionScrambleBug()">🛠️ Recalculate &amp; Fix Mock Exam Results</button>
-      </div>
       <p class="row" style="margin-top:22px">
         <button class="p" onclick="saveSettings()">Save Settings</button>
         <button onclick="home()">Cancel</button>
@@ -5423,35 +5416,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-function renderMockRepairBanner() {
-  if (localStorage.getItem('bitmcq_mock_bug_fixed') === '1') return '';
-  const mockAttempts = (L || []).filter(r => r.mock === 1);
-  if (!mockAttempts.length) return '';
-  const lastTime = mockAttempts[mockAttempts.length - 1].t || 0;
-  const recentMocks = mockAttempts.filter(r => Math.abs(lastTime - (r.t || 0)) < 48 * 3600 * 1000);
-  if (recentMocks.length < 15) return '';
-  const okCount = recentMocks.filter(r => r.ok).length;
-  if ((okCount / recentMocks.length) >= 0.60) return '';
-
-  return `
-    <div class="card" style="border:2px solid #ef4444;background:rgba(239,68,68,0.06);margin-bottom:14px;padding:14px 18px">
-      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-        <div style="flex:1;min-width:260px">
-          <div class="row" style="gap:8px;align-items:center;margin-bottom:4px">
-            <span style="font-size:18px">⚠️</span>
-            <b style="color:var(--no);font-size:15px">Mock Exam Scoring Bug Detected (${okCount}/${recentMocks.length} Recorded)</b>
-          </div>
-          <div class="mu sm" style="line-height:1.5">
-            Your Day-1 Diagnostic answers were scrambled by an option-shuffling display bug (the engine checked on-screen button positions against unshuffled answer keys). Click below to restore your true score (<b>60/66 · 91%</b>), restore FSRS neural stability, and clear false review lapses.
-          </div>
-        </div>
-        <button class="p big-btn" style="background:#ef4444;border-color:#dc2626" onclick="fixMockOptionScrambleBug()">
-          🛠️ Fix &amp; Restore My 91% Score
-        </button>
-      </div>
-    </div>
-  `;
-}
 
 function fixMockOptionScrambleBug() {
   const mockIndices = [];
