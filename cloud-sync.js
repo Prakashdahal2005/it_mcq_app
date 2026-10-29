@@ -267,6 +267,65 @@
     return out;
   }
 
+  function mergeA(a, b) {
+    var map = {};
+    (a || []).concat(b || []).forEach(function (e) {
+      if (!e) return;
+      var key;
+      if (e.bankId != null && e.bi != null) {
+        key = 'bank_' + e.bankId + '_bi_' + e.bi;
+      } else if (e.setNo != null) {
+        key = 'set_' + e.setNo + '_' + (e.date || Math.floor((e.doneAt||e.t||0)/600000));
+      } else {
+        key = 'no_' + (e.no || '') + '_date_' + (e.date || '') + '_tot_' + (e.total || '');
+      }
+      var existing = map[key];
+      if (!existing) {
+        map[key] = JSON.parse(JSON.stringify(e));
+        return;
+      }
+      // Prefer completed version and newer
+      var scoreE = (existing.completed?1000:0) + (existing.doneAt||existing.t||0);
+      var scoreN = (e.completed?1000:0) + (e.doneAt||e.t||0);
+      if (scoreN >= scoreE) {
+        map[key] = JSON.parse(JSON.stringify(e));
+      }
+    });
+    var out = [];
+    for (var k in map) {
+      if (Object.prototype.hasOwnProperty.call(map, k)) out.push(map[k]);
+    }
+    return out;
+  }
+
+  function mergeCards(a, b) {
+    var map = {};
+    (a || []).concat(b || []).forEach(function (c) {
+      if (!c) return;
+      var key = c.id || (c.qk ? ('qk_' + c.qk) : null);
+      if (!key) {
+        try { key = JSON.stringify(c); } catch(e) { key = String(c); }
+      }
+      var existing = map[key];
+      if (!existing) {
+        map[key] = JSON.parse(JSON.stringify(c));
+        return;
+      }
+      var cScore = (c.lastReviewed || c.due || c.created || 0);
+      var eScore = (existing.lastReviewed || existing.due || existing.created || 0);
+      if (cScore >= eScore || (c.grad && !existing.grad) || (c.stab && c.stab > (existing.stab||0))) {
+        map[key] = JSON.parse(JSON.stringify(c));
+      }
+    });
+    var out = [];
+    for (var k in map) {
+      if (Object.prototype.hasOwnProperty.call(map, k)) {
+        out.push(map[k]);
+      }
+    }
+    return out;
+  }
+
   function mergeAppStates(local, remote, genSets, options) {
     options = options || {};
     var conflicts = [];
@@ -364,9 +423,9 @@
       QRESULTS: active.QRESULTS || [],
       P: active.P || 0,
       S: options.preferRemoteActive
-        ? Math.max(active.S || 1, banks.length ? mergeJsonList(local.A, remote.A).length + 1 : 1)
+        ? Math.max(active.S || 1, banks.length ? mergeA(local.A, remote.A).length + 1 : 1)
         : (active.S || 1),
-      A: mergeJsonList(local.A, remote.A),
+      A: mergeA(local.A, remote.A),
       L: mergeL(local.L, remote.L),
       V: mergeV(local.V, remote.V),
       BANKS: banks,
@@ -383,7 +442,7 @@
       lastFreshSetDay: active.lastFreshSetDay == null ? null : active.lastFreshSetDay,
       QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
       recallFirst: active.recallFirst !== false,
-      CARDS: mergeJsonList(local.CARDS, remote.CARDS),
+      CARDS: mergeCards(local.CARDS, remote.CARDS),
       RESOURCE_MARKS: Object.assign({}, local.RESOURCE_MARKS || {}, remote.RESOURCE_MARKS || {}),
       FIX_DAYS: Object.assign({}, local.FIX_DAYS || {}, remote.FIX_DAYS || {}),
       DIAGNOSTIC_DONE: !!(local.DIAGNOSTIC_DONE || remote.DIAGNOSTIC_DONE),

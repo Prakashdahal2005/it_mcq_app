@@ -785,11 +785,16 @@ let QOV = {};
 let gemLast = 0;
 let genInProgress = false;
 let GEM_KEY = localStorage.getItem('bitmcq_gem') || '';
-// Gemini Models Configuration: gemini-3.8-flash is primary default; gemini-2.0-flash-lite is automatic fallback
+// Gemini Models Configuration
 let storedGen = localStorage.getItem('bitmcq_gem_gen');
-let GEM_GEN_MODEL = (storedGen && storedGen !== 'gemini-2.0-flash-lite') ? storedGen : 'gemini-3.8-flash';
-let GEM_FALLBACK_MODEL = localStorage.getItem('bitmcq_gem_fallback') || 'gemini-2.0-flash-lite';
-let GEM_VERIFY_MODEL = localStorage.getItem('bitmcq_gem_verify') || 'gemini-3.8-flash';
+if (storedGen === 'gemini-2.0-flash-lite') storedGen = null;
+let GEM_GEN_MODEL = storedGen || 'gemini-3.8-flash';
+let storedFallback = localStorage.getItem('bitmcq_gem_fallback');
+if (storedFallback === 'gemini-2.0-flash-lite') storedFallback = null;
+let GEM_FALLBACK_MODEL = storedFallback || 'gemini-2.5-flash-lite';
+let storedVerify = localStorage.getItem('bitmcq_gem_verify');
+if (storedVerify === 'gemini-2.0-flash-lite') storedVerify = null;
+let GEM_VERIFY_MODEL = storedVerify || 'gemini-3.8-flash';
 let GEM_MODEL = GEM_GEN_MODEL;
 let DAILY_API_LIMIT = parseInt(localStorage.getItem('bitmcq_daily_limit') || '150', 10);
 let CARDS = [];
@@ -800,6 +805,7 @@ let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
 let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
 let COLD_QS = {}; // n -> true for questions marked as cold/useless
 let ACTIVE_FC_INDEX = 0;
+let ACTIVE_FC_SESSION_IDS = [];
 let ACTIVE_FC_SHOW_BACK = false;
 let sessionLeechCount = 0;
 let recallWaiting = false;
@@ -2630,7 +2636,8 @@ function regenerateCurrentQuestion() {
       sessionHistory[P] = null;
       show();
     }).catch(err => {
-      alert('AI variant generation failed: ' + (err.message || err));
+      try { alert('AI variant generation failed: ' + (err.message || err)); } catch(e){}
+      sessionHistory[P] = null;
       show();
     });
     return;
@@ -2728,33 +2735,85 @@ const RESOURCE_LIBRARY = [
   { id: 'geeks-deadlock', title: 'Deadlock Conditions & Prevention', provider: 'GeeksforGeeks', subject: 'Operating Systems', url: 'https://www.geeksforgeeks.org/introduction-of-deadlock-in-operating-system/', desc: 'The 4 necessary Coffman conditions and safe state checks.' }
 ];
 
-function getRecommendedResource(subj, isStuck = false) {
-  if (!subj) return null;
-  const s = subj.toLowerCase();
+function getRecommendedResource(subj, isStuck = false, stem = '', tags = []) {
+  if (!subj && !stem) return null;
+  const s = (subj || '').toLowerCase();
+  const text = ((stem||'') + ' ' + ((tags||[]).join(' '))).toLowerCase();
   const now = Date.now();
   const cooldownMs = 14 * 864e5;
 
-  const candidates = RESOURCE_LIBRARY.filter(r => {
-    if (r.subject.toLowerCase() !== s && !s.includes(r.subject.toLowerCase()) && !r.subject.toLowerCase().includes(s)) return false;
+  let candidates = RESOURCE_LIBRARY.filter(r => {
     const mark = RESOURCE_MARKS[r.id];
     if (mark) {
       if (mark.status === 'not_for_me' || mark.status === 'done') return false;
       if (now - (mark.date || 0) < cooldownMs) return false;
     }
-    return true;
+    const rs = (r.subject||'').toLowerCase();
+    if(rs && s && (rs === s || s.includes(rs) || rs.includes(s))) return true;
+    return false;
   });
 
-  return candidates.length ? candidates[0] : null;
+  // Targeting by content
+  if(text.includes('select') || text.includes('where') || text.includes('join') || text.includes('sql') || text.includes('group by') || text.includes('union')){
+    const sql = RESOURCE_LIBRARY.find(r=>r.id==='w3-sql-drills');
+    if(sql){
+      const mark = RESOURCE_MARKS[sql.id];
+      if(!(mark && (mark.status==='not_for_me'||mark.status==='done') && now - (mark.date||0)<cooldownMs)) candidates.unshift(sql);
+    }
+  }
+  if(text.includes('normalization') || text.includes('1nf') || text.includes('2nf') || text.includes('3nf') || text.includes('bcnf') || text.includes('functional dependency')){
+    const norm = RESOURCE_LIBRARY.find(r=>r.id==='gs-dbms' || (r.title&&r.title.toLowerCase().includes('normal')));
+    if(norm){
+      const mark = RESOURCE_MARKS[norm.id];
+      if(!(mark && (mark.status==='not_for_me'||mark.status==='done') && now - (mark.date||0)<cooldownMs)){
+        candidates = candidates.filter(c=>c.id!==norm.id);
+        candidates.unshift(norm);
+      }
+    }else{
+      // try to add a targeted one
+      candidates.unshift({ id: 'gs-dbms-norm', title: 'Gate Smashers – DBMS Normalization', provider: 'Gate Smashers', subject: 'Database Management Systems', url: 'https://www.youtube.com/results?search_query=Gate%20Smashers%20DBMS%20Normalization', desc: '1NF–BCNF with examples.' });
+    }
+  }
+
+  // dedupe
+  const seen = new Set();
+  const out = [];
+  for(const c of candidates){
+    if(!c||seen.has(c.id)) continue;
+    seen.add(c.id); out.push(c);
+  }
+  return out.length ? out[0] : null;
 }
 
 function markResource(id, status) {
   RESOURCE_MARKS[id] = { status, date: Date.now() };
   save();
-  home();
+  // Do not navigate away; just update state
+}
+
+function addFlashcardForCurrent(){
+  try {
+    const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (byN(Q[P]));
+    if(!rawQ) return;
+    const card = createCardForMissed(rawQ, -1);
+    if(card){ alert('Flashcard added to review deck.'); save(); }
+    else { alert('Could not add flashcard (maybe duplicate or limit).'); }
+  } catch(e){ console.warn(e); }
 }
 
 function createCardForMissed(rawQ, chosenOptIndex = -1) {
   if (!rawQ) return null;
+  try {
+    const k = qk(rawQ);
+    const vRec = V[k] = V[k] || {};
+    vRec.missCount = (vRec.missCount || 0) + 1;
+    // Only create card on repeat miss or guess/unsure context
+    const cf = REC && REC.cf;
+    if (vRec.missCount < 2 && cf !== 1 && cf !== 2) {
+      save();
+      return null;
+    }
+  } catch(e){}
   const todayDate = new Date().toISOString().slice(0, 10);
   const createdToday = CARDS.filter(c => c.createdDate === todayDate).length;
   if (createdToday >= 20) return null;
@@ -2796,31 +2855,126 @@ function createCardForMissed(rawQ, chosenOptIndex = -1) {
 }
 
 function startFlashcardReview() {
-  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
+  const todayTs = today();
+  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
   if (!due.length) {
     alert('No flashcards are currently due for review. Great work!');
+    ACTIVE_FC_SESSION_IDS = [];
+    ACTIVE_FC_INDEX = 0;
+    ACTIVE_FC_SHOW_BACK = false;
     return;
   }
+  ACTIVE_FC_SESSION_IDS = due.map(c => c.id);
   ACTIVE_FC_INDEX = 0;
   ACTIVE_FC_SHOW_BACK = false;
   view = 'cards';
   renderFlashcardView();
 }
 
+function renderCardManagerView(){
+  view = 'cardmgr';
+  const subjects = Array.from(new Set((CARDS||[]).map(c=>c.subject).filter(Boolean)));
+  let filter = window._cardmgrFilter || 'all';
+  let search = (window._cardmgrSearch||'').toLowerCase();
+  let list = (CARDS||[]).slice();
+  if(filter !== 'all') list = list.filter(c=>c.subject===filter);
+  if(search) list = list.filter(c=>{
+    const t = ((c.front||'') + ' ' + (c.back||'')).toLowerCase();
+    return t.includes(search);
+  });
+  const due = list.filter(c=>!c.grad && (c.due||0)<=today()).length;
+  const learning = list.filter(c=>!c.grad && (c.due||0)>today()).length;
+  const grad = list.filter(c=>c.grad).length;
+  $('#app').innerHTML = `
+    <div class="top"><div class="row" style="justify-content:space-between"><b>🃏 Manage Flashcards</b><button onclick="home()">← Dashboard</button></div></div>
+    <div class="card">
+      <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        <button class="sm ${filter==='all'?'p':''}" onclick="window._cardmgrFilter='all';renderCardManagerView()">All (${CARDS.length})</button>
+        ${subjects.map(s=>`<button class="sm ${filter===s?'p':''}" onclick="window._cardmgrFilter='${esc(s).replace(/'/g,'\\\'')}';renderCardManagerView()">${esc(cl(s))} (${CARDS.filter(c=>c.subject===s).length})</button>`).join('')}
+      </div>
+      <input type="text" id="cardmgr-search" placeholder="Search cards..." value="${esc(window._cardmgrSearch||'')}" oninput="window._cardmgrSearch=this.value;renderCardManagerView()">
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+        <span class="chip">Due: <b>${due}</b></span>
+        <span class="chip">Learning: <b>${learning}</b></span>
+        <span class="chip">Graduated: <b>${grad}</b></span>
+      </div>
+      <div style="margin-top:12px">
+        ${list.slice(0,100).map(c=>`
+          <div class="item" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div><b>${esc(cl(c.subject||''))}</b> ${c.grad?'<span class="badge-unverified">Graduated</span>':''} <span class="mu sm">Due: ${new Date((c.due||0)*86400000 + Date.now()-((Date.now()%86400000))).toDateString ? '' : ''}${c.due||0}</span></div>
+              <div class="mu sm" style="margin-top:4px">${esc((c.front||'').replace(/<[^>]+>/g,' ')).slice(0,80)}...</div>
+            </div>
+            <div class="row" style="gap:6px">
+              <button class="sm" onclick="editFlashcard('${esc(c.id)}')">✏️ Edit</button>
+              <button class="sm" style="color:var(--no)" onclick="deleteFlashcard('${esc(c.id)}')">🗑 Delete</button>
+            </div>
+          </div>
+        `).join('') || '<p class="mu">No cards found.</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function deleteFlashcard(id){
+  const idx = (CARDS||[]).findIndex(c=>c.id===id);
+  if(idx<0) return;
+  if(!confirm('Delete this flashcard?')) return;
+  CARDS.splice(idx,1);
+  save();
+  renderCardManagerView();
+}
+
+function editFlashcard(id){
+  const c = (CARDS||[]).find(x=>x.id===id);
+  if(!c) return;
+  const front = prompt('Edit front (HTML allowed)', c.front||'');
+  if(front===null) return;
+  const back = prompt('Edit back (HTML allowed)', c.back||'');
+  if(back===null) return;
+  c.front = front; c.back = back;
+  save();
+  renderCardManagerView();
+}
+
 function renderFlashcardView() {
-  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
-  if (ACTIVE_FC_INDEX >= due.length) {
+  const todayTs = today();
+  if(!Array.isArray(ACTIVE_FC_SESSION_IDS) || !ACTIVE_FC_SESSION_IDS.length){
+    const dueInit = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
+    if(!dueInit.length){
+      $('#app').innerHTML = `
+        <div class="card" style="text-align:center;padding:36px">
+          <h2>🃏 Flashcard Review Complete!</h2>
+          <p class="mu">No due flashcards right now.</p>
+          <p style="margin-top:20px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
+        </div>
+      `;
+      return;
+    }
+    ACTIVE_FC_SESSION_IDS = dueInit.map(c=>c.id);
+    ACTIVE_FC_INDEX = 0;
+  }
+  if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) {
+    ACTIVE_FC_SESSION_IDS = [];
+    ACTIVE_FC_INDEX = 0;
     $('#app').innerHTML = `
       <div class="card" style="text-align:center;padding:36px">
         <h2>🃏 Flashcard Review Complete!</h2>
-        <p class="mu">You have reviewed all ${due.length} due flashcard(s) for today.</p>
+        <p class="mu">You have reviewed all due flashcard(s) for this session.</p>
         <p style="margin-top:20px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
       </div>
     `;
     return;
   }
 
-  const curCard = due[ACTIVE_FC_INDEX];
+  const cardId = ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX];
+  let curCard = CARDS.find(c => c.id === cardId);
+  if(!curCard || curCard.grad || (curCard.due || 0) > todayTs){
+    ACTIVE_FC_INDEX++;
+    renderFlashcardView();
+    return;
+  }
+  const due = ACTIVE_FC_SESSION_IDS.map(id => CARDS.find(c=>c.id===id)).filter(Boolean);
   clearMath($('#app'));
   $('#app').innerHTML = `
     <div class="top">
@@ -2868,27 +3022,49 @@ function flipCard() {
 }
 
 function rateCard(grade) {
-  const due = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
-  if (ACTIVE_FC_INDEX >= due.length) return home();
-  const card = due[ACTIVE_FC_INDEX];
+  const todayTs = today();
+  if(!Array.isArray(ACTIVE_FC_SESSION_IDS) || !ACTIVE_FC_SESSION_IDS.length){
+    const due = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
+    ACTIVE_FC_SESSION_IDS = due.map(c=>c.id);
+    ACTIVE_FC_INDEX = 0;
+  }
+  if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length){
+    ACTIVE_FC_SESSION_IDS = [];
+    ACTIVE_FC_INDEX = 0;
+    const dueNow = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
+    if(dueNow.length === 0){
+      $('#app').innerHTML = `<div class="card"><h2>Review Complete!</h2><p class="mu">All due flashcards reviewed.</p><button class="p" onclick="home()">Back to Dashboard</button></div>`;
+      return;
+    }
+    renderFlashcardView();
+    return;
+  }
+  const cardId = ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX];
+  let card = CARDS.find(c => c.id === cardId);
+  if(!card || card.grad || (card.due || 0) > todayTs){
+    ACTIVE_FC_INDEX++;
+    ACTIVE_FC_SHOW_BACK = false;
+    rateCard(grade);
+    return;
+  }
 
   if (grade === 1) {
     card.lapses = (card.lapses || 0) + 1;
     card.consecOk = 0;
     card.stab = Math.max(0.5, (card.stab || 1.0) * 0.6);
-    card.due = today();
+    card.due = todayTs;
   } else if (grade === 2) {
     card.consecOk = (card.consecOk || 0) + 1;
     card.stab = (card.stab || 1.0) * 1.2;
-    card.due = today() + Math.max(1, Math.round(card.stab * 1.2));
+    card.due = todayTs + Math.max(1, Math.round(card.stab * 1.2));
   } else if (grade === 3) {
     card.consecOk = (card.consecOk || 0) + 1;
     card.stab = (card.stab || 1.0) * 2.0;
-    card.due = today() + Math.max(2, Math.round(card.stab * 2.0));
+    card.due = todayTs + Math.max(2, Math.round(card.stab * 2.0));
   } else if (grade === 4) {
     card.consecOk = (card.consecOk || 0) + 1;
     card.stab = (card.stab || 1.0) * 3.0;
-    card.due = today() + Math.max(4, Math.round(card.stab * 3.0));
+    card.due = todayTs + Math.max(4, Math.round(card.stab * 3.0));
   }
 
   if (card.consecOk >= 3) {
@@ -2898,6 +3074,17 @@ function rateCard(grade) {
   save();
   ACTIVE_FC_INDEX++;
   ACTIVE_FC_SHOW_BACK = false;
+  if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length){
+    ACTIVE_FC_SESSION_IDS = [];
+    ACTIVE_FC_INDEX = 0;
+    const dueNow = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
+    if(dueNow.length === 0){
+      $('#app').innerHTML = `<div class="card"><h2>Review Complete!</h2><p class="mu">All due flashcards reviewed.</p><button class="p" onclick="home()">Back to Dashboard</button></div>`;
+      return;
+    }
+    renderFlashcardView();
+    return;
+  }
   renderFlashcardView();
 }
 
@@ -2980,7 +3167,14 @@ function recordFixDay(subject) {
 function toggleQuietMode(val) {
   QUIET_MODE = typeof val === 'boolean' ? val : !QUIET_MODE;
   save();
-  home();
+  if (typeof home === 'function') home(true);
+  else { if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE); }
+}
+
+function toggleCurrentQuick(){
+  isQuick = !isQuick;
+  try { localStorage.setItem('bitmcq_quick', isQuick ? 'true' : 'false'); } catch(e){}
+  if (typeof show === 'function') show();
 }
 
 // Option Shuffling with Anchored/Pinned Options & Shuffle-Safe Enforcement
@@ -3304,15 +3498,37 @@ function renderReadinessMeter() {
 
 function startSubjectDrillFromBank(subjectName) {
   const norm = canonSubj(subjectName);
-  const pool = (D || []).filter(q => canonSubj(q.s) === norm).map(q => q.n);
+  const allQs = [];
+  if(Array.isArray(BANKS) && BANKS.length){
+    BANKS.forEach(b => {
+      if(Array.isArray(b.q)) allQs.push(...b.q);
+    });
+  }
+  if(!allQs.length && Array.isArray(D)) allQs.push(...D);
+  let pool = allQs.filter(q => canonSubj(q.s) === norm);
+  if(!pool.length){
+    pool = (D || []).filter(q => canonSubj(q.s) === norm);
+  }
   if (!pool.length) {
     alert('No questions found for subject: ' + subjectName);
     return;
   }
-  const un = pool.filter(n => !R[n]);
-  const due = pool.filter(n => R[n] === 'w' || (V[qk(byN(n))] && V[qk(byN(n))].due <= today()));
-  const rest = pool.filter(n => !un.includes(n) && !due.includes(n));
-  const list = [...un.sort(() => Math.random() - 0.5), ...due.sort(() => Math.random() - 0.5), ...rest.sort(() => Math.random() - 0.5)].slice(0, 15);
+  // Prioritize Level 0 first
+  pool = pool.slice().sort((a,b)=>{
+    const la = (typeof a.lvl==='number'?a.lvl:(typeof a.level==='number'?a.level:1));
+    const lb = (typeof b.lvl==='number'?b.lvl:(typeof b.level==='number'?b.level:1));
+    if(la !== lb) return la - lb;
+    return 0;
+  });
+  const un = pool.filter(q => !R[q.n]).map(q=>q.n);
+  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && V[qk(q)].due <= today())).map(q=>q.n);
+  const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
+  let list = [...un, ...due, ...rest];
+  // ensure uniqueness
+  const seen = new Set();
+  list = list.filter(n=>{ if(seen.has(n)) return false; seen.add(n); return true; });
+  list = list.slice(0, 20);
+  if(!list.length){ alert('No questions found for subject: ' + subjectName); return; }
   start(list);
 }
 
@@ -3496,15 +3712,33 @@ function home(preserveScroll = false) {
       </div>
 
       <button class="p big-btn" onclick="startToday()">
-        ▶ Continue Today's Practice (${todayMins} min)
+        ${(() => {
+          try {
+            const d = new Date().toISOString().slice(0,10);
+            if(localStorage.getItem('bitmcq_today_date')===d && parseInt(localStorage.getItem('bitmcq_today_done')||'0',10)>=todayMins){
+              return `✓ Today's Practice Completed · Tap for Bonus Session`;
+            }
+            const done = (localStorage.getItem('bitmcq_today_date')===d)?parseInt(localStorage.getItem('bitmcq_today_done')||'0',10):0;
+            if(done>0) return `▶ Continue Today's Practice (${done}/${todayMins} min)`;
+            return `▶ Start Today's Practice (${todayMins} min)`;
+          }catch(e){return `▶ Continue Today's Practice (${todayMins} min)`}
+        })()}
       </button>
 
       ${dueCards.length ? `
-        <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFlashcardReview()">
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="big-btn" style="flex:1;min-width:200px;background:var(--card);border:2px solid var(--bd)" onclick="startFlashcardReview()">
           🃏 Review Due Flashcards (<b>${dueCards.length}</b> due)
         </button>
+        <button class="big-btn" style="flex:1;min-width:200px;background:var(--card);border:2px solid var(--bd)" onclick="renderCardManagerView()">
+          🃏 Manage Flashcards
+        </button>
+      </div>
       ` : ''}
 
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startQuickMode()">
+        ⚡ Quick Questions Only (L0 Core First · Mobile Friendly)
+      </button>
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
       </button>
@@ -3630,6 +3864,33 @@ function startCommuteQuick() {
   start(qList);
 }
 
+function startQuickMode() {
+  const allQs = [];
+  if(Array.isArray(BANKS) && BANKS.length){
+    BANKS.forEach(b => {
+      if(Array.isArray(b.q)) allQs.push(...b.q);
+    });
+  }
+  if(!allQs.length && Array.isArray(D)) allQs.push(...D);
+  let pool = allQs.slice();
+  pool = pool.sort((a,b)=>{
+    const la = (typeof a.lvl==='number'?a.lvl:(typeof a.level==='number'?a.level:1));
+    const lb = (typeof b.lvl==='number'?b.lvl:(typeof b.level==='number'?b.level:1));
+    if(la !== lb) return la - lb;
+    return 0;
+  });
+  const un = pool.filter(q => !R[q.n]).map(q=>q.n);
+  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && V[qk(q)].due <= today())).map(q=>q.n);
+  const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
+  let list = [...un, ...due, ...rest];
+  const seen = new Set();
+  list = list.filter(n=>{ if(seen.has(n)) return false; seen.add(n); return true; });
+  if(!list.length){ alert('No questions available.'); return; }
+  isQuick = true;
+  try { localStorage.setItem('bitmcq_quick', 'true'); } catch(e){}
+  start(list.slice(0, Math.max(10, Math.round((todayMins||15)*0.8))));
+}
+
 function startFreshSet() {
   const day = today();
   const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
@@ -3703,21 +3964,50 @@ function startSubjectDrill() {
   }
 
   const subject = $('#sub-sel').value;
-  const available = D.filter(q => q.s === subject).map(q => q.n);
-  if (!available.length) {
+  const norm = canonSubj(subject);
+  const allQs = [];
+  if(Array.isArray(BANKS) && BANKS.length){
+    BANKS.forEach(b => {
+      if(Array.isArray(b.q)) allQs.push(...b.q);
+    });
+  }
+  if(!allQs.length && Array.isArray(D)) allQs.push(...D);
+  let pool = allQs.filter(q => canonSubj(q.s) === norm);
+  if(!pool.length) pool = (D || []).filter(q => canonSubj(q.s) === norm);
+  if (!pool.length) {
     alert('No questions are available for this subject.');
     return;
   }
-  if (requestedCount > available.length) {
-    alert(`Only ${available.length} question(s) are available for ${subject}. Starting all available questions.`);
+  pool = pool.slice().sort((a,b)=>{
+    const la = (typeof a.lvl==='number'?a.lvl:(typeof a.level==='number'?a.level:1));
+    const lb = (typeof b.lvl==='number'?b.lvl:(typeof b.level==='number'?b.level:1));
+    if(la !== lb) return la - lb;
+    return 0;
+  });
+  const un = pool.filter(q => !R[q.n]).map(q=>q.n);
+  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && V[qk(q)].due <= today())).map(q=>q.n);
+  const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
+  let list = [...un, ...due, ...rest];
+  const seen = new Set();
+  list = list.filter(n=>{ if(seen.has(n)) return false; seen.add(n); return true; });
+  if (requestedCount > list.length) {
+    alert(`Only ${list.length} question(s) are available for ${subject}. Starting all available questions.`);
   }
-  start(available.sort(() => Math.random() - 0.5).slice(0, requestedCount));
+  start(list.slice(0, requestedCount));
 }
 
 function startMistakes() {
   const wr = D.filter(q => R[q.n] === 'w').map(q => q.n);
-  if (!wr.length) return;
-  start(wr.slice(0, 5));
+  if (!wr.length) { alert('No mistakes yet.'); return; }
+  start(wr.slice(0, 10));
+}
+
+function startMistakesBySubject(subjectName){
+  if(!subjectName){ alert('Select a subject.'); return; }
+  const norm = canonSubj(subjectName);
+  const wr = D.filter(q => R[q.n] === 'w' && canonSubj(q.s)===norm).map(q=>q.n);
+  if(!wr.length){ alert('No mistakes for this subject.'); return; }
+  start(wr.slice(0,20));
 }
 
 function editExamDate() {
@@ -3762,6 +4052,18 @@ function show() {
   cancelRecallTimer();
 
   if (P >= Q.length) {
+    try {
+      const d = new Date().toISOString().slice(0,10);
+      if(localStorage.getItem('bitmcq_today_date')===d){
+        const doneToday = parseInt(localStorage.getItem('bitmcq_today_done')||'0',10);
+        const add = Math.max(1, Math.min(10, Math.round((Q.length||1)*0.6)));
+        localStorage.setItem('bitmcq_today_done', String(doneToday + add));
+        if(doneToday + add >= (todayMins||15)) localStorage.setItem('bitmcq_today_date', d);
+      } else {
+        localStorage.setItem('bitmcq_today_date', d);
+        localStorage.setItem('bitmcq_today_done', String(Math.max(1, Math.min(10, Math.round((Q.length||1)*0.6)))));
+      }
+    } catch(e){}
     return MK ? mockEnd() : done();
   }
 
@@ -3801,7 +4103,7 @@ function show() {
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
   const levelLabel = ['L0 · Core', 'L1 · Standard', 'L2 · Exact', 'L3 · Advanced'][rawQ.level];
-  const canRegen = !!(rawQ.regeneratable || matchQuestionFamily(rawQ) || (GEM_KEY && !isQuick));
+    const canRegen = !!((rawQ.regeneratable === true) || (rawQ.calc === true) || (Array.isArray(rawQ.code) && rawQ.code.length>0) || matchQuestionFamily(rawQ) || (GEM_KEY && (rawQ.regeneratable || matchQuestionFamily(rawQ) || rawQ.calc)));
 
   // Memory Anchor
   const mnemonicAnchor = vRec?.mnemonic ? `
@@ -4047,6 +4349,7 @@ function confirmExit() {
 let questionStartTime = Date.now();
 
 function updateConfidence(cf) {
+  try { cancelAutoAdvance(); } catch(e){}
   if (!REC || !CURRENT_Q) return;
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
   const timeTakenMs = Math.max(500, Date.now() - (questionStartTime || Date.now()));
@@ -4127,7 +4430,7 @@ function pick(i) {
 
   const vRec = V[qk(rawQ)];
   const isLeech = vRec && (vRec.lapses >= 3 || vRec.missCount >= 3);
-  const recRes = getRecommendedResource(rawQ.s, isLeech);
+  const recRes = getRecommendedResource(rawQ.s, isLeech, rawQ.q, []);
 
   const resourceHtml = recRes ? `
     <div class="hide-quiet" style="margin-top:10px;padding:8px 12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px">
@@ -4173,8 +4476,12 @@ function pick(i) {
           <button type="button" class="cf-btn" data-cf="2" onclick="updateConfidence(2)">2 · Unsure</button>
           <button type="button" class="cf-btn on" data-cf="3" onclick="updateConfidence(3)">3 · Sure</button>
         </div>
-        ${explanationHtml(rawQ.e)}
+        ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+        <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
+          <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
+        </div>
         ${resourceHtml}
+        ${isLeech ? `<div class="ladder-box"><div class="ladder-title">🔥 Leech Rescue Ladder</div><div>1) Read explanation carefully  2) Do a quick drill on this unit  3) Review via flashcards tomorrow</div></div>` : ''}
       </div>
       <p class="row" style="margin-top:12px;gap:8px">
         <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
@@ -4184,10 +4491,11 @@ function pick(i) {
     hist.feedbackHtml = $('#fb').innerHTML;
     typesetMath($('#fb'));
     save();
+    try { cancelAutoAdvance(); } catch(e){}
     AUTO_ADVANCE_TIMER = setTimeout(() => {
       AUTO_ADVANCE_TIMER = null;
       fin();
-    }, 1400);
+    }, 2200);
   } else {
     // Wrong Answer
     if (rawQ._k) mark(rawQ._k, 0, origPickedIndex);
@@ -4344,10 +4652,10 @@ async function triggerBackgroundVariantUpgrades(sessionKeys) {
 
 // Gemini Prompts A, B, C Implementation with Automatic Fallback (gemini_prompts.md)
 // Primary: gemini-3.8-flash. If exhausted (429) or errors -> automatically falls back to gemini-2.0-flash-lite
-async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = null) {
+async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = null, timeoutMs = 15000) {
   const models = [
     preferredModel || GEM_GEN_MODEL || 'gemini-3.8-flash',
-    GEM_FALLBACK_MODEL || 'gemini-2.0-flash-lite'
+    GEM_FALLBACK_MODEL || 'gemini-2.5-flash-lite'
   ].filter((m, i, a) => m && a.indexOf(m) === i);
 
   let lastError = null;
@@ -4355,6 +4663,8 @@ async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = 
     try {
       recordApiCall();
       const cleanM = m.replace(/^models\//, '');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cleanM)}:generateContent?key=${encodeURIComponent(GEM_KEY)}`;
       const res = await fetch(url, {
         method: 'POST',
@@ -4362,8 +4672,10 @@ async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = 
         body: JSON.stringify({
           contents: [{ parts: [{ text: promptText }] }],
           generationConfig: { temperature: temp }
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error?.message || `HTTP ${res.status}`);
@@ -4404,7 +4716,7 @@ async function fillExplanationsWithGemini() {
 }
 
 async function rewriteQuestionWithGemini(targetQ) {
-  if (!GEM_KEY) return;
+  if (!GEM_KEY) return Promise.reject(new Error('No API key'));
   try {
     const k = qk(targetQ);
     const vRec = V[k] = V[k] || {};
@@ -4443,41 +4755,44 @@ async function rewriteQuestionWithGemini(targetQ) {
     const blindPrompt = 'Solve this multiple choice question step by step without bias. Identify the single correct option index (0 for first, 1 for second, 2 for third, 3 for fourth). Return ONLY valid JSON: {"answer":0,"why":"string"}';
     let isVerified = false;
     try {
+      const genUsed = (genResult && genResult.modelUsed) ? genResult.modelUsed : (GEM_GEN_MODEL||'');
+      const verifyPref = (String(genUsed).includes('lite')) ? (GEM_FALLBACK_MODEL || 'gemini-2.5-flash-lite') : (GEM_VERIFY_MODEL || GEM_GEN_MODEL);
       const blindResultRaw = await fetchGeminiWithFallback(
         blindPrompt + '\n\nQuestion to solve:\n' + JSON.stringify({ stem: v.stem, code: v.code || [], options: v.options }),
         0.2,
-        GEM_VERIFY_MODEL || GEM_GEN_MODEL
+        verifyPref
       );
       const cleanBlind = blindResultRaw.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
       const blindResult = JSON.parse(cleanBlind);
-      if (blindResult.answer === v.answer) {
-        isVerified = true;
-      } else {
-        console.warn(`[AI Variant Blind Mismatch] Gen=${v.answer}, Verify=${blindResult.answer}`);
-        return;
+        if (blindResult.answer === v.answer) {
+          isVerified = true;
+        } else {
+          console.warn(`[AI Variant Blind Mismatch] Gen=${v.answer}, Verify=${blindResult.answer}`);
+          throw new Error('Blind verification mismatch');
+        }
+      } catch (verErr) {
+        console.warn('Blind verification call error:', verErr);
+        throw verErr;
       }
-    } catch (verErr) {
-      console.warn('Blind verification call error:', verErr);
-    }
 
-    // App-side randomization of key position
-    const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
-    const randomizedOpts = origIndices.map(idx => v.options[idx]);
-    const newAnswerIdx = origIndices.indexOf(v.answer);
+      // App-side randomization of key position
+      const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+      const randomizedOpts = origIndices.map(idx => v.options[idx]);
+      const newAnswerIdx = origIndices.indexOf(v.answer);
 
-    vRec._pastValues = [...pastValues.slice(-4), String(v.stem).slice(0, 20)];
-    vRec._variant = {
-      q: String(v.stem),
-      o: randomizedOpts.map(String),
-      a: newAnswerIdx,
-      e: v.why || v.working || targetQ.e || '',
-      code: Array.isArray(v.code) ? v.code.map(String) : [],
-      verified: isVerified,
-      modelUsed: genResult.modelUsed,
-      date: Date.now()
-    };
-    vRec._useOriginal = false;
-    save();
+      vRec._pastValues = [...pastValues.slice(-6), String(v.stem).slice(0, 30)];
+      vRec._variant = {
+        q: String(v.stem),
+        o: randomizedOpts.map(String),
+        a: newAnswerIdx,
+        e: v.why || v.working || targetQ.e || '',
+        code: Array.isArray(v.code) ? v.code.map(String) : [],
+        verified: isVerified,
+        modelUsed: genResult.modelUsed,
+        date: Date.now()
+      };
+      vRec._useOriginal = false;
+      save();
 
     const bgBox = $('#bg-gen-box');
     if (bgBox) {
@@ -4486,6 +4801,7 @@ async function rewriteQuestionWithGemini(targetQ) {
     }
   } catch (err) {
     console.warn('AI variant generation error:', err);
+    throw err;
   }
 }
 
@@ -4509,6 +4825,38 @@ function done() {
   view = 'done';
   cancelRecallTimer();
   save();
+  try {
+    // Check Level 0 completion per subject
+    const subjMap = {};
+    (BANKS||[]).forEach(b=>{
+      if(Array.isArray(b.q)) b.q.forEach(q=>{
+        const lvl = (typeof q.lvl==='number'?q.lvl:(typeof q.level==='number'?q.level:1));
+        if(lvl===0){
+          const s = canonSubj(q.s);
+          subjMap[s] = subjMap[s] || {total:0, done:0};
+          subjMap[s].total++;
+          if(R[q.n]) subjMap[s].done++;
+        }
+      });
+    });
+    if(D){
+      D.forEach(q=>{
+        const lvl = (typeof q.lvl==='number'?q.lvl:(typeof q.level==='number'?q.level:1));
+        if(lvl===0){
+          const s = canonSubj(q.s);
+          subjMap[s] = subjMap[s] || {total:0, done:0};
+          subjMap[s].total++;
+          if(R[q.n]) subjMap[s].done++;
+        }
+      });
+    }
+    Object.keys(subjMap).forEach(s=>{
+      if(subjMap[s].total>0 && subjMap[s].done===subjMap[s].total && !localStorage.getItem('bitmcq_l0done_'+s)){
+        localStorage.setItem('bitmcq_l0done_'+s,'1');
+        setTimeout(()=>{ alert('🎉 All Level 0 Questions Mastered for ' + s + '!'); }, 500);
+      }
+    });
+  } catch(e){}
   const r = Q.map((n, i) => QRESULTS[i] || (typeof n === 'string' ? (A[n.split(':')[0]].errs[n.split(':')[1]].fx ? 'c' : 'w') : R[n]));
   const c = r.filter(x => x === 'c').length;
   const w = r.filter(x => x === 'w').length;
@@ -5159,16 +5507,25 @@ function revCard() {
   const T = A.map((a, i) => ({ a, i, w: a.errs.filter(e => e.r === 'w').length, s: a.errs.filter(e => e.r === 's').length }))
     .filter(x => x.w + x.s > 0);
   if (!T.length) return '';
+  const seen = new Set();
+  const items = T.filter(x=>{
+    const key = (x.a.bankId!=null&&x.a.bi!=null)?('b'+x.a.bankId+'i'+x.a.bi):('s'+x.a.no+':'+(x.a.date||''));
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  }).slice(0,15);
+  if(!items.length) return '';
   return `
-    <div style="margin-top:12px">
-      <h3>🔁 Past Set Archives</h3>
-      ${T.map(x => `
-        <div class="item row" style="justify-content:space-between">
-          <span>Set ${x.a.no} · ✗ ${x.w} misses</span>
-          <button class="sm" onclick="start(A[${x.i}].errs.map((e,j)=>'${x.i}:'+j))">Revise Set ${x.a.no}</button>
-        </div>
-      `).join('')}
-    </div>
+    <details style="margin-top:12px" class="card">
+      <summary style="cursor:pointer;font-weight:600">📁 Past Set Archives (${items.length})</summary>
+      <div style="margin-top:10px">
+        ${items.map(x => `
+          <div class="item row" style="justify-content:space-between">
+            <span>Set ${x.a.no} · ✗ ${x.w} misses</span>
+            <button class="sm" onclick="start(A[${x.i}].errs.map((e,j)=>'${x.i}:'+j))">Revise Set ${x.a.no}</button>
+          </div>
+        `).join('')}
+      </div>
+    </details>
   `;
 }
 
@@ -5222,8 +5579,14 @@ function restore(f) {
 
 function exportUI() {
   return `
-    <div class="row">
-      <select id="xs"><option value="w">Mistakes only</option><option value="wsk">Mistakes + skipped</option></select>
+    <div class="row" style="flex-wrap:wrap">
+      <select id="xs">
+        <option value="all">All Categories: Mistakes + Skipped + Unsure/Guessed</option>
+        <option value="w">Mistakes Only</option>
+        <option value="s">Skipped Only</option>
+        <option value="ug">Unsure & Guessed (Confidence 1 & 2)</option>
+        <option value="wsk">Mistakes + skipped</option>
+      </select>
       <select id="xf"><option value="md">Markdown (.md)</option><option value="txt">Plain Text (.txt)</option></select>
       <button class="p sm" onclick="exportLog(0)">⬇ Download</button>
       <button class="sm" onclick="exportLog(1)">Copy</button>
@@ -5236,20 +5599,91 @@ function exportLog(copy) {
   const scope = $('#xs').value;
   const isMd = $('#xf').value === 'md';
   const m = $('#xm');
-  const wr = D.filter(q => R[q.n] === 'w');
-  const sk = D.filter(q => R[q.n] === 's');
-  let text = `# Recall Error Log - ${new Date().toISOString().slice(0, 10)}\n\n`;
-  if (scope !== 's') {
-    text += `## Mistakes (${wr.length})\n\n`;
-    wr.forEach(q => {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  let text = `# Recall Error Log - ${todayStr}\n\n`;
+  const results = [];
+
+  // From current deck
+  (D||[]).forEach(q => {
+    if (R[q.n] === 'w') results.push({ q, type: 'w', src: 'current' });
+    if (R[q.n] === 's') results.push({ q, type: 's', src: 'current' });
+  });
+
+  // From history log L (all sessions)
+  (L||[]).forEach(rec => {
+    try {
+      const d = new Date(rec.t || Date.now()).toISOString().slice(0,10);
+      if (d !== todayStr) return;
+      const q = byN(rec.k) || (BANKS||[]).flatMap(b=>b.q||[]).find(x=>qk(x)===rec.k) || null;
+      if (!q) return;
+      if (rec.ok === false) results.push({ q, type: 'w', src: 'log', cf: rec.cf });
+      if (rec.ch === -2 || rec.skipped) results.push({ q, type: 's', src: 'log', cf: rec.cf });
+      if (rec.cf === 1 || rec.cf === 2) results.push({ q, type: 'ug', src: 'log', cf: rec.cf });
+    } catch(e){}
+  });
+
+  // Deduplicate by question number
+  const seen = new Set();
+  const unique = results.filter(r => {
+    const key = r.q.n + '|' + r.type;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const wList = unique.filter(r => r.type === 'w');
+  const sList = unique.filter(r => r.type === 's');
+  const ugList = unique.filter(r => r.type === 'ug');
+
+  if (scope === 'all' || scope === 'wsk') {
+    if (scope !== 's' && (scope === 'all' || scope === 'wsk' || scope === 'w')) {
+      if (scope === 'all' || scope === 'wsk' || scope === 'w') {
+        text += `## Mistakes (${wList.length})\n\n`;
+        wList.forEach(r => {
+          const q = r.q;
+          text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nYour confidence: ${r.cf||'-'}\nReason: ${q.e || ''}\n\n`;
+        });
+      }
+    }
+    if (scope === 'all' || scope === 'wsk' || scope === 's') {
+      text += `## Skipped (${sList.length})\n\n`;
+      sList.forEach(r => {
+        const q = r.q;
+        text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nReason: ${q.e || ''}\n\n`;
+      });
+    }
+    if (scope === 'all') {
+      text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
+      ugList.forEach(r => {
+        const q = r.q;
+        text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nConfidence: ${r.cf}\nReason: ${q.e || ''}\n\n`;
+      });
+    }
+  } else if (scope === 'w') {
+    text += `## Mistakes (${wList.length})\n\n`;
+    wList.forEach(r => {
+      const q = r.q;
       text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nReason: ${q.e || ''}\n\n`;
     });
+  } else if (scope === 's') {
+    text += `## Skipped (${sList.length})\n\n`;
+    sList.forEach(r => {
+      const q = r.q;
+      text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nReason: ${q.e || ''}\n\n`;
+    });
+  } else if (scope === 'ug') {
+    text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
+    ugList.forEach(r => {
+      const q = r.q;
+      text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nConfidence: ${r.cf}\nReason: ${q.e || ''}\n\n`;
+    });
   }
+
   if (!copy) {
-    saveFile(`mit-mcq-errors.${isMd ? 'md' : 'txt'}`, text, isMd ? 'text/markdown' : 'text/plain');
-    m.textContent = 'Downloaded error log.';
+    saveFile(`recall-error-log-${todayStr}.${isMd ? 'md' : 'txt'}`, text, isMd ? 'text/markdown' : 'text/plain');
+    if (m) m.textContent = 'Downloaded error log.';
   } else {
-    navigator.clipboard.writeText(text).then(() => m.textContent = 'Copied to clipboard.');
+    navigator.clipboard.writeText(text).then(() => { if (m) m.textContent = 'Copied to clipboard.'; });
   }
 }
 
@@ -5389,6 +5823,7 @@ window.AppState = {
   get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, schemaVer: SCHEMA_VER }),
   apply: (s) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
+    const currentView = typeof view !== 'undefined' ? view : 'home';
     const prevP = P;
     const prevKey = (wasQ && Array.isArray(Q) && typeof P === 'number' && Q[P] != null) ? Q[P] : null;
     D = s.D == null ? null : s.D;
@@ -5420,6 +5855,13 @@ window.AppState = {
       return;
     }
     if (document.getElementById('ed')) return;
+    if (currentView === 'cards' || currentView === 'drill' || currentView === 'mistakes' || currentView === 'mock' || currentView === 'flash' || currentView === 'rev') {
+      if (typeof renderFlashcardView === 'function' && currentView === 'cards') {
+        try { renderFlashcardView(); return; } catch(e){}
+      }
+      if (typeof home === 'function') home(true);
+      return;
+    }
     home();
   },
   save: save,
