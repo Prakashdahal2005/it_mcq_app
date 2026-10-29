@@ -798,6 +798,7 @@ let FIX_DAYS = {};
 let DIAGNOSTIC_DONE = false;
 let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
 let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+let COLD_QS = {}; // n -> true for questions marked as cold/useless
 let ACTIVE_FC_INDEX = 0;
 let ACTIVE_FC_SHOW_BACK = false;
 let sessionLeechCount = 0;
@@ -827,7 +828,7 @@ function save() {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
       D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst,
-      CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE
+      CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS
     }));
     localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
     localStorage.setItem('bitmcq_rmarks', JSON.stringify(RESOURCE_MARKS));
@@ -877,6 +878,7 @@ function load() {
       DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE || localStorage.getItem('bitmcq_diag_done') === '1';
       QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
       PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+      COLD_QS = (s.COLD_QS && typeof s.COLD_QS === 'object') ? s.COLD_QS : {};
       if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
       try {
         sessionHistory = JSON.parse(localStorage.getItem('bitmcq_session_hist') || '[]');
@@ -2043,7 +2045,7 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
 
 function dueKeys(quickOnly = false) {
   const t = today();
-  const pool = (D || []).filter(q => !quickOnly || effQuick(q));
+  const pool = (D || []).filter(q => (!quickOnly || effQuick(q)) && !COLD_QS[q.n]);
 
   const dueItems = [];
   pool.forEach(q => {
@@ -2637,6 +2639,35 @@ function regenerateCurrentQuestion() {
   alert('This question cannot be regenerated without a Gemini API key or matching calculation template.');
 }
 
+
+function toggleColdQuestion() {
+  if (MK) return; // no cold-marking during mock exams
+  const rawQ = byN(Q[P]);
+  if (!rawQ) return;
+  const n = rawQ.n;
+  if (COLD_QS[n]) {
+    delete COLD_QS[n];
+    // Remove extended interval we set
+    const k = qk(rawQ);
+    if (V[k] && V[k]._coldSet) {
+      V[k].d = today(); // make it due normally again
+      delete V[k]._coldSet;
+    }
+    save();
+    show(); // re-render to update button
+  } else {
+    COLD_QS[n] = true;
+    // Push due date far into the future (180 days)
+    const k = qk(rawQ);
+    V[k] = V[k] || {};
+    V[k].d = today() + 180;
+    V[k].stab = V[k].stab ? Math.max(V[k].stab, 180) : 180;
+    V[k]._coldSet = true;
+    save();
+    show();
+  }
+}
+
 function quarantineCurrentQuestion() {
   if (!confirm('Quarantine this question/variant? It will be marked as questionable and excluded from future study sets.')) return;
   const rawQ = byN(Q[P]);
@@ -3022,7 +3053,7 @@ function prepareQuestionForDisplay(rawQ) {
 function buildTodaySession(minutes = 15, quickOnly = false) {
   if (!D || !D.length) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
-  const pool = quickOnly ? (D || []).filter(q => effQuick(q)) : (D || []);
+  const pool = (quickOnly ? (D || []).filter(q => effQuick(q)) : (D || [])).filter(q => !COLD_QS[q.n]);
   if (!pool.length) return [];
 
   const due = dueKeys(quickOnly);
@@ -3827,6 +3858,9 @@ function show() {
               ${isShowingVariant ? '↺ View original' : '✨ View variant'}
             </button>
           ` : ''}
+          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${COLD_QS[rawQ?.n] ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
+            ${COLD_QS[rawQ?.n] ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
+          </button>` : ''}
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
             🚩 Looks wrong
           </button>
