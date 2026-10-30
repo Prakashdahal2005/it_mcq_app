@@ -7,7 +7,7 @@
   var SCHEMA = 1;
   var MAX_BYTES = 20 * 1024 * 1024;
   var PERIODIC_MS = 5 * 60 * 1000;
-  var DEBOUNCE_SAVE_MS = 2500;
+  var DEBOUNCE_SAVE_MS = 8000;
 
   function SyncError(kind, message) {
     this.name = 'SyncError';
@@ -139,6 +139,7 @@
       DIAGNOSTIC_DONE: !!s.DIAGNOSTIC_DONE,
       QUIET_MODE: !!s.QUIET_MODE,
       PB_MOCK_SCORE: typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : 0,
+      COLD_QS: (s.COLD_QS && typeof s.COLD_QS === 'object' && !Array.isArray(s.COLD_QS)) ? s.COLD_QS : {},
       schemaVer: typeof s.schemaVer === 'number' ? s.schemaVer : 1
     };
     n.BANKS = n.BANKS.filter(function (b) { return b && typeof b === 'object'; }).map(function (b) {
@@ -155,6 +156,11 @@
     if (s.D && s.D.length) return true;
     if (s.BANKS && s.BANKS.some(function (b) { return b && b.q && b.q.length; })) return true;
     if (s.R && Object.keys(s.R).length) return true;
+    if (s.A && s.A.length) return true;
+    if (s.L && s.L.length) return true;
+    if (s.CARDS && s.CARDS.length) return true;
+    if (s.V && Object.keys(s.V).length) return true;
+    if (s.COLD_QS && Object.keys(s.COLD_QS).length) return true;
     return false;
   }
 
@@ -207,6 +213,7 @@
       base.d = Math.max(x.d || 0, y.d || 0);
       base.missCount = Math.max(x.missCount || 0, y.missCount || 0);
       if (x.confWrongRetest || y.confWrongRetest) base.confWrongRetest = Math.max(x.confWrongRetest || 0, y.confWrongRetest || 0);
+      if (x._coldSet || y._coldSet) base._coldSet = true;
 
       if (x.stab != null || y.stab != null) {
         var xLatest = (x.history && x.history.length) ? x.history[x.history.length - 1].t : 0;
@@ -272,8 +279,12 @@
     (a || []).concat(b || []).forEach(function (e) {
       if (!e) return;
       var key;
-      if (e.bankId != null && e.bi != null) {
-        key = 'bank_' + e.bankId + '_bi_' + e.bi;
+      if (e.id != null) {
+        key = 'id_' + e.id;
+      } else if (e.t != null || e.doneAt != null) {
+        key = 't_' + (e.t || e.doneAt) + '_' + (e.bankId != null ? ('b' + e.bankId + 'i' + e.bi) : (e.no || ''));
+      } else if (e.bankId != null && e.bi != null) {
+        key = 'bank_' + e.bankId + '_bi_' + e.bi + '_d_' + (e.date || '') + '_no_' + (e.no || 0) + '_tot_' + (e.total || 0);
       } else if (e.setNo != null) {
         key = 'set_' + e.setNo + '_' + (e.date || Math.floor((e.doneAt||e.t||0)/600000));
       } else {
@@ -323,6 +334,44 @@
         out.push(map[k]);
       }
     }
+    return out;
+  }
+
+  function mergeColdQs(a, b) {
+    var out = {};
+    var keys = {};
+    Object.keys(a || {}).forEach(function (k) { keys[k] = 1; });
+    Object.keys(b || {}).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+      var va = (a || {})[k];
+      var vb = (b || {})[k];
+      if (va === undefined) { out[k] = vb; return; }
+      if (vb === undefined) { out[k] = va; return; }
+      var ta = (typeof va === 'object' && va && va.t) ? va.t : 0;
+      var tb = (typeof vb === 'object' && vb && vb.t) ? vb.t : 0;
+      if (ta || tb) {
+        out[k] = ta >= tb ? va : vb;
+      } else {
+        var isColdA = (va === true || (va && typeof va === 'object' && va.cold !== false));
+        var isColdB = (vb === true || (vb && typeof vb === 'object' && vb.cold !== false));
+        out[k] = isColdA || isColdB ? (va || vb) : false;
+      }
+    });
+    return out;
+  }
+
+  function mergeFixDays(a, b) {
+    var out = {};
+    var subjects = {};
+    Object.keys(a || {}).forEach(function (s) { subjects[s] = 1; });
+    Object.keys(b || {}).forEach(function (s) { subjects[s] = 1; });
+    Object.keys(subjects).forEach(function (s) {
+      var listA = Array.isArray((a || {})[s]) ? (a || {})[s] : [];
+      var listB = Array.isArray((b || {})[s]) ? (b || {})[s] : [];
+      var set = {};
+      listA.concat(listB).forEach(function (d) { if (d) set[String(d)] = 1; });
+      out[s] = Object.keys(set).sort();
+    });
     return out;
   }
 
@@ -443,8 +492,9 @@
       QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
       recallFirst: active.recallFirst !== false,
       CARDS: mergeCards(local.CARDS, remote.CARDS),
+      COLD_QS: mergeColdQs(local.COLD_QS, remote.COLD_QS),
       RESOURCE_MARKS: Object.assign({}, local.RESOURCE_MARKS || {}, remote.RESOURCE_MARKS || {}),
-      FIX_DAYS: Object.assign({}, local.FIX_DAYS || {}, remote.FIX_DAYS || {}),
+      FIX_DAYS: mergeFixDays(local.FIX_DAYS, remote.FIX_DAYS),
       DIAGNOSTIC_DONE: !!(local.DIAGNOSTIC_DONE || remote.DIAGNOSTIC_DONE),
       QUIET_MODE: local.QUIET_MODE !== undefined ? !!local.QUIET_MODE : !!remote.QUIET_MODE,
       PB_MOCK_SCORE: Math.max(local.PB_MOCK_SCORE || 0, remote.PB_MOCK_SCORE || 0),
@@ -490,18 +540,35 @@
       }
       throw new SyncError('http', 'Server error (' + res.status + '): ' + errText);
     }
-    return await res.json();
+    var data = await res.json();
+    if (data && typeof data === 'object') {
+      var verHeader = res.headers.get('x-version');
+      if (verHeader) {
+        data._syncMeta = data._syncMeta || {};
+        if (!data._syncMeta.version) data._syncMeta.version = parseInt(verHeader, 10);
+      }
+    }
+    return data;
   }
 
-  async function postRemoteState(stateObj) {
+  async function postRemoteState(stateObj, baseVersion) {
+    var headers = getApiHeaders();
+    if (baseVersion != null && !isNaN(baseVersion) && baseVersion > 0) {
+      headers['x-base-version'] = String(baseVersion);
+    }
     var res = await fetch('/api/state', {
       method: 'POST',
-      headers: getApiHeaders(),
+      headers: headers,
       body: JSON.stringify(stateObj)
     });
 
     if (res.status === 401) {
       throw new SyncError('unauthorized', 'Passcode required or incorrect. Please enter your Sync Secret.');
+    }
+    if (res.status === 409) {
+      var conflictJson = {};
+      try { conflictJson = await res.json(); } catch (e) {}
+      throw new SyncError('conflict', conflictJson.error || 'Concurrency conflict: Cloud was updated by another device.');
     }
     if (!res.ok) {
       var errText = '';
@@ -526,71 +593,102 @@
     state.busy = true;
     setStatus('syncing', 'Syncing with cloud...');
 
-    try {
-      var remote = await fetchRemoteState();
-      var local = appGet();
-      var meta = loadMeta();
+    var maxRetries = 2;
+    for (var attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        var remote = await fetchRemoteState();
+        var local = appGet();
+        var meta = loadMeta();
 
-      var remoteEmpty = !remote || (typeof remote === 'object' && Object.keys(remote).length === 0);
-      var localEmpty = !hasLocalData(local);
+        var remoteEmpty = !remote || (typeof remote === 'object' && Object.keys(remote).length === 0);
+        var localEmpty = !hasLocalData(local);
 
-      if (remoteEmpty && !localEmpty) {
-        // First-time sync: push local state to cloud
-        await postRemoteState(local);
+        if (remoteEmpty && !localEmpty) {
+          // First-time sync: push local state to cloud
+          var postRes = await postRemoteState(local, 0);
+          state.lastSync = Date.now();
+          meta.lastSync = state.lastSync;
+          meta.cloudVersion = postRes && postRes.version ? postRes.version : 1;
+          saveMeta(meta);
+          state.dirty = false;
+          setStatus('synced', 'Synced to Upstash Redis (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
+          return;
+        }
+
+        if (!remoteEmpty && localEmpty) {
+          // New device: restore from cloud directly
+          var normalized = normalizeAppState(remote);
+          appApply(normalized);
+          state.lastSync = Date.now();
+          meta.lastSync = state.lastSync;
+          meta.cloudVersion = (remote._syncMeta && remote._syncMeta.version) || 1;
+          saveMeta(meta);
+          state.dirty = false;
+          setStatus('synced', 'Restored from cloud (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
+          return;
+        }
+
+        if (!remoteEmpty && !localEmpty) {
+          // Both exist: smart merge
+          var genSets = (window.AppState && window.AppState.genSets) ? window.AppState.genSets : null;
+          var normRemote = normalizeAppState(remote);
+          var merged = mergeAppStates(local, normRemote, genSets, {
+            preferRemoteActive: !!opts.preferRemote
+          });
+
+          appApply(merged.appState);
+
+          var baseVer = (remote._syncMeta && typeof remote._syncMeta.version === 'number') ? remote._syncMeta.version : 0;
+
+          // Check if remote already matches merged state (no network upload needed)
+          var remoteHash = hashStr(JSON.stringify(normRemote));
+          var mergedHash = hashStr(JSON.stringify(merged.appState));
+          if (remoteHash === mergedHash) {
+            state.lastSync = Date.now();
+            meta.lastSync = state.lastSync;
+            meta.cloudVersion = baseVer;
+            saveMeta(meta);
+            state.dirty = false;
+            setStatus('synced', 'Synced & up to date (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
+            return;
+          }
+
+          // Push merged state back to Redis with optimistic baseVersion
+          var postRes = await postRemoteState(merged.appState, baseVer);
+          state.lastSync = Date.now();
+          meta.lastSync = state.lastSync;
+          meta.cloudVersion = postRes && postRes.version ? postRes.version : baseVer + 1;
+          saveMeta(meta);
+          state.dirty = false;
+          setStatus('synced', 'Synced & merged with cloud (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
+          return;
+        }
+
+        // Both empty
         state.lastSync = Date.now();
         meta.lastSync = state.lastSync;
         saveMeta(meta);
         state.dirty = false;
-        setStatus('synced', 'Synced to Upstash Redis (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
+        setStatus('synced', 'Connected (cloud is ready)');
         return;
+      } catch (err) {
+        if (err.kind === 'conflict' && attempt < maxRetries - 1) {
+          console.warn('Concurrency conflict detected; auto re-fetching and merging latest cloud state...');
+          continue;
+        }
+        console.warn('Cloud sync error:', err);
+        if (err.kind === 'unauthorized') {
+          setStatus('unauthorized', err.message);
+        } else {
+          setStatus('error', err.message || 'Sync failed');
+        }
+        break;
+      } finally {
+        if (attempt === maxRetries - 1 || state.status !== 'syncing') {
+          state.busy = false;
+          refreshUI();
+        }
       }
-
-      if (!remoteEmpty && localEmpty) {
-        // New device: restore from cloud directly
-        var normalized = normalizeAppState(remote);
-        appApply(normalized);
-        state.lastSync = Date.now();
-        meta.lastSync = state.lastSync;
-        saveMeta(meta);
-        state.dirty = false;
-        setStatus('synced', 'Restored from cloud (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
-        return;
-      }
-
-      if (!remoteEmpty && !localEmpty) {
-        // Both exist: smart merge
-        var genSets = (window.AppState && window.AppState.genSets) ? window.AppState.genSets : null;
-        var merged = mergeAppStates(local, normalizeAppState(remote), genSets, {
-          preferRemoteActive: !!opts.preferRemote
-        });
-
-        appApply(merged.appState);
-        // Push merged state back to Redis
-        await postRemoteState(merged.appState);
-        state.lastSync = Date.now();
-        meta.lastSync = state.lastSync;
-        saveMeta(meta);
-        state.dirty = false;
-        setStatus('synced', 'Synced & merged with cloud (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
-        return;
-      }
-
-      // Both empty
-      state.lastSync = Date.now();
-      meta.lastSync = state.lastSync;
-      saveMeta(meta);
-      state.dirty = false;
-      setStatus('synced', 'Connected (cloud is ready)');
-    } catch (err) {
-      console.warn('Cloud sync error:', err);
-      if (err.kind === 'unauthorized') {
-        setStatus('unauthorized', err.message);
-      } else {
-        setStatus('error', err.message || 'Sync failed');
-      }
-    } finally {
-      state.busy = false;
-      refreshUI();
     }
   }
 
@@ -599,21 +697,28 @@
       alert('You are offline. Cannot push to cloud right now.');
       return;
     }
-    var local = appGet();
-    if (!hasLocalData(local)) {
-      if (!confirm('Local study data appears empty. Do you really want to push empty data to cloud?')) return;
-    }
     state.busy = true;
-    setStatus('syncing', 'Pushing to cloud...');
+    setStatus('syncing', 'Merging & uploading to cloud...');
     try {
-      await postRemoteState(local);
+      var remote = await fetchRemoteState();
+      var local = appGet();
+      var genSets = (window.AppState && window.AppState.genSets) ? window.AppState.genSets : null;
+      var normRemote = normalizeAppState(remote || {});
+      // Safe two-way merge: ensures progress from other devices is retained, preferring local active pointer
+      var merged = mergeAppStates(local, normRemote, genSets, {
+        preferRemoteActive: false
+      });
+      appApply(merged.appState);
+      var baseVer = (remote && remote._syncMeta && remote._syncMeta.version) || 0;
+      var postRes = await postRemoteState(merged.appState, baseVer);
       state.lastSync = Date.now();
       var meta = loadMeta();
       meta.lastSync = state.lastSync;
+      meta.cloudVersion = postRes && postRes.version ? postRes.version : baseVer + 1;
       saveMeta(meta);
       state.dirty = false;
-      setStatus('synced', 'Pushed to Upstash Redis at ' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      alert('Successfully uploaded local progress to cloud!');
+      setStatus('synced', 'Uploaded to Upstash Redis at ' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      alert('Successfully unified and uploaded study progress to cloud!');
     } catch (err) {
       alert('Push failed: ' + err.message);
       setStatus(err.kind === 'unauthorized' ? 'unauthorized' : 'error', err.message);
@@ -628,25 +733,32 @@
       alert('You are offline. Cannot pull from cloud right now.');
       return;
     }
-    if (!confirm('This will replace or merge your local progress with the latest version from Upstash Redis. Continue?')) return;
+    if (!confirm('This will fetch the latest progress from Upstash Redis and cleanly merge it with your local progress. Continue?')) return;
     state.busy = true;
-    setStatus('syncing', 'Pulling from cloud...');
+    setStatus('syncing', 'Pulling & merging latest cloud progress...');
     try {
       var remote = await fetchRemoteState();
       if (!remote || Object.keys(remote).length === 0) {
-        alert('Cloud storage is currently empty. Nothing to restore.');
+        alert('Cloud storage is currently empty. Local progress preserved.');
         setStatus('synced', 'Cloud is empty');
         return;
       }
-      var normalized = normalizeAppState(remote);
-      appApply(normalized);
+      var local = appGet();
+      var genSets = (window.AppState && window.AppState.genSets) ? window.AppState.genSets : null;
+      var normRemote = normalizeAppState(remote);
+      // Safe two-way merge: incorporates remote while safeguarding local progress
+      var merged = mergeAppStates(local, normRemote, genSets, {
+        preferRemoteActive: true
+      });
+      appApply(merged.appState);
       state.lastSync = Date.now();
       var meta = loadMeta();
       meta.lastSync = state.lastSync;
+      meta.cloudVersion = (remote._syncMeta && remote._syncMeta.version) || 1;
       saveMeta(meta);
       state.dirty = false;
-      setStatus('synced', 'Restored from cloud at ' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      alert('Successfully loaded progress from cloud!');
+      setStatus('synced', 'Merged with cloud (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
+      alert('Successfully synced with cloud! Your progress has been cleanly unified.');
     } catch (err) {
       alert('Pull failed: ' + err.message);
       setStatus(err.kind === 'unauthorized' ? 'unauthorized' : 'error', err.message);
@@ -687,16 +799,12 @@
     });
 
     window.addEventListener('pagehide', function () {
-      if (state.dirty && !state.busy && navigator.onLine) {
-        var local = appGet();
-        if (local && window.fetch) {
-          fetch('/api/state', {
-            method: 'POST',
-            headers: getApiHeaders(),
-            body: JSON.stringify(local),
-            keepalive: true
-          }).catch(function () {});
-        }
+      // Do not blind POST unmerged local state on pagehide.
+      // Mark needsSync in metadata so next session performs full two-way merge.
+      if (state.dirty) {
+        var meta = loadMeta();
+        meta.needsSync = true;
+        saveMeta(meta);
       }
     });
 

@@ -18,7 +18,8 @@ export default async function handler(req, res) {
   // Set CORS headers for cross-device & PWA compatibility
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-secret, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-secret, Authorization, x-base-version, If-Match");
+  res.setHeader("Access-Control-Expose-Headers", "ETag, x-version, x-updated-at");
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -53,7 +54,15 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const state = await redis.get(STATE_KEY);
-      return res.status(200).json(state ?? {});
+      if (!state || typeof state !== "object") {
+        return res.status(200).json({});
+      }
+      const version = (state._syncMeta && typeof state._syncMeta.version === "number") ? state._syncMeta.version : 1;
+      const updatedAt = (state._syncMeta && typeof state._syncMeta.updatedAt === "number") ? state._syncMeta.updatedAt : Date.now();
+      res.setHeader("ETag", `"${version}"`);
+      res.setHeader("x-version", String(version));
+      res.setHeader("x-updated-at", String(updatedAt));
+      return res.status(200).json(state);
     }
 
     if (req.method === "POST") {
@@ -70,9 +79,39 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Request body must be a valid JSON object" });
       }
 
+      // Check current state in Redis to verify version
+      const current = await redis.get(STATE_KEY);
+      let currentVersion = 0;
+      if (current && typeof current === "object") {
+        currentVersion = (current._syncMeta && typeof current._syncMeta.version === "number") ? current._syncMeta.version : 1;
+      }
+
+      // Client can send baseVersion via header (x-base-version or If-Match) or in body
+      const rawBaseVer = req.headers["x-base-version"] || (req.headers["if-match"] ? req.headers["if-match"].replace(/["W\/]/g, "") : null) || body._baseVersion;
+      const clientBaseVersion = rawBaseVer != null ? parseInt(rawBaseVer, 10) : null;
+
+      // Optimistic concurrency control: if client specifies a baseVersion and current version is newer, return 409 Conflict
+      if (clientBaseVersion != null && !isNaN(clientBaseVersion) && clientBaseVersion > 0 && currentVersion > clientBaseVersion) {
+        return res.status(409).json({
+          error: "Conflict: Cloud state has been updated by another device. Please merge with latest version.",
+          code: "CONCURRENCY_CONFLICT",
+          currentVersion: currentVersion,
+          clientBaseVersion: clientBaseVersion
+        });
+      }
+
+      delete body._baseVersion;
+      const nextVersion = Math.max(currentVersion + 1, (clientBaseVersion || 0) + 1);
+      body._syncMeta = {
+        version: nextVersion,
+        updatedAt: Date.now()
+      };
+
       // Save state to Upstash Redis
       await redis.set(STATE_KEY, body);
-      return res.status(200).json({ ok: true, savedAt: Date.now() });
+      res.setHeader("ETag", `"${nextVersion}"`);
+      res.setHeader("x-version", String(nextVersion));
+      return res.status(200).json({ ok: true, version: nextVersion, savedAt: Date.now() });
     }
 
     return res.status(405).json({ error: "Method Not Allowed" });

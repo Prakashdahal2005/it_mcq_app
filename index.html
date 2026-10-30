@@ -803,7 +803,14 @@ let FIX_DAYS = {};
 let DIAGNOSTIC_DONE = false;
 let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
 let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
-let COLD_QS = {}; // n -> true for questions marked as cold/useless
+let COLD_QS = {}; // n -> { cold: boolean, t: timestamp } or boolean
+function isColdQuestion(q) {
+  if (!q) return false;
+  const v = COLD_QS[q.n];
+  if (v === true) return true;
+  if (v && typeof v === 'object') return v.cold !== false;
+  return false;
+}
 let ACTIVE_FC_INDEX = 0;
 let ACTIVE_FC_SESSION_IDS = [];
 let ACTIVE_FC_SHOW_BACK = false;
@@ -1695,19 +1702,50 @@ function isQuickQuestion(q) {
   return true;
 }
 
-// Manual override store: keyed by stable content key qk(q) -> true (quick) / false (pen & paper)
+// Manual override store: keyed by stable content key qk(q) -> { quick, level } or boolean
 function effQuick(q) {
   if (!q) return true;
   const k = qk(q);
-  if (Object.prototype.hasOwnProperty.call(QOV, k)) return QOV[k];
+  if (QOV[k] && typeof QOV[k] === 'object' && 'quick' in QOV[k]) return QOV[k].quick;
+  if (Object.prototype.hasOwnProperty.call(QOV, k) && typeof QOV[k] === 'boolean') return QOV[k];
   return q.quick !== false;
 }
 
 function setQuick(n, val) {
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
   if (!rawQ) return;
-  QOV[qk(rawQ)] = !!val;
+  const k = qk(rawQ);
+  if (typeof QOV[k] !== 'object' || QOV[k] === null) {
+    const prevQuick = typeof QOV[k] === 'boolean' ? QOV[k] : (rawQ.quick !== false);
+    QOV[k] = { quick: prevQuick };
+  }
+  QOV[k].quick = !!val;
   rawQ.quick = !!val;
+  save();
+  show();
+}
+
+function effLevel(q) {
+  if (!q) return 1;
+  const k = qk(q);
+  if (QOV[k] && typeof QOV[k] === 'object' && typeof QOV[k].level === 'number') return QOV[k].level;
+  if (typeof q.lvl === 'number') return q.lvl;
+  if (typeof q.level === 'number') return q.level;
+  return 1;
+}
+
+function setQuestionLevel(n, newLvl) {
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
+  if (!rawQ) return;
+  newLvl = parseInt(newLvl, 10);
+  if (isNaN(newLvl) || newLvl < 0 || newLvl > 3) return;
+  const k = qk(rawQ);
+  if (typeof QOV[k] !== 'object' || QOV[k] === null) {
+    const prevQuick = typeof QOV[k] === 'boolean' ? QOV[k] : (rawQ.quick !== false);
+    QOV[k] = { quick: prevQuick };
+  }
+  QOV[k].level = newLvl;
+  rawQ.level = newLvl;
   save();
   show();
 }
@@ -1898,6 +1936,7 @@ function parse(t) {
 
 // Spaced Repetition, Deadline & Locked-In Logic
 const qk = q => {
+  if (!q) return '';
   const origOpts = (q._orig && q._orig.o) || q.origO || q.o;
   const stem = (q._orig && q._orig.q) || q.q || '';
   return stem + '|' + ((q.code || []).join('\n')) + '|' + (origOpts || []).join('|');
@@ -2051,7 +2090,7 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
 
 function dueKeys(quickOnly = false) {
   const t = today();
-  const pool = (D || []).filter(q => (!quickOnly || effQuick(q)) && !COLD_QS[q.n]);
+  const pool = (D || []).filter(q => (!quickOnly || effQuick(q)) && !isColdQuestion(q));
 
   const dueItems = [];
   pool.forEach(q => {
@@ -2092,12 +2131,13 @@ function dueKeys(quickOnly = false) {
 }
 
 const byN = k => {
+  if (k == null) return null;
   if (typeof k === 'string') {
-    if (k.startsWith('v:')) return gemVars[+k.slice(2)];
+    if (k.startsWith('v:')) return gemVars[+k.slice(2)] || null;
     const [a, i] = k.split(':');
-    return { ...A[a].errs[i], _k: k };
+    return (A[a] && A[a].errs && A[a].errs[i]) ? { ...A[a].errs[i], _k: k } : null;
   }
-  return (D || []).find(q => q.n === k);
+  return (D || []).find(q => q && q.n === k) || null;
 };
 
 function groupQuestionBlocks(questionKeys) {
@@ -2619,7 +2659,7 @@ function generateLocalFamilyVariant(rawQ) {
 
 function regenerateCurrentQuestion() {
   if (!CURRENT_Q || P >= Q.length) return;
-  const rawQ = byN(Q[P]);
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
 
   if (matchQuestionFamily(rawQ)) {
@@ -2629,7 +2669,7 @@ function regenerateCurrentQuestion() {
     return;
   }
 
-  if (GEM_KEY && (rawQ.regeneratable || !effQuick(rawQ))) {
+  if (GEM_KEY) {
     const qStem = $('#q-stem');
     if (qStem) qStem.innerHTML = '<span class="c-sk">✨ Generating verified AI variant with blind validation...</span>';
     rewriteQuestionWithGemini(rawQ).then(() => {
@@ -2643,7 +2683,7 @@ function regenerateCurrentQuestion() {
     return;
   }
 
-  alert('This question cannot be regenerated without a Gemini API key or matching calculation template.');
+  alert('A Gemini API key is required to regenerate questions. Please configure your Gemini API Key in Settings (⚙).');
 }
 
 
@@ -2652,8 +2692,8 @@ function toggleColdQuestion() {
   const rawQ = byN(Q[P]);
   if (!rawQ) return;
   const n = rawQ.n;
-  if (COLD_QS[n]) {
-    delete COLD_QS[n];
+  if (isColdQuestion(rawQ)) {
+    COLD_QS[n] = { cold: false, t: Date.now() };
     // Remove extended interval we set
     const k = qk(rawQ);
     if (V[k] && V[k]._coldSet) {
@@ -2663,7 +2703,7 @@ function toggleColdQuestion() {
     save();
     show(); // re-render to update button
   } else {
-    COLD_QS[n] = true;
+    COLD_QS[n] = { cold: true, t: Date.now() };
     // Push due date far into the future (180 days)
     const k = qk(rawQ);
     V[k] = V[k] || {};
@@ -2741,13 +2781,16 @@ function getRecommendedResource(subj, isStuck = false, stem = '', tags = []) {
   const text = ((stem||'') + ' ' + ((tags||[]).join(' '))).toLowerCase();
   const now = Date.now();
   const cooldownMs = 14 * 864e5;
+  const isExcluded = id => {
+    const mark = RESOURCE_MARKS[id];
+    if (!mark) return false;
+    if (mark.status === 'not_for_me' || mark.status === 'done') return true;
+    if (now - (mark.date || 0) < cooldownMs) return true;
+    return false;
+  };
 
   let candidates = RESOURCE_LIBRARY.filter(r => {
-    const mark = RESOURCE_MARKS[r.id];
-    if (mark) {
-      if (mark.status === 'not_for_me' || mark.status === 'done') return false;
-      if (now - (mark.date || 0) < cooldownMs) return false;
-    }
+    if (isExcluded(r.id)) return false;
     const rs = (r.subject||'').toLowerCase();
     if(rs && s && (rs === s || s.includes(rs) || rs.includes(s))) return true;
     return false;
@@ -2756,21 +2799,14 @@ function getRecommendedResource(subj, isStuck = false, stem = '', tags = []) {
   // Targeting by content
   if(text.includes('select') || text.includes('where') || text.includes('join') || text.includes('sql') || text.includes('group by') || text.includes('union')){
     const sql = RESOURCE_LIBRARY.find(r=>r.id==='w3-sql-drills');
-    if(sql){
-      const mark = RESOURCE_MARKS[sql.id];
-      if(!(mark && (mark.status==='not_for_me'||mark.status==='done') && now - (mark.date||0)<cooldownMs)) candidates.unshift(sql);
-    }
+    if(sql && !isExcluded(sql.id)) candidates.unshift(sql);
   }
   if(text.includes('normalization') || text.includes('1nf') || text.includes('2nf') || text.includes('3nf') || text.includes('bcnf') || text.includes('functional dependency')){
     const norm = RESOURCE_LIBRARY.find(r=>r.id==='gs-dbms' || (r.title&&r.title.toLowerCase().includes('normal')));
-    if(norm){
-      const mark = RESOURCE_MARKS[norm.id];
-      if(!(mark && (mark.status==='not_for_me'||mark.status==='done') && now - (mark.date||0)<cooldownMs)){
-        candidates = candidates.filter(c=>c.id!==norm.id);
-        candidates.unshift(norm);
-      }
-    }else{
-      // try to add a targeted one
+    if(norm && !isExcluded(norm.id)){
+      candidates = candidates.filter(c=>c.id!==norm.id);
+      candidates.unshift(norm);
+    } else if (!isExcluded('gs-dbms-norm')) {
       candidates.unshift({ id: 'gs-dbms-norm', title: 'Gate Smashers – DBMS Normalization', provider: 'Gate Smashers', subject: 'Database Management Systems', url: 'https://www.youtube.com/results?search_query=Gate%20Smashers%20DBMS%20Normalization', desc: '1NF–BCNF with examples.' });
     }
   }
@@ -2779,7 +2815,7 @@ function getRecommendedResource(subj, isStuck = false, stem = '', tags = []) {
   const seen = new Set();
   const out = [];
   for(const c of candidates){
-    if(!c||seen.has(c.id)) continue;
+    if(!c || seen.has(c.id) || isExcluded(c.id)) continue;
     seen.add(c.id); out.push(c);
   }
   return out.length ? out[0] : null;
@@ -2788,7 +2824,13 @@ function getRecommendedResource(subj, isStuck = false, stem = '', tags = []) {
 function markResource(id, status) {
   RESOURCE_MARKS[id] = { status, date: Date.now() };
   save();
-  // Do not navigate away; just update state
+  const box = document.getElementById('res-box-' + id) || document.querySelector(`[data-res-id="${id}"]`);
+  if (box) {
+    box.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    box.style.opacity = '0';
+    box.style.transform = 'translateY(-6px)';
+    setTimeout(() => { if (box && box.parentNode) box.remove(); }, 260);
+  }
 }
 
 function addFlashcardForCurrent(){
@@ -3102,7 +3144,7 @@ function getCurrentMilestone() {
       const acc = tot ? o.c / tot : 0;
       // Evaluate subjects even from diagnostic mock sets (2+ attempts)
       const isWeak = tot >= 2 && acc <= 0.40;
-      const isBorderline = tot >= 2 && acc > 0.40 && acc < 0.75;
+      const isBorderline = tot >= 2 && acc > 0.40 && acc < 0.81;
       return { k, tot, c: o.c, acc, isWeak, isBorderline };
     });
 
@@ -3129,21 +3171,19 @@ function getCurrentMilestone() {
     }
   });
 
-  if (mockSessions.length < 2) {
-    return { id: 3, tag: 'M3', title: 'First Full Mock', desc: 'Complete and review your first 100-question timed mock exam.', done: false };
+  const hasCompletedMock = (typeof PB_MOCK_SCORE === 'number' && PB_MOCK_SCORE > 0) || mockSessions.some(s => s.count >= 40);
+
+  if (!hasCompletedMock && mockSessions.length < 1) {
+    return { id: 3, tag: 'M3', title: 'First Full Mock', desc: 'Complete and review your first timed mock exam.', done: false };
   }
 
-  if (PB_MOCK_SCORE <= 0) {
-    return { id: 4, tag: 'M4', title: 'Score Growth', desc: 'Beat your previous mock exam score on a fresh mock attempt.', done: false };
-  }
-
-  if (PB_MOCK_SCORE < 70) {
-    return { id: 5, tag: 'M5', title: '70% Threshold', desc: 'Attain 70%+ on a timed mock exam to lock in your entrance qualification buffer.', done: false };
+  if (PB_MOCK_SCORE < 81) {
+    return { id: 5, tag: 'M5', title: '81% Target Threshold', desc: `Push past the 81% entrance safety buffer on a timed mock exam (current best: ${PB_MOCK_SCORE || 0}%).`, done: false };
   }
 
   const days = getDaysLeft();
   if (days > 2) {
-    return { id: 6, tag: 'M6', title: 'Retention & Spaced Mastery', desc: `Maintain your ≥75% retention edge across the remaining ${days} days with daily spaced retrieval and variants.`, done: false };
+    return { id: 6, tag: 'M6', title: 'Retention & Spaced Mastery', desc: `Maintain your ≥81% retention edge across the remaining ${days} days with daily spaced retrieval and variants.`, done: false };
   }
 
   if (days === 2) {
@@ -3247,14 +3287,31 @@ function prepareQuestionForDisplay(rawQ) {
 function buildTodaySession(minutes = 15, quickOnly = false) {
   if (!D || !D.length) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
-  const pool = (quickOnly ? (D || []).filter(q => effQuick(q)) : (D || [])).filter(q => !COLD_QS[q.n]);
-  if (!pool.length) return [];
+  const basePool = (quickOnly ? (D || []).filter(q => effQuick(q)) : (D || [])).filter(q => !isColdQuestion(q));
+  if (!basePool.length) return [];
 
-  const due = dueKeys(quickOnly);
+  // Exclude questions already completed today so the user never gets the exact same questions repeatedly in a single day!
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const doneTodayKeys = new Set(
+    (L || [])
+      .filter(r => r && r.t >= startOfToday)
+      .map(r => r.k)
+  );
+
+  let pool = basePool.filter(q => !doneTodayKeys.has(qk(q)));
+  if (pool.length < Math.min(5, targetQ)) {
+    // If user answered almost all questions today, allow unattempted questions from basePool
+    pool = basePool;
+  }
+
+  const due = dueKeys(quickOnly).filter(candidateN => {
+    const q = byN(candidateN);
+    return q && !doneTodayKeys.has(qk(q));
+  });
   const lockedSet = new Set(pool.filter(q => isLockedIn(q)).map(q => q.n));
 
-  // Easy first question: pick an L0 item with highest historical accuracy (eliminates startup anxiety)
-  const easyFirstCandidates = pool.filter(q => (q.level === 0 || q.level == null) && V[qk(q)]?.history?.some(h => h.ok));
+  // Easy first question: pick an L0 item with high historical accuracy (randomize top candidates)
+  const easyFirstCandidates = pool.filter(q => (effLevel(q) === 0 || q.level == null) && V[qk(q)]?.history?.some(h => h.ok));
   let easyFirst = null;
   if (easyFirstCandidates.length) {
     easyFirstCandidates.sort((a, b) => {
@@ -3264,10 +3321,13 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
       const accB = vb.filter(h => h.ok).length / (vb.length || 1);
       return accB - accA;
     });
-    easyFirst = easyFirstCandidates[0].n;
+    const pickCount = Math.min(3, easyFirstCandidates.length);
+    easyFirst = easyFirstCandidates[Math.floor(Math.random() * pickCount)].n;
   } else {
-    const l0Item = pool.find(q => q.level === 0);
-    if (l0Item) easyFirst = l0Item.n;
+    const l0Candidates = pool.filter(q => effLevel(q) === 0);
+    if (l0Candidates.length) {
+      easyFirst = l0Candidates[Math.floor(Math.random() * l0Candidates.length)].n;
+    }
   }
 
   // Identify Red/Weak subjects (accuracy <= 40%)
@@ -3307,7 +3367,7 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
 
   // Red/Weak subjects: pull L0/L1 items heavily (75% L0, 20% L1)
   if (redSubjects.size > 0) {
-    const redPool = pool.filter(q => redSubjects.has(cl(q.s)) && (q.level === 0 || q.level === 1));
+    const redPool = pool.filter(q => redSubjects.has(cl(q.s)) && (effLevel(q) === 0 || effLevel(q) === 1));
     redPool.sort(() => Math.random() - 0.5);
     for (const q of redPool) {
       if (session.length >= targetQ - 2) break;
@@ -3316,7 +3376,7 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   }
 
   // Fresh unattempted items (exclude L3 unless L0-L2 are mastered)
-  const unseenItems = pool.filter(q => !V[qk(q)] && (q.level == null || q.level < 3)).map(q => q.n).sort(() => Math.random() - 0.5);
+  const unseenItems = pool.filter(q => !V[qk(q)] && (effLevel(q) < 3)).map(q => q.n).sort(() => Math.random() - 0.5);
   while (unseenItems.length && session.length < targetQ - 1) {
     add(unseenItems.pop());
   }
@@ -3358,14 +3418,58 @@ function agg() {
     else if (r === 's') v[2]++;
   });
   Object.entries(cur).forEach(([k, v]) => add(k, ...v));
+
+  // Non-destructive Attempt Recovery:
+  // If historical attempts in A were truncated by older cloud-sync deduplication,
+  // reconcile with the immutable question-level log L so the user's authentic attempt progress is restored!
+  if (Array.isArray(L) && L.length > 0) {
+    const logCounts = {};
+    L.forEach(item => {
+      if (!item || !item.s) return;
+      const ck = canonSubj(item.s);
+      const entry = logCounts[ck] || (logCounts[ck] = { c: 0, w: 0, k: 0 });
+      if (item.ok) entry.c++;
+      else if (item.ch === -1) entry.k++;
+      else entry.w++;
+    });
+    Object.entries(logCounts).forEach(([subjKey, lc]) => {
+      const o = m[subjKey] || (m[subjKey] = { c: 0, w: 0, k: 0, h: [] });
+      const currentTot = o.c + o.w + o.k;
+      const logTot = lc.c + lc.w + lc.k;
+      if (logTot > currentTot) {
+        o.c = lc.c;
+        o.w = lc.w;
+        o.k = lc.k;
+      }
+    });
+  }
+
   return m;
 }
 
 function renderReadinessMeter() {
   if (!D || !D.length) return '';
+  const TARGET_MARK = 81;
   const subjData = agg();
-  const lockedCount = D.filter(q => isLockedIn(q)).length;
-  const lockedPct = Math.round(lockedCount / (D.length || 1) * 100);
+
+  // Global "Locked In" across all studied questions
+  const studiedQuestionKeys = Object.keys(V).filter(k => V[k] && Array.isArray(V[k].history) && V[k].history.length > 0);
+  const lockedCount = studiedQuestionKeys.filter(k => {
+    const v = V[k];
+    if (!v || !Array.isArray(v.history) || v.history.length < 2) return false;
+    const correctHits = [];
+    for (const h of v.history) {
+      if (!h.ok) correctHits.length = 0;
+      else correctHits.push(h.t);
+    }
+    if (correctHits.length < 2) return false;
+    for (let i = 0; i < correctHits.length - 1; i++) {
+      for (let j = i + 1; j < correctHits.length; j++) {
+        if (correctHits[j] - correctHits[i] >= 3 * 864e5) return true;
+      }
+    }
+    return false;
+  }).length;
 
   let fsOk = 0, fsTot = 0, rpOk = 0, rpTot = 0;
   if (L.length) {
@@ -3378,22 +3482,25 @@ function renderReadinessMeter() {
     });
   }
 
-  // Calibrated thresholds per MIT Entrance Scope Guide:
-  // Red <= 40%, Amber 41-79%, Green >= 80%, Calibrating < 5 attempts
+  const studiedTotal = Math.max(studiedQuestionKeys.length, fsTot);
+  const lockedPct = studiedTotal ? Math.round(lockedCount / studiedTotal * 100) : 0;
+
+  // Calibrated thresholds per MIT Entrance Scope Guide (Target 81%):
+  // Red <= 40%, Amber 41-80%, Green >= 81%, Calibrating < 5 attempts
   const rows = Object.entries(subjData)
     .filter(([k, o]) => (o.c + o.w + o.k) > 0)
     .map(([k, o]) => {
       const tot = o.c + o.w + o.k;
       const acc = tot ? o.c / tot : 0;
       const isCalibrated = tot >= 5;
-      const gap = acc - 0.75;
+      const gap = acc - (TARGET_MARK / 100);
       return { k, tot, c: o.c, acc, isCalibrated, gap };
     }).sort((a, b) => {
       const priority = r => {
         if (r.isCalibrated && r.acc <= 0.40) return 1; // Red
-        if (r.isCalibrated && r.acc < 0.80) return 2;  // Amber
+        if (r.isCalibrated && r.acc < (TARGET_MARK / 100)) return 2;  // Amber
         if (!r.isCalibrated) return 3;                 // Calibrating
-        return 4;                                      // Green (>=80%)
+        return 4;                                      // Green (>=81%)
       };
       return priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
     });
@@ -3405,17 +3512,26 @@ function renderReadinessMeter() {
   const mockAcc = mockTot >= 10 ? (mockOk / mockTot) : null;
   const fsAcc = fsTot ? (fsOk / fsTot) : 0;
   
-  let projectedAcc = fsAcc;
-  if (mockAcc !== null && fsTot >= 10) {
-    projectedAcc = (mockAcc * 0.60) + (fsAcc * 0.40);
+  // Effective mock accuracy: use verified PB_MOCK_SCORE if available, otherwise raw mock log
+  let effectiveMockAcc = null;
+  if (typeof PB_MOCK_SCORE === 'number' && PB_MOCK_SCORE > 0) {
+    effectiveMockAcc = PB_MOCK_SCORE / 100;
   } else if (mockAcc !== null) {
-    projectedAcc = mockAcc;
+    effectiveMockAcc = mockAcc;
+  }
+
+  let projectedAcc = fsAcc;
+  if (effectiveMockAcc !== null && fsTot >= 10) {
+    // Balanced 50/50 blend between verified mock exam score and first-attempt unseen practice
+    projectedAcc = (effectiveMockAcc * 0.50) + (fsAcc * 0.50);
+  } else if (effectiveMockAcc !== null) {
+    projectedAcc = effectiveMockAcc;
   } else if (!fsTot && calibratedRows.length) {
     projectedAcc = calibratedRows.reduce((sum, r) => sum + r.acc, 0) / calibratedRows.length;
   }
 
   const projectedMark = Math.round(projectedAcc * 1000) / 10;
-  const markGap = Math.round((projectedMark - 75) * 10) / 10;
+  const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
 
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
   const unattemptedInDeck = [...activeDeckSubjs].filter(s => {
@@ -3426,7 +3542,7 @@ function renderReadinessMeter() {
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (Math.min(100, Math.max(0, projectedMark)) / 100) * circumference;
-  const ringColor = projectedMark >= 75 ? 'var(--ok)' : (projectedMark >= 50 ? 'var(--sk)' : 'var(--no)');
+  const ringColor = projectedMark >= TARGET_MARK ? 'var(--ok)' : (projectedMark >= 60 ? 'var(--sk)' : 'var(--no)');
 
   return `
   <div class="card">
@@ -3446,12 +3562,12 @@ function renderReadinessMeter() {
         </svg>
         <div class="readiness-ring-center">
           <span class="readiness-ring-val" style="color:${ringColor}">${projectedMark}%</span>
-          <span class="readiness-ring-target">Target 75%</span>
+          <span class="readiness-ring-target">Target ${TARGET_MARK}%</span>
         </div>
       </div>
       <div style="flex:1;min-width:200px">
         <div class="row" style="gap:6px;margin-bottom:8px">
-          <span class="chip">🔒 Locked in: <b>${lockedCount}/${D.length}</b> (${lockedPct}%)</span>
+          <span class="chip">🔒 Locked in: <b>${lockedCount}/${studiedTotal} studied</b> (${lockedPct}%)</span>
           <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">Gap: <b>${markGap >= 0 ? '+' : ''}${markGap} marks</b></span>
         </div>
         <div class="row sm mu" style="gap:10px">
@@ -3472,7 +3588,7 @@ function renderReadinessMeter() {
         let dotClass = 'dot-gray';
         let statusText = `Calibrating (${r.tot}/5)`;
         if (r.isCalibrated) {
-          if (r.acc >= 0.80) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
+          if (r.acc >= (TARGET_MARK / 100)) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
           else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
           else { dotClass = 'dot-amber'; statusText = `${Math.round(r.acc * 100)}% · Borderline`; }
         }
@@ -3865,27 +3981,25 @@ function startCommuteQuick() {
 }
 
 function startQuickMode() {
-  const allQs = [];
-  if(Array.isArray(BANKS) && BANKS.length){
-    BANKS.forEach(b => {
-      if(Array.isArray(b.q)) allQs.push(...b.q);
-    });
+  if (!D || !D.length) {
+    if (BANKS.length && BANKS[0].sets && BANKS[0].sets[0]) {
+      loadSet(BANKS[0].id, 0);
+    }
   }
-  if(!allQs.length && Array.isArray(D)) allQs.push(...D);
-  let pool = allQs.slice();
-  pool = pool.sort((a,b)=>{
-    const la = (typeof a.lvl==='number'?a.lvl:(typeof a.level==='number'?a.level:1));
-    const lb = (typeof b.lvl==='number'?b.lvl:(typeof b.level==='number'?b.level:1));
-    if(la !== lb) return la - lb;
-    return 0;
+  const pool = (D || []).filter(q => q && effQuick(q) && !isColdQuestion(q));
+  if (!pool.length) { alert('No quick questions available in the current active deck.'); return; }
+  pool.sort((a,b)=>{
+    const la = effLevel(a);
+    const lb = effLevel(b);
+    return la - lb;
   });
   const un = pool.filter(q => !R[q.n]).map(q=>q.n);
-  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && V[qk(q)].due <= today())).map(q=>q.n);
+  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && (V[qk(q)].d <= today() || V[qk(q)].due <= today()))).map(q=>q.n);
   const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
-  let list = [...un, ...due, ...rest];
+  let list = [...due, ...un, ...rest];
   const seen = new Set();
-  list = list.filter(n=>{ if(seen.has(n)) return false; seen.add(n); return true; });
-  if(!list.length){ alert('No questions available.'); return; }
+  list = list.filter(n=>{ if(n == null || seen.has(n)) return false; seen.add(n); return true; });
+  if(!list.length){ alert('No quick questions available.'); return; }
   isQuick = true;
   try { localStorage.setItem('bitmcq_quick', 'true'); } catch(e){}
   start(list.slice(0, Math.max(10, Math.round((todayMins||15)*0.8))));
@@ -4068,6 +4182,13 @@ function show() {
   }
 
   const rawQ = byN(Q[P]);
+  if (!rawQ) {
+    if (P + 1 < Q.length) {
+      P++;
+      return show();
+    }
+    return MK ? mockEnd() : done();
+  }
   const vRec = V[qk(rawQ)];
 
   // Auto-generate fresh variant if regeneratable/calc and student previously got it right
@@ -4102,8 +4223,8 @@ function show() {
   const hasVariant = !!activeVariant;
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
-  const levelLabel = ['L0 · Core', 'L1 · Standard', 'L2 · Exact', 'L3 · Advanced'][rawQ.level];
-    const canRegen = !!((rawQ.regeneratable === true) || (rawQ.calc === true) || (Array.isArray(rawQ.code) && rawQ.code.length>0) || matchQuestionFamily(rawQ) || (GEM_KEY && (rawQ.regeneratable || matchQuestionFamily(rawQ) || rawQ.calc)));
+  const curLvl = effLevel(rawQ);
+  const canRegen = !!((rawQ.regeneratable === true) || (rawQ.calc === true) || (Array.isArray(rawQ.code) && rawQ.code.length > 0) || matchQuestionFamily(rawQ) || (GEM_KEY));
 
   // Memory Anchor
   const mnemonicAnchor = vRec?.mnemonic ? `
@@ -4136,7 +4257,12 @@ function show() {
           ${MK ? '<span class="chip" id="tm"></span><span class="chip c-no" id="unans-chip"></span>' : stats()}
           ${pauseBtn}
           <span class="chip mu">${isQuick ? '⚡ Quick' : '📝 Pen &amp; Paper'}</span>
-          ${levelLabel ? `<span class="chip" title="Question priority level">${levelLabel}</span>` : ''}
+          <select class="chip" style="font-size:11.5px;padding:2px 4px;cursor:pointer;background:var(--card);border:1px solid var(--bd);color:inherit" onchange="setQuestionLevel(${rawQ.n}, this.value)" title="Change question difficulty level">
+            <option value="0" ${curLvl === 0 ? 'selected' : ''}>L0 · Core</option>
+            <option value="1" ${curLvl === 1 ? 'selected' : ''}>L1 · Standard</option>
+            <option value="2" ${curLvl === 2 ? 'selected' : ''}>L2 · Exact</option>
+            <option value="3" ${curLvl === 3 ? 'selected' : ''}>L3 · Advanced</option>
+          </select>
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
           ${isShowingVariant && activeVariant && activeVariant.verified === false ? '<span class="badge-unverified" title="Generated single-pass without blind verify">unverified</span>' : ''}
         </div>
@@ -4160,8 +4286,8 @@ function show() {
               ${isShowingVariant ? '↺ View original' : '✨ View variant'}
             </button>
           ` : ''}
-          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${COLD_QS[rawQ?.n] ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
-            ${COLD_QS[rawQ?.n] ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
+          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
+            ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
           </button>` : ''}
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
             🚩 Looks wrong
@@ -4433,7 +4559,7 @@ function pick(i) {
   const recRes = getRecommendedResource(rawQ.s, isLeech, rawQ.q, []);
 
   const resourceHtml = recRes ? `
-    <div class="hide-quiet" style="margin-top:10px;padding:8px 12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px">
+    <div id="res-box-${recRes.id}" class="hide-quiet" style="margin-top:10px;padding:8px 12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px">
       <div class="row" style="justify-content:space-between;align-items:center">
         <span class="sm"><b>See it →</b> ${esc(recRes.title)} (${esc(recRes.provider)})</span>
         <div class="row" style="gap:4px">
@@ -4476,7 +4602,9 @@ function pick(i) {
           <button type="button" class="cf-btn" data-cf="2" onclick="updateConfidence(2)">2 · Unsure</button>
           <button type="button" class="cf-btn on" data-cf="3" onclick="updateConfidence(3)">3 · Sure</button>
         </div>
-        ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+        <div id="current-exp-container" style="margin-top:6px">
+          ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+        </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
           <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
         </div>
@@ -4512,7 +4640,12 @@ function pick(i) {
       <div class="exp ${isLeech ? 'leech' : ''}">
         <b style="color:var(--no)">✗ Incorrect.</b>
         <div style="margin-top:6px">Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
-        ${explanationHtml(rawQ.e)}
+        <div id="current-exp-container" style="margin-top:6px">
+          ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+        </div>
+        <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
+          <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
+        </div>
         ${rescueLadderHtml}
         ${resourceHtml}
       </div>
@@ -4564,10 +4697,33 @@ function dontKnow() {
     sr(rawQ, false);
   }
 
+  const vRec = V[qk(rawQ)];
+  const isLeech = vRec && (vRec.lapses >= 3 || vRec.missCount >= 3);
+  const recRes = getRecommendedResource(rawQ.s, isLeech, rawQ.q, []);
+  const resourceHtml = recRes ? `
+    <div id="res-box-${recRes.id}" class="hide-quiet" style="margin-top:10px;padding:8px 12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="sm"><b>See it →</b> ${esc(recRes.title)} (${esc(recRes.provider)})</span>
+        <div class="row" style="gap:4px">
+          <a href="${recRes.url}" target="_blank" rel="noopener noreferrer" class="res-pill" onclick="markResource('${recRes.id}','visited')">Open ↗</a>
+          <button class="sm" onclick="markResource('${recRes.id}','not_for_me')">Not for me</button>
+          <button class="sm" onclick="markResource('${recRes.id}','done')">Done</button>
+        </div>
+      </div>
+      <div class="mu sm" style="margin-top:4px">${esc(recRes.desc)}</div>
+    </div>
+  ` : '';
+
   $('#fb').innerHTML = `
     <div class="exp">
       <b class="c-no">Scheduled for tomorrow.</b> Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>
-      ${explanationHtml(rawQ.e)}
+      <div id="current-exp-container" style="margin-top:6px">
+        ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+      </div>
+      <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
+      </div>
+      ${resourceHtml}
     </div>
     <p class="row" style="margin-top:12px;gap:8px">
       <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
@@ -4606,7 +4762,6 @@ function fin() {
 
 function next() {
   P++;
-  save();
   show();
 }
 
@@ -4650,9 +4805,34 @@ async function triggerBackgroundVariantUpgrades(sessionKeys) {
   });
 }
 
+// Safe JSON extractor that handles markdown code fences, conversational preambles, and unescaped characters
+function extractJson(text) {
+  if (!text) throw new Error('Empty response from model');
+  let clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    const startObj = clean.indexOf('{');
+    const endObj = clean.lastIndexOf('}');
+    if (startObj !== -1 && endObj > startObj) {
+      try {
+        return JSON.parse(clean.slice(startObj, endObj + 1));
+      } catch (e2) {}
+    }
+    const startArr = clean.indexOf('[');
+    const endArr = clean.lastIndexOf(']');
+    if (startArr !== -1 && endArr > startArr) {
+      try {
+        return JSON.parse(clean.slice(startArr, endArr + 1));
+      } catch (e3) {}
+    }
+    throw e;
+  }
+}
+
 // Gemini Prompts A, B, C Implementation with Automatic Fallback (gemini_prompts.md)
 // Primary: gemini-3.8-flash. If exhausted (429) or errors -> automatically falls back to gemini-2.0-flash-lite
-async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = null, timeoutMs = 15000) {
+async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = null, timeoutMs = 15000, jsonMode = false) {
   const models = [
     preferredModel || GEM_GEN_MODEL || 'gemini-3.8-flash',
     GEM_FALLBACK_MODEL || 'gemini-2.5-flash-lite'
@@ -4666,12 +4846,16 @@ async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cleanM)}:generateContent?key=${encodeURIComponent(GEM_KEY)}`;
+      const genConfig = { temperature: temp };
+      if (jsonMode) {
+        genConfig.responseMimeType = 'application/json';
+      }
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: { temperature: temp }
+          generationConfig: genConfig
         }),
         signal: controller.signal
       });
@@ -4691,6 +4875,53 @@ async function fetchGeminiWithFallback(promptText, temp = 0.7, preferredModel = 
   throw lastError || new Error('All configured Gemini models failed.');
 }
 
+async function fetchExplanationForCurrent() {
+  if (!CURRENT_Q || P >= Q.length) return;
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+  if (!rawQ) return;
+  if (!GEM_KEY) {
+    alert('Please enter your Gemini API Key in Settings (⚙) to generate AI explanations.');
+    return;
+  }
+  const btn = $('#btn-fetch-exp') || document.querySelector('#current-exp-container button') || (window.event && window.event.target);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Generating explanation...';
+  }
+  const promptA = 'You explain MCQ answers for a BSc CSIT graduate preparing for the MIT entrance exam. Rusty, not a beginner. Explain in 1-3 sentences: why the correct option is right, then name the specific mistake that each wrong option represents. Be direct and concise. Return ONLY valid JSON: {"explanation": "string"}';
+  const inputQ = {
+    question: rawQ.q,
+    options: rawQ.o,
+    correct_option: rawQ.o[rawQ.a],
+    subject: rawQ.s
+  };
+  try {
+    const res = await fetchGeminiWithFallback(promptA + '\n\nQuestion:\n' + JSON.stringify(inputQ), 0.3, GEM_GEN_MODEL, 15000, true);
+    const parsed = extractJson(res.text);
+    const expText = parsed.explanation || (typeof parsed === 'string' ? parsed : '');
+    if (expText) {
+      rawQ.e = expText;
+      save();
+      const expContainer = $('#current-exp-container');
+      if (expContainer) {
+        expContainer.innerHTML = explanationHtml(expText);
+        typesetMath(expContainer);
+      } else {
+        show();
+      }
+    } else {
+      throw new Error('Model did not return explanation');
+    }
+  } catch (err) {
+    console.warn('AI explanation failed:', err);
+    alert('AI explanation failed: ' + (err.message || err));
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '💡 Why? (Explain with AI)';
+    }
+  }
+}
+
 async function fillExplanationsWithGemini() {
   if (!GEM_KEY || !D || !D.length) return;
   const missing = D.filter(q => !q.e || q.e.trim() === '').slice(0, 15);
@@ -4700,9 +4931,8 @@ async function fillExplanationsWithGemini() {
   const inputList = missing.map(q => ({ id: q.n, question: q.q, options: q.o, answer: q.a }));
 
   try {
-    const res = await fetchGeminiWithFallback(promptA + '\n\nInput Questions:\n' + JSON.stringify(inputList), 0.3, GEM_GEN_MODEL);
-    const clean = res.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-    const list = JSON.parse(clean);
+    const res = await fetchGeminiWithFallback(promptA + '\n\nInput Questions:\n' + JSON.stringify(inputList), 0.3, GEM_GEN_MODEL, 15000, true);
+    const list = extractJson(res.text);
     if (Array.isArray(list)) {
       list.forEach(item => {
         const q = byN(item.id);
@@ -4737,9 +4967,8 @@ async function rewriteQuestionWithGemini(targetQ) {
     const promptB = 'You are an expert STEM exam writer. Create ONE new MCQ testing the SAME concept and reasoning as the source question. Change the numbers/values AND the scenario. Rules: 1. Same type, same level, one fact or small step. 2. Solve it step by step yourself first in "working". 3. Each wrong option is a specific slip named in "slips". 4. Four options within ~20% of same length. The correct option must not be the longest. 5. Avoid degenerate values (0, 1, equal numbers) and a key that appears in the stem. 6. Do not reuse any numbers in "avoid". Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
 
     // Primary call uses GEM_GEN_MODEL (default gemini-3.8-flash) with fallback to gemini-2.0-flash-lite
-    const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL);
-    const cleanGen = genResult.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-    const v = JSON.parse(cleanGen);
+    const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL, 18000, true);
+    const v = extractJson(genResult.text);
     if (!v.stem || !Array.isArray(v.options) || v.options.length !== 4 || typeof v.answer !== 'number') return;
 
     // App-side check: reject if correct option is the longest option by >30%
@@ -4760,20 +4989,21 @@ async function rewriteQuestionWithGemini(targetQ) {
       const blindResultRaw = await fetchGeminiWithFallback(
         blindPrompt + '\n\nQuestion to solve:\n' + JSON.stringify({ stem: v.stem, code: v.code || [], options: v.options }),
         0.2,
-        verifyPref
+        verifyPref,
+        15000,
+        true
       );
-      const cleanBlind = blindResultRaw.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-      const blindResult = JSON.parse(cleanBlind);
-        if (blindResult.answer === v.answer) {
-          isVerified = true;
-        } else {
-          console.warn(`[AI Variant Blind Mismatch] Gen=${v.answer}, Verify=${blindResult.answer}`);
-          throw new Error('Blind verification mismatch');
-        }
-      } catch (verErr) {
-        console.warn('Blind verification call error:', verErr);
-        throw verErr;
+      const blindResult = extractJson(blindResultRaw.text);
+      if (blindResult.answer === v.answer) {
+        isVerified = true;
+      } else {
+        console.warn(`[AI Variant Blind Mismatch] Gen=${v.answer}, Verify=${blindResult.answer}`);
+        throw new Error('Blind verification mismatch');
       }
+    } catch (verErr) {
+      console.warn('Blind verification call error:', verErr);
+      throw verErr;
+    }
 
       // App-side randomization of key position
       const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
@@ -4914,6 +5144,17 @@ function done() {
     if (q) recordFixDay(q.s);
   });
 
+  // Subject accuracy for session recap
+  const recapSubj = {};
+  Q.forEach((k, idx) => {
+    const q = byN(k);
+    if (!q) return;
+    const s = canonSubj(q.s);
+    if (!recapSubj[s]) recapSubj[s] = { total: 0, correct: 0 };
+    recapSubj[s].total++;
+    if (r[idx] === 'c') recapSubj[s].correct++;
+  });
+
   $('#app').innerHTML = `
     <h1>Session Complete 🎉</h1>
     <div class="recap-card">
@@ -4922,7 +5163,7 @@ function done() {
           <h2 style="margin:0 0 4px">Calm, Focused Practice Complete</h2>
           <div class="mu sm">Every active retrieval strengthens your neural recall pathways.</div>
         </div>
-        <span class="chip ${acc >= 75 ? 'c-ok' : 'c-sk'}">
+        <span class="chip ${acc >= 81 ? 'c-ok' : 'c-sk'}">
           Accuracy: <b>${acc}%</b>
         </span>
       </div>
@@ -4963,7 +5204,7 @@ function done() {
                   <span><b>${esc(s)}</b></span>
                   <span class="mu">${data.correct}/${data.total} (${pct}%)</span>
                 </div>
-                <div class="mini"><i style="width:${pct}%;background:${pct >= 75 ? 'var(--ok)' : (pct >= 50 ? 'var(--sk)' : 'var(--no)')}"></i></div>
+                <div class="mini"><i style="width:${pct}%;background:${pct >= 81 ? 'var(--ok)' : (pct >= 50 ? 'var(--sk)' : 'var(--no)')}"></i></div>
               </div>
             `;
           }).join('')}
@@ -5232,7 +5473,7 @@ function mockEnd() {
     <h1>Mock Exam Result ${isDiag ? '(Day-1 Diagnostic)' : ''}</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
-        Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%) 🎉</span>' : '<span class="c-no">Below 75% target</span>'}
+        Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 81 ? '<span class="c-ok">Target Met (≥81%) 🎉</span>' : '<span class="c-no">Below 81% target</span>'}
       </p>
       ${pct >= PB_MOCK_SCORE && PB_MOCK_SCORE > 0 ? `<p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score!</p>` : ''}
       ${isDiag ? `<p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>` : ''}
@@ -5453,6 +5694,9 @@ function compact() {
     else if (r === 's') v[2]++;
   });
   return {
+    id: 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    t: Date.now(),
+    doneAt: Date.now(),
     no: S,
     date: new Date().toISOString().slice(0, 10),
     total: D.length,
@@ -5461,7 +5705,7 @@ function compact() {
     ...(SETBANK !== null && SETI >= 0 ? { bankId: SETBANK, bi: SETI } : {}),
     errs: D.filter(q => R[q.n] === 'w' || R[q.n] === 's').map(q => ({
       n: q.n, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e, p: W[q.n] ?? -1, r: R[q.n], fx: 0,
-      quick: effQuick(q), level: q.level, _orig: q._orig
+      quick: effQuick(q), level: effLevel(q), _orig: q._orig
     }))
   };
 }
@@ -5541,8 +5785,14 @@ function saveFile(name, text, mime) {
 function backup() {
   lastBackup = Date.now();
   save();
-  const data = JSON.stringify({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst });
-  saveFile('bitmcq-progress-backup.json', data, 'application/json');
+  const state = AppState.get();
+  const envelope = {
+    format: 'it-mcq-trainer-backup',
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    appState: state
+  };
+  saveFile('bitmcq-progress-backup.json', JSON.stringify(envelope, null, 2), 'application/json');
   home();
 }
 
@@ -5820,7 +6070,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, schemaVer: SCHEMA_VER }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
   apply: (s) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const currentView = typeof view !== 'undefined' ? view : 'home';
@@ -5845,6 +6095,18 @@ window.AppState = {
     DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE;
     QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
     PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+    COLD_QS = (s.COLD_QS && typeof s.COLD_QS === 'object') ? s.COLD_QS : {};
+    // Synchronize Leitner/FSRS V cold flags with COLD_QS
+    Object.entries(COLD_QS).forEach(([nStr, val]) => {
+      const isCold = (val === true || (val && typeof val === 'object' && val.cold !== false));
+      if (isCold) {
+        const qObj = byN(Number(nStr));
+        if (qObj) {
+          const k = qk(qObj);
+          if (V[k]) V[k]._coldSet = true;
+        }
+      }
+    });
     save();
     if (window.CloudSync) CloudSync.refreshUI();
     if (wasQ) {
@@ -5855,6 +6117,7 @@ window.AppState = {
       return;
     }
     if (document.getElementById('ed')) return;
+    if (currentView === 'done') return;
     if (currentView === 'cards' || currentView === 'drill' || currentView === 'mistakes' || currentView === 'mock' || currentView === 'flash' || currentView === 'rev') {
       if (typeof renderFlashcardView === 'function' && currentView === 'cards') {
         try { renderFlashcardView(); return; } catch(e){}
@@ -6021,7 +6284,7 @@ function fixMockOptionScrambleBug() {
       </p>
       <div class="mu sm" style="line-height:1.6">
         ✓ Restored <b>${repairedCount}</b> falsely-failed questions to Correct.<br>
-        ✓ True Score: <b>${correctCount}/${total} (${pct}%)</b> — <span class="c-ok" style="font-weight:700">Target Met (≥75%)!</span><br>
+        ✓ True Score: <b>${correctCount}/${total} (${pct}%)</b> — <span class="c-ok" style="font-weight:700">${pct >= 81 ? 'Target Met (≥81%)!' : 'Below 81% target'}</span><br>
         ✓ Reset FSRS neural stability (cleared false priority lapses, leech flags, and urgent retest schedules).<br>
         ✓ Updated Personal Best Mock Score to <b>${pct}%</b>.<br>
         ✓ Option-shuffling in mock exams has been disabled and button indices mapped back safely.
@@ -6031,7 +6294,7 @@ function fixMockOptionScrambleBug() {
     <h1>Mock Exam Result (Day-1 Diagnostic · Repaired)</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
-        Score: <b>${correctCount}/${total} (${pct}%)</b> — <span class="c-ok">Target Met (≥75%) 🎉</span>
+        Score: <b>${correctCount}/${total} (${pct}%)</b> — ${pct >= 81 ? '<span class="c-ok">Target Met (≥81%) 🎉</span>' : '<span class="c-no">Below 81% target</span>'}
       </p>
       <p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score: ${pct}%!</p>
       <p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>
