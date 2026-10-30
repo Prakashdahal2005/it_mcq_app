@@ -798,6 +798,7 @@ let GEM_VERIFY_MODEL = storedVerify || 'gemini-3.8-flash';
 let GEM_MODEL = GEM_GEN_MODEL;
 let DAILY_API_LIMIT = parseInt(localStorage.getItem('bitmcq_daily_limit') || '150', 10);
 let CARDS = [];
+let CARD_TOMBSTONES = {};
 let RESOURCE_MARKS = {};
 let FIX_DAYS = {};
 let DIAGNOSTIC_DONE = false;
@@ -844,7 +845,7 @@ function save() {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
       D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst,
-      CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS
+      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS
     }));
     localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
     localStorage.setItem('bitmcq_rmarks', JSON.stringify(RESOURCE_MARKS));
@@ -858,6 +859,32 @@ function save() {
     console.error('Save failed:', e);
   }
   try { if (window.CloudSync) window.CloudSync.onLocalSave(); } catch (e) {}
+}
+
+function cardStamp(c) {
+  if (!c || typeof c !== 'object') return 0;
+  return Math.max(
+    Number(c.updatedAt) || 0,
+    Number(c.convertedAt) || 0,
+    Number(c.lastReviewed) || 0,
+    Number(c.created) || 0
+  );
+}
+
+function pruneCardTombstones() {
+  const cutoff = Date.now() - 180 * 864e5;
+  Object.keys(CARD_TOMBSTONES || {}).forEach(k => {
+    const t = Number(CARD_TOMBSTONES[k]) || 0;
+    if (!t || t < cutoff) delete CARD_TOMBSTONES[k];
+  });
+}
+
+function filterCardsAgainstTombstones(cards) {
+  return (Array.isArray(cards) ? cards : []).filter(c => {
+    if (!c || !c.id) return true;
+    const t = Number(CARD_TOMBSTONES[c.id]) || 0;
+    return !t || cardStamp(c) > t;
+  });
 }
 
 function restoreBanks(s) {
@@ -889,6 +916,9 @@ function load() {
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
       recallFirst = s.recallFirst !== false;
       CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
+      CARD_TOMBSTONES = (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {};
+      pruneCardTombstones();
+      CARDS = filterCardsAgainstTombstones(CARDS);
       RESOURCE_MARKS = (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : (JSON.parse(localStorage.getItem('bitmcq_rmarks') || '{}'));
       FIX_DAYS = (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : (JSON.parse(localStorage.getItem('bitmcq_fix_days') || '{}'));
       DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE || localStorage.getItem('bitmcq_diag_done') === '1';
@@ -2981,7 +3011,8 @@ function saveConceptCard(rawQ, data, opts = {}) {
     consecOk: 0,
     grad: false,
     created: now,
-    createdDate: todayDate
+    createdDate: todayDate,
+    updatedAt: now
   };
 
   if (existing) {
@@ -2996,6 +3027,7 @@ function saveConceptCard(rawQ, data, opts = {}) {
     existing.front = html.front;
     existing.back = html.back;
     existing.convertedAt = now;
+    existing.updatedAt = now;
   } else {
     CARDS.push(card);
   }
@@ -3054,22 +3086,58 @@ async function convertFlashcardToConcept(id) {
 }
 
 async function convertAllLegacyFlashcards() {
+  if (window._legacyConversionRunning) return;
   const legacy = (CARDS || []).filter(c => !c.conceptKey);
   if (!legacy.length) {
     alert('No legacy question-style cards found.');
     return;
   }
-  if (!confirm(`Convert ${legacy.length} legacy card(s) to concept cards using offline templates?`)) return;
-  let converted = 0, skipped = 0;
-  legacy.forEach(card => {
-    const source = findSourceQuestionForCard(card);
-    if (!source) { skipped++; return; }
-    const result = saveConceptCard(source, conceptCardFallback(source), { replaceId: card.id, deferSave: true });
-    if (result.updated) converted++;
-  });
-  save();
-  alert(`Converted ${converted} card(s)${skipped ? `; skipped ${skipped} with no source question` : ''}.`);
-  renderCardManagerView();
+  if (!confirm(`Convert ${legacy.length} legacy card(s) to concept cards using AI? This may take a while and uses your Gemini quota. Fallback templates are used when the AI is unavailable.`)) return;
+
+  window._legacyConversionRunning = true;
+  const btn = (window.event && window.event.target && window.event.target.tagName === 'BUTTON') ? window.event.target : null;
+  const original = btn ? btn.innerHTML : '';
+  const total = legacy.length;
+  let converted = 0, skipped = 0, aiCount = 0, offlineCount = 0;
+
+  if (btn) btn.disabled = true;
+  try {
+    for (let i = 0; i < legacy.length; i++) {
+      const card = legacy[i];
+      if (btn) btn.innerHTML = `⏳ Converting ${i + 1}/${total}...`;
+      const source = findSourceQuestionForCard(card);
+      if (!source) { skipped++; continue; }
+
+      let data;
+      try {
+        data = await generateConceptCardData(source);
+      } catch (err) {
+        console.warn('AI concept conversion failed; using offline template:', err);
+        data = conceptCardFallback(source);
+      }
+      const result = saveConceptCard(source, data, { replaceId: card.id, deferSave: true });
+      if (result.updated) {
+        converted++;
+        if (data.origin === 'ai') aiCount++;
+        else offlineCount++;
+      } else {
+        skipped++;
+      }
+      if (i < legacy.length - 1) await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    save();
+    alert(`Converted ${converted} card(s)` +
+      (aiCount ? `; ${aiCount} via AI` : '') +
+      (offlineCount ? `; ${offlineCount} via offline template` : '') +
+      (skipped ? `; skipped ${skipped}` : '') + '.');
+    renderCardManagerView();
+  } finally {
+    window._legacyConversionRunning = false;
+    if (btn && btn.isConnected) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
 }
 
 function createCardForMissed(rawQ, chosenOptIndex = -1) {
@@ -3129,7 +3197,7 @@ function renderCardManagerView(){
       <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">
         <button class="sm ${filter==='all'?'p':''}" onclick="window._cardmgrFilter='all';renderCardManagerView()">All (${CARDS.length})</button>
         ${subjects.map(s=>`<button class="sm ${filter===s?'p':''}" onclick="window._cardmgrFilter='${esc(s).replace(/'/g,'\\\'')}';renderCardManagerView()">${esc(cl(s))} (${CARDS.filter(c=>c.subject===s).length})</button>`).join('')}
-        ${legacyCount ? `<button class="sm" onclick="convertAllLegacyFlashcards()">🧠 Convert legacy (${legacyCount})</button>` : ''}
+        ${legacyCount ? `<button class="sm" onclick="convertAllLegacyFlashcards()">🧠 AI convert legacy (${legacyCount})</button>` : ''}
       </div>
       <input type="text" id="cardmgr-search" placeholder="Search cards..." value="${esc(window._cardmgrSearch||'')}" oninput="window._cardmgrSearch=this.value;renderCardManagerView()">
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
@@ -3160,6 +3228,7 @@ function deleteFlashcard(id){
   const idx = (CARDS||[]).findIndex(c=>c.id===id);
   if(idx<0) return;
   if(!confirm('Delete this flashcard?')) return;
+  CARD_TOMBSTONES[id] = Date.now();
   CARDS.splice(idx,1);
   save();
   renderCardManagerView();
@@ -3173,6 +3242,7 @@ function editFlashcard(id){
   const back = prompt('Edit back (HTML allowed)', c.back||'');
   if(back===null) return;
   c.front = front; c.back = back;
+  c.updatedAt = Date.now();
   save();
   renderCardManagerView();
 }
@@ -3311,6 +3381,8 @@ function rateCard(grade) {
     card.grad = true;
   }
 
+  card.lastReviewed = Date.now();
+  card.updatedAt = card.lastReviewed;
   save();
   ACTIVE_FC_INDEX++;
   ACTIVE_FC_SHOW_BACK = false;
@@ -6295,12 +6367,16 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
-  apply: (s) => {
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
+  apply: (s, opts = {}) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const currentView = typeof view !== 'undefined' ? view : 'home';
     const prevP = P;
     const prevKey = (wasQ && Array.isArray(Q) && typeof P === 'number' && Q[P] != null) ? Q[P] : null;
+    // A background sync must never swap the set or session the user is currently answering.
+    if (opts && opts.silent && (currentView === 'q' || (typeof MK !== 'undefined' && MK))) {
+      s = Object.assign({}, s, { D, Q, QRESULTS, P, S, SETBANK, SETI, lastFreshSetDay });
+    }
     D = s.D == null ? null : s.D;
     R = s.R || {}; W = s.W || {}; Q = s.Q || []; QRESULTS = Array.isArray(s.QRESULTS) ? s.QRESULTS : []; P = s.P || 0;
     S = s.S || 1; A = s.A || []; L = s.L || []; V = s.V || {};
@@ -6315,6 +6391,9 @@ window.AppState = {
     QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
     recallFirst = s.recallFirst !== false;
     CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
+    CARD_TOMBSTONES = (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {};
+    pruneCardTombstones();
+    CARDS = filterCardsAgainstTombstones(CARDS);
     RESOURCE_MARKS = (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : (JSON.parse(localStorage.getItem('bitmcq_rmarks') || '{}'));
     FIX_DAYS = (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : {};
     DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE;
@@ -6334,6 +6413,7 @@ window.AppState = {
     });
     save();
     if (window.CloudSync) CloudSync.refreshUI();
+    if (opts && opts.silent) return;
     if (wasQ) {
       const nowKey = (Array.isArray(Q) && typeof P === 'number' && P >= 0 && Q[P] != null) ? Q[P] : null;
       if (nowKey !== prevKey || P !== prevP) {
@@ -6343,6 +6423,13 @@ window.AppState = {
     }
     if (document.getElementById('ed')) return;
     if (currentView === 'done') return;
+    if (currentView === 'cardmgr') {
+      if (typeof renderCardManagerView === 'function') {
+        try { renderCardManagerView(); return; } catch(e){}
+      }
+      if (typeof home === 'function') home(true);
+      return;
+    }
     if (currentView === 'cards' || currentView === 'drill' || currentView === 'mistakes' || currentView === 'mock' || currentView === 'flash' || currentView === 'rev') {
       if (typeof renderFlashcardView === 'function' && currentView === 'cards') {
         try { renderFlashcardView(); return; } catch(e){}
@@ -6350,7 +6437,7 @@ window.AppState = {
       if (typeof home === 'function') home(true);
       return;
     }
-    home();
+    home(true);
   },
   save: save,
   home: home,

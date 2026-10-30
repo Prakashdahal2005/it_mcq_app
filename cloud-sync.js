@@ -99,11 +99,11 @@
     return (window.AppState && AppState.get) ? AppState.get() : null;
   }
 
-  function appApply(app) {
+  function appApply(app, opts) {
     if (window.AppState && AppState.apply) {
       state.suppress = true;
       try {
-        AppState.apply(app);
+        AppState.apply(app, { silent: !!(opts && opts.silent) });
       } finally {
         state.suppress = false;
       }
@@ -134,6 +134,7 @@
       QOV: (s.QOV && typeof s.QOV === 'object' && !Array.isArray(s.QOV)) ? s.QOV : {},
       recallFirst: s.recallFirst !== false,
       CARDS: Array.isArray(s.CARDS) ? s.CARDS : [],
+      CARD_TOMBSTONES: (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {},
       RESOURCE_MARKS: (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : {},
       FIX_DAYS: (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : {},
       DIAGNOSTIC_DONE: !!s.DIAGNOSTIC_DONE,
@@ -148,6 +149,11 @@
     n.BANKS.forEach(function (b) { b.q.forEach(function (q) { if (q && typeof q === 'object' && !q._sid) q._sid = sidOf(q); }); });
     if (n.D) n.D = n.D.filter(function (q) { return q && typeof q === 'object'; });
     if (n.D) n.D.forEach(function (q) { if (!q._sid) q._sid = sidOf(q); });
+    Object.keys(n.CARD_TOMBSTONES).forEach(function (k) {
+      var v = Number(n.CARD_TOMBSTONES[k]) || 0;
+      if (v > 0) n.CARD_TOMBSTONES[k] = v;
+      else delete n.CARD_TOMBSTONES[k];
+    });
     return n;
   }
 
@@ -309,7 +315,35 @@
     return out;
   }
 
-  function mergeCards(a, b) {
+  function cardStamp(c) {
+    if (!c || typeof c !== 'object') return 0;
+    return Math.max(
+      Number(c.updatedAt) || 0,
+      Number(c.convertedAt) || 0,
+      Number(c.lastReviewed) || 0,
+      Number(c.created) || 0
+    );
+  }
+
+  // Returns > 0 when card A should replace card B.
+  function compareCards(a, b) {
+    if (!a) return -1;
+    if (!b) return 1;
+    var aConcept = a.conceptKey ? 1 : 0;
+    var bConcept = b.conceptKey ? 1 : 0;
+    if (aConcept !== bConcept) return aConcept - bConcept;
+    var aStamp = cardStamp(a);
+    var bStamp = cardStamp(b);
+    if (aStamp !== bStamp) return aStamp - bStamp;
+    var aDue = Number(a.due) || 0;
+    var bDue = Number(b.due) || 0;
+    if (aDue !== bDue) return aDue - bDue;
+    var aGrad = a.grad ? 1 : 0;
+    var bGrad = b.grad ? 1 : 0;
+    return aGrad - bGrad;
+  }
+
+  function mergeCards(a, b, tombstones) {
     var map = {};
     (a || []).concat(b || []).forEach(function (c) {
       if (!c) return;
@@ -318,22 +352,30 @@
         try { key = JSON.stringify(c); } catch(e) { key = String(c); }
       }
       var existing = map[key];
-      if (!existing) {
-        map[key] = JSON.parse(JSON.stringify(c));
-        return;
-      }
-      var cScore = (c.lastReviewed || c.due || c.created || 0);
-      var eScore = (existing.lastReviewed || existing.due || existing.created || 0);
-      if (cScore >= eScore || (c.grad && !existing.grad) || (c.stab && c.stab > (existing.stab||0))) {
+      if (!existing || compareCards(c, existing) > 0) {
         map[key] = JSON.parse(JSON.stringify(c));
       }
     });
     var out = [];
-    for (var k in map) {
-      if (Object.prototype.hasOwnProperty.call(map, k)) {
-        out.push(map[k]);
-      }
-    }
+    Object.keys(map).forEach(function (k) {
+      var c = map[k];
+      var t = Number(tombstones && (tombstones[c.id] != null ? tombstones[c.id] : tombstones[k])) || 0;
+      if (t && t >= cardStamp(c)) return;
+      out.push(c);
+    });
+    return out;
+  }
+
+  function mergeTombstones(a, b) {
+    var out = {};
+    Object.keys(a || {}).forEach(function (k) {
+      var v = Number(a[k]) || 0;
+      if (v > 0) out[k] = v;
+    });
+    Object.keys(b || {}).forEach(function (k) {
+      var v = Number(b[k]) || 0;
+      if (v > (out[k] || 0)) out[k] = v;
+    });
     return out;
   }
 
@@ -464,6 +506,8 @@
       activeBankId = remoteBankIds[activeBankId];
     }
 
+    var cardTombstones = mergeTombstones(local.CARD_TOMBSTONES, remote.CARD_TOMBSTONES);
+
     var merged = {
       D: active.D,
       R: active.R || {},
@@ -491,7 +535,8 @@
       lastFreshSetDay: active.lastFreshSetDay == null ? null : active.lastFreshSetDay,
       QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
       recallFirst: active.recallFirst !== false,
-      CARDS: mergeCards(local.CARDS, remote.CARDS),
+      CARDS: mergeCards(local.CARDS, remote.CARDS, cardTombstones),
+      CARD_TOMBSTONES: cardTombstones,
       COLD_QS: mergeColdQs(local.COLD_QS, remote.COLD_QS),
       RESOURCE_MARKS: Object.assign({}, local.RESOURCE_MARKS || {}, remote.RESOURCE_MARKS || {}),
       FIX_DAYS: mergeFixDays(local.FIX_DAYS, remote.FIX_DAYS),
@@ -601,7 +646,8 @@
         var meta = loadMeta();
 
         var remoteEmpty = !remote || (typeof remote === 'object' && Object.keys(remote).length === 0);
-        var localEmpty = !hasLocalData(local);
+        var localHasTombstones = !!(local && local.CARD_TOMBSTONES && Object.keys(local.CARD_TOMBSTONES).length);
+        var localEmpty = !hasLocalData(local) && !localHasTombstones;
 
         if (remoteEmpty && !localEmpty) {
           // First-time sync: push local state to cloud
@@ -616,9 +662,9 @@
         }
 
         if (!remoteEmpty && localEmpty) {
-          // New device: restore from cloud directly
+          // New device: restore from cloud directly (one-time visible render)
           var normalized = normalizeAppState(remote);
-          appApply(normalized);
+          appApply(normalized, { silent: false });
           state.lastSync = Date.now();
           meta.lastSync = state.lastSync;
           meta.cloudVersion = (remote._syncMeta && remote._syncMeta.version) || 1;
@@ -636,13 +682,17 @@
             preferRemoteActive: !!opts.preferRemote
           });
 
-          appApply(merged.appState);
+          // Background sync must never navigate or repaint the current screen.
+          var localHash = hashStr(JSON.stringify(normalizeAppState(local)));
+          var mergedHash = hashStr(JSON.stringify(merged.appState));
+          if (localHash !== mergedHash) {
+            appApply(merged.appState, { silent: true });
+          }
 
           var baseVer = (remote._syncMeta && typeof remote._syncMeta.version === 'number') ? remote._syncMeta.version : 0;
 
           // Check if remote already matches merged state (no network upload needed)
           var remoteHash = hashStr(JSON.stringify(normRemote));
-          var mergedHash = hashStr(JSON.stringify(merged.appState));
           if (remoteHash === mergedHash) {
             state.lastSync = Date.now();
             meta.lastSync = state.lastSync;
@@ -689,82 +739,6 @@
           refreshUI();
         }
       }
-    }
-  }
-
-  async function pushToCloud() {
-    if (!navigator.onLine) {
-      alert('You are offline. Cannot push to cloud right now.');
-      return;
-    }
-    state.busy = true;
-    setStatus('syncing', 'Merging & uploading to cloud...');
-    try {
-      var remote = await fetchRemoteState();
-      var local = appGet();
-      var genSets = (window.AppState && window.AppState.genSets) ? window.AppState.genSets : null;
-      var normRemote = normalizeAppState(remote || {});
-      // Safe two-way merge: ensures progress from other devices is retained, preferring local active pointer
-      var merged = mergeAppStates(local, normRemote, genSets, {
-        preferRemoteActive: false
-      });
-      appApply(merged.appState);
-      var baseVer = (remote && remote._syncMeta && remote._syncMeta.version) || 0;
-      var postRes = await postRemoteState(merged.appState, baseVer);
-      state.lastSync = Date.now();
-      var meta = loadMeta();
-      meta.lastSync = state.lastSync;
-      meta.cloudVersion = postRes && postRes.version ? postRes.version : baseVer + 1;
-      saveMeta(meta);
-      state.dirty = false;
-      setStatus('synced', 'Uploaded to Upstash Redis at ' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      alert('Successfully unified and uploaded study progress to cloud!');
-    } catch (err) {
-      alert('Push failed: ' + err.message);
-      setStatus(err.kind === 'unauthorized' ? 'unauthorized' : 'error', err.message);
-    } finally {
-      state.busy = false;
-      refreshUI();
-    }
-  }
-
-  async function pullFromCloud() {
-    if (!navigator.onLine) {
-      alert('You are offline. Cannot pull from cloud right now.');
-      return;
-    }
-    if (!confirm('This will fetch the latest progress from Upstash Redis and cleanly merge it with your local progress. Continue?')) return;
-    state.busy = true;
-    setStatus('syncing', 'Pulling & merging latest cloud progress...');
-    try {
-      var remote = await fetchRemoteState();
-      if (!remote || Object.keys(remote).length === 0) {
-        alert('Cloud storage is currently empty. Local progress preserved.');
-        setStatus('synced', 'Cloud is empty');
-        return;
-      }
-      var local = appGet();
-      var genSets = (window.AppState && window.AppState.genSets) ? window.AppState.genSets : null;
-      var normRemote = normalizeAppState(remote);
-      // Safe two-way merge: incorporates remote while safeguarding local progress
-      var merged = mergeAppStates(local, normRemote, genSets, {
-        preferRemoteActive: true
-      });
-      appApply(merged.appState);
-      state.lastSync = Date.now();
-      var meta = loadMeta();
-      meta.lastSync = state.lastSync;
-      meta.cloudVersion = (remote._syncMeta && remote._syncMeta.version) || 1;
-      saveMeta(meta);
-      state.dirty = false;
-      setStatus('synced', 'Merged with cloud (' + new Date(state.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')');
-      alert('Successfully synced with cloud! Your progress has been cleanly unified.');
-    } catch (err) {
-      alert('Pull failed: ' + err.message);
-      setStatus(err.kind === 'unauthorized' ? 'unauthorized' : 'error', err.message);
-    } finally {
-      state.busy = false;
-      refreshUI();
     }
   }
 
@@ -922,8 +896,6 @@
 
         <div class="row" style="gap:8px;flex-wrap:wrap">
           <button type="button" class="p sm" onclick="CloudSync.syncNow()">🔄 Sync Now</button>
-          <button type="button" class="sm" onclick="CloudSync.pullFromCloud()">⬇️ Pull from Cloud</button>
-          <button type="button" class="sm" onclick="CloudSync.pushToCloud()">⬆️ Push to Cloud</button>
         </div>
       </div>
     `;
@@ -981,8 +953,6 @@
     settingsHTML: settingsHTML,
     refreshUI: refreshUI,
     syncNow: function () { performSync({ mode: 'manual', preferRemote: false }); },
-    pushToCloud: pushToCloud,
-    pullFromCloud: pullFromCloud,
     saveSecret: saveSecretFromUI,
     toggleSecret: toggleSecretVisibility,
     getSecret: getSecret,
