@@ -811,6 +811,9 @@ function isColdQuestion(q) {
   if (v && typeof v === 'object') return v.cold !== false;
   return false;
 }
+const DRILL_N_BASE = 1000000;
+let DRILL_D = [];
+let DRILL_SUBJECT = '';
 let ACTIVE_FC_INDEX = 0;
 let ACTIVE_FC_SESSION_IDS = [];
 let ACTIVE_FC_SHOW_BACK = false;
@@ -899,6 +902,21 @@ function load() {
         sessionHistory = [];
       }
       restoreBanks(s);
+      DRILL_D = [];
+      DRILL_SUBJECT = '';
+      Object.keys(R).forEach(k => { if (Number(k) >= DRILL_N_BASE) delete R[k]; });
+      Object.keys(W).forEach(k => { if (Number(k) >= DRILL_N_BASE) delete W[k]; });
+      if ((Q || []).some(k => Number(k) >= DRILL_N_BASE)) {
+        const keptQ = [], keptResults = [];
+        Q.forEach((k, i) => {
+          if (Number(k) >= DRILL_N_BASE) return;
+          keptQ.push(k);
+          keptResults.push(Array.isArray(QRESULTS) ? QRESULTS[i] : null);
+        });
+        Q = keptQ;
+        QRESULTS = keptResults;
+        P = Math.min(P || 0, Math.max(0, Q.length - 1));
+      }
       return true;
     }
   } catch (e) {
@@ -2137,7 +2155,7 @@ const byN = k => {
     const [a, i] = k.split(':');
     return (A[a] && A[a].errs && A[a].errs[i]) ? { ...A[a].errs[i], _k: k } : null;
   }
-  return (D || []).find(q => q && q.n === k) || null;
+  return (D || []).find(q => q && q.n === k) || (DRILL_D || []).find(q => q && q.n === k) || null;
 };
 
 function groupQuestionBlocks(questionKeys) {
@@ -2833,14 +2851,225 @@ function markResource(id, status) {
   }
 }
 
-function addFlashcardForCurrent(){
+function conceptKeyFor(subject, concept) {
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return norm(subject) + '|' + norm(concept);
+}
+
+function isConceptCardCopyOfQuestion(front, rawQ) {
+  const norm = s => String(s || '').toLowerCase().replace(/<[^>]+>/g, ' ').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = norm(front);
+  const stem = norm(rawQ && rawQ.q);
+  if (!text) return true;
+  if (/\b[abcd]\s*[).:-]/i.test(String(front || ''))) return true;
+  if (stem.length >= 40 && (text.includes(stem.slice(0, 45)) || (stem.includes(text) && text.length > 40))) return true;
+  const stemWords = new Set(stem.split(' ').filter(w => w.length > 4));
+  const textWords = text.split(' ').filter(w => w.length > 4);
+  if (stemWords.size >= 6 && textWords.length >= 6) {
+    const overlap = textWords.filter(w => stemWords.has(w)).length / textWords.length;
+    if (overlap >= 0.8) return true;
+  }
+  return false;
+}
+
+function conceptCardFallback(rawQ) {
+  const subject = canonSubj(rawQ.s);
+  const rawUnit = String(rawQ.unit_name || rawQ.unit || rawQ.t || '').trim();
+  const concept = rawUnit.replace(/^\s*\d+\s*[-.:]?\s*/, '').trim() || subject;
+  const correctText = rawQ.o && rawQ.o[rawQ.a] ? String(rawQ.o[rawQ.a]).trim() : '';
+  const explanation = rawQ.e && String(rawQ.e).trim();
+  const keyFact = correctText ? `Key fact: ${correctText}` : '';
+  return {
+    concept,
+    front: `Explain the core idea of ${concept} in ${subject}: what it means, when it applies, and the most common mistake.`,
+    back: [explanation, keyFact].filter(Boolean).join(' ') || `State the definition and purpose of ${concept}, then give one example from ${subject}.`,
+    trap: '',
+    memoryHook: '',
+    origin: 'local'
+  };
+}
+
+async function generateConceptCardData(rawQ) {
+  const fallback = conceptCardFallback(rawQ);
+  if (!GEM_KEY || getDailyApiCount() >= DAILY_API_LIMIT) return fallback;
   try {
-    const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (byN(Q[P]));
-    if(!rawQ) return;
-    const card = createCardForMissed(rawQ, -1);
-    if(card){ alert('Flashcard added to review deck.'); save(); }
-    else { alert('Could not add flashcard (maybe duplicate or limit).'); }
-  } catch(e){ console.warn(e); }
+    const prompt = `You create concept flashcards for a BSc CSIT student preparing for the MIT entrance exam. Extract the ONE underlying concept from the source MCQ and turn it into an active-recall concept card.
+
+Rules:
+1. "front" must ask the student to explain, compare, or apply the concept. It must NOT quote or closely paraphrase the source question, its scenario, its options, or mention A/B/C/D.
+2. "back" must teach the concept in 2-4 sentences: definition/rule, when it applies, and why it matters.
+3. "trap" names the most common mistake in one sentence.
+4. "memory_hook" is an optional short mnemonic, or "".
+5. Use plain text only. No markdown, no HTML, no code fences.
+6. Return ONLY valid JSON: {"concept":"...","front":"...","back":"...","trap":"...","memory_hook":"..."}
+
+Source MCQ:
+${JSON.stringify({
+  subject: canonSubj(rawQ.s),
+  unit: rawQ.unit_name || rawQ.t || '',
+  question: rawQ.q,
+  options: rawQ.o,
+  correct_option: rawQ.o && rawQ.o[rawQ.a],
+  explanation: rawQ.e || ''
+})}`;
+    const result = await fetchGeminiWithFallback(prompt, 0.4, GEM_GEN_MODEL, 20000, true);
+    const parsed = extractJson(result.text);
+    const concept = String(parsed && parsed.concept || '').trim();
+    const front = String(parsed && parsed.front || '').trim();
+    const back = String(parsed && parsed.back || '').trim();
+    if (!concept || !front || !back) throw new Error('AI returned an incomplete concept card');
+    if (isConceptCardCopyOfQuestion(front, rawQ)) throw new Error('AI front copied the source question');
+    return {
+      concept,
+      front,
+      back,
+      trap: String(parsed.trap || '').trim(),
+      memoryHook: String(parsed.memory_hook || parsed.memoryHook || '').trim(),
+      origin: 'ai'
+    };
+  } catch (err) {
+    console.warn('Concept card AI generation failed; using offline template:', err);
+    return fallback;
+  }
+}
+
+function conceptCardHtml(data) {
+  const concept = String(data.concept || '').trim() || 'Core concept';
+  const frontText = String(data.front || '').trim();
+  const backText = String(data.back || '').trim();
+  const trap = String(data.trap || '').trim();
+  const hook = String(data.memoryHook || '').trim();
+  const front = `<b>Concept:</b> ${esc(concept)}<br><br>${esc(frontText).replace(/\n/g, '<br>')}`;
+  let back = esc(backText).replace(/\n/g, '<br>');
+  if (trap) back += `<div style="margin-top:8px"><b class="c-no">Common trap:</b> ${esc(trap).replace(/\n/g, '<br>')}</div>`;
+  if (hook) back += `<div style="margin-top:8px"><b>Memory hook:</b> ${esc(hook)}</div>`;
+  return { front, back };
+}
+
+function saveConceptCard(rawQ, data, opts = {}) {
+  if (!rawQ || !data) return { card: null };
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const conceptKey = conceptKeyFor(rawQ.s, data.concept);
+  const sourceQk = qk(rawQ);
+  let existing = null;
+  if (opts.replaceId) existing = (CARDS || []).find(c => c.id === opts.replaceId) || null;
+  if (!existing && !opts.allowDuplicate) existing = (CARDS || []).find(c => c.conceptKey === conceptKey && !c.grad) || null;
+  if (existing && !opts.replaceId) return { card: existing, duplicate: true };
+  if (!existing) {
+    const createdToday = (CARDS || []).filter(c => c.createdDate === todayDate).length;
+    if (createdToday >= 20) return { card: null, limit: true };
+  }
+
+  const html = conceptCardHtml(data);
+  const now = Date.now();
+  const card = existing || {
+    id: 'fc_' + now + '_' + Math.random().toString(36).slice(2, 7),
+    qk: sourceQk,
+    sourceQk,
+    qId: rawQ._sid || rawQ.id || rawQ.n,
+    subject: canonSubj(rawQ.s),
+    type: 'concept',
+    concept: String(data.concept || '').trim(),
+    conceptKey,
+    origin: data.origin || 'local',
+    front: html.front,
+    back: html.back,
+    stab: 1.0,
+    diff: 5.0,
+    due: today() + 1,
+    lapses: 0,
+    consecOk: 0,
+    grad: false,
+    created: now,
+    createdDate: todayDate
+  };
+
+  if (existing) {
+    existing.qk = sourceQk;
+    existing.sourceQk = sourceQk;
+    existing.qId = rawQ._sid || rawQ.id || rawQ.n;
+    existing.subject = canonSubj(rawQ.s);
+    existing.type = 'concept';
+    existing.concept = String(data.concept || '').trim();
+    existing.conceptKey = conceptKey;
+    existing.origin = data.origin || 'local';
+    existing.front = html.front;
+    existing.back = html.back;
+    existing.convertedAt = now;
+  } else {
+    CARDS.push(card);
+  }
+  if (!opts.deferSave) save();
+  return { card, updated: !!existing };
+}
+
+function findSourceQuestionForCard(card) {
+  if (!card) return null;
+  const keys = [card.sourceQk, card.qk].filter(Boolean);
+  const pool = [...(D || []), ...((BANKS || []).flatMap(b => Array.isArray(b.q) ? b.q : []))];
+  return pool.find(q => keys.includes(qk(q))) || null;
+}
+
+async function addFlashcardForCurrent() {
+  const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : byN(Q[P]);
+  if (!rawQ) return;
+  const btn = (window.event && window.event.target && window.event.target.tagName === 'BUTTON') ? window.event.target : null;
+  const original = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Generating concept card...';
+  }
+  try {
+    const data = await generateConceptCardData(rawQ);
+    const result = saveConceptCard(rawQ, data);
+    if (result.duplicate) alert('A concept card for this idea is already in your review deck.');
+    else if (result.limit) alert('Daily flashcard limit reached (20). Try again tomorrow.');
+    else if (result.card) alert(data.origin === 'ai' ? 'AI concept card added to your review deck.' : 'Concept card added to your review deck.');
+    else alert('Could not add flashcard.');
+  } catch (err) {
+    console.warn('Add concept card failed:', err);
+    alert('Could not add flashcard: ' + (err.message || err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+}
+
+async function convertFlashcardToConcept(id) {
+  const card = (CARDS || []).find(c => c.id === id);
+  if (!card) return;
+  const source = findSourceQuestionForCard(card);
+  if (!source) {
+    alert('Could not find the original question for this card. Delete and recreate it instead.');
+    return;
+  }
+  const data = await generateConceptCardData(source);
+  const result = saveConceptCard(source, data, { replaceId: id });
+  if (result.updated) {
+    alert(data.origin === 'ai' ? 'Card converted to an AI concept card.' : 'Card converted to a concept card.');
+    renderCardManagerView();
+  }
+}
+
+async function convertAllLegacyFlashcards() {
+  const legacy = (CARDS || []).filter(c => !c.conceptKey);
+  if (!legacy.length) {
+    alert('No legacy question-style cards found.');
+    return;
+  }
+  if (!confirm(`Convert ${legacy.length} legacy card(s) to concept cards using offline templates?`)) return;
+  let converted = 0, skipped = 0;
+  legacy.forEach(card => {
+    const source = findSourceQuestionForCard(card);
+    if (!source) { skipped++; return; }
+    const result = saveConceptCard(source, conceptCardFallback(source), { replaceId: card.id, deferSave: true });
+    if (result.updated) converted++;
+  });
+  save();
+  alert(`Converted ${converted} card(s)${skipped ? `; skipped ${skipped} with no source question` : ''}.`);
+  renderCardManagerView();
 }
 
 function createCardForMissed(rawQ, chosenOptIndex = -1) {
@@ -2856,44 +3085,10 @@ function createCardForMissed(rawQ, chosenOptIndex = -1) {
       return null;
     }
   } catch(e){}
-  const todayDate = new Date().toISOString().slice(0, 10);
-  const createdToday = CARDS.filter(c => c.createdDate === todayDate).length;
-  if (createdToday >= 20) return null;
-
-  const cardQk = qk(rawQ);
-  if (CARDS.some(c => c.qk === cardQk && !c.grad)) return null;
-
-  const chosenText = (chosenOptIndex >= 0 && rawQ.o && rawQ.o[chosenOptIndex]) ? rawQ.o[chosenOptIndex] : '';
-  const correctText = (rawQ.o && rawQ.o[rawQ.a]) ? rawQ.o[rawQ.a] : '';
-
-  let front = '<b>' + esc(rawQ.s) + '</b><br><br>' + renderQuestionStem(rawQ.q);
-  let back = '<b>Correct Answer:</b> ' + esc(correctText);
-  if (chosenText && chosenOptIndex !== rawQ.a) {
-    back += '<br><span class="c-no sm">⚠️ Trapped by: ' + esc(chosenText) + '</span>';
-  }
-  if (rawQ.e) back += '<br><br>' + explanationHtml(rawQ.e);
-
-  const card = {
-    id: 'fc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-    qk: cardQk,
-    qId: rawQ.n,
-    subject: rawQ.s,
-    type: rawQ.calc ? 'calc' : (chosenOptIndex >= 0 ? 'lure' : 'concept'),
-    front,
-    back,
-    stab: 1.0,
-    diff: 5.0,
-    due: today() + 1,
-    lapses: 0,
-    consecOk: 0,
-    grad: false,
-    created: Date.now(),
-    createdDate: todayDate
-  };
-
-  CARDS.push(card);
-  save();
-  return card;
+  const sourceQk = qk(rawQ);
+  if ((CARDS || []).some(c => !c.grad && (c.sourceQk === sourceQk || c.qk === sourceQk))) return null;
+  const result = saveConceptCard(rawQ, conceptCardFallback(rawQ));
+  return result && result.card && !result.duplicate ? result.card : null;
 }
 
 function startFlashcardReview() {
@@ -2921,18 +3116,20 @@ function renderCardManagerView(){
   let list = (CARDS||[]).slice();
   if(filter !== 'all') list = list.filter(c=>c.subject===filter);
   if(search) list = list.filter(c=>{
-    const t = ((c.front||'') + ' ' + (c.back||'')).toLowerCase();
+    const t = ((c.concept||'') + ' ' + (c.front||'') + ' ' + (c.back||'')).toLowerCase();
     return t.includes(search);
   });
   const due = list.filter(c=>!c.grad && (c.due||0)<=today()).length;
   const learning = list.filter(c=>!c.grad && (c.due||0)>today()).length;
   const grad = list.filter(c=>c.grad).length;
+  const legacyCount = (CARDS||[]).filter(c=>!c.conceptKey).length;
   $('#app').innerHTML = `
     <div class="top"><div class="row" style="justify-content:space-between"><b>🃏 Manage Flashcards</b><button onclick="home()">← Dashboard</button></div></div>
     <div class="card">
       <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">
         <button class="sm ${filter==='all'?'p':''}" onclick="window._cardmgrFilter='all';renderCardManagerView()">All (${CARDS.length})</button>
         ${subjects.map(s=>`<button class="sm ${filter===s?'p':''}" onclick="window._cardmgrFilter='${esc(s).replace(/'/g,'\\\'')}';renderCardManagerView()">${esc(cl(s))} (${CARDS.filter(c=>c.subject===s).length})</button>`).join('')}
+        ${legacyCount ? `<button class="sm" onclick="convertAllLegacyFlashcards()">🧠 Convert legacy (${legacyCount})</button>` : ''}
       </div>
       <input type="text" id="cardmgr-search" placeholder="Search cards..." value="${esc(window._cardmgrSearch||'')}" oninput="window._cardmgrSearch=this.value;renderCardManagerView()">
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
@@ -2944,10 +3141,11 @@ function renderCardManagerView(){
         ${list.slice(0,100).map(c=>`
           <div class="item" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
             <div style="flex:1;min-width:200px">
-              <div><b>${esc(cl(c.subject||''))}</b> ${c.grad?'<span class="badge-unverified">Graduated</span>':''} <span class="mu sm">Due: ${new Date((c.due||0)*86400000 + Date.now()-((Date.now()%86400000))).toDateString ? '' : ''}${c.due||0}</span></div>
-              <div class="mu sm" style="margin-top:4px">${esc((c.front||'').replace(/<[^>]+>/g,' ')).slice(0,80)}...</div>
+              <div><b>${esc(cl(c.subject||''))}</b> ${c.concept ? `<span class="badge-unverified">${esc(c.concept)}</span>` : '<span class="badge-unverified">Legacy Q&amp;A</span>'} ${c.origin==='ai' ? '<span class="chip" style="padding:1px 6px;font-size:10px">AI</span>' : ''} ${c.grad?'<span class="badge-unverified">Graduated</span>':''} <span class="mu sm">Due: ${c.due||0}</span></div>
+              <div class="mu sm" style="margin-top:4px">${esc((c.front||'').replace(/<[^>]+>/g,' ')).slice(0,100)}...</div>
             </div>
             <div class="row" style="gap:6px">
+              ${!c.conceptKey ? `<button class="sm" onclick="convertFlashcardToConcept('${esc(c.id)}')">🧠 Concept</button>` : ''}
               <button class="sm" onclick="editFlashcard('${esc(c.id)}')">✏️ Edit</button>
               <button class="sm" style="color:var(--no)" onclick="deleteFlashcard('${esc(c.id)}')">🗑 Delete</button>
             </div>
@@ -3030,7 +3228,7 @@ function renderFlashcardView() {
     <div class="fc-card" onclick="flipCard()">
       <div class="fc-inner">
         <span class="fc-badge ${curCard.type === 'calc' ? 'c-sk' : (curCard.type === 'lure' ? 'c-no' : 'c-ok')}">
-          ${esc(curCard.type || 'Concept')} · ${esc(curCard.subject)}
+          ${esc(curCard.concept || curCard.type || 'Concept')} · ${esc(curCard.subject)}${curCard.origin === 'ai' ? ' · AI' : ''}
         </span>
         <div style="font-size:16px;line-height:1.5">${curCard.front}</div>
         ${ACTIVE_FC_SHOW_BACK ? `
@@ -3579,7 +3777,7 @@ function renderReadinessMeter() {
 
     <div class="row" style="justify-content:space-between;align-items:center;margin-top:18px">
       <b>Subject Status &amp; Targeted Drills</b>
-      <span class="mu sm">Tap any subject to launch targeted drill</span>
+      <span class="mu sm">Tap any subject to launch a 15-question targeted drill</span>
     </div>
 
     <div class="subject-card-grid">
@@ -3612,40 +3810,89 @@ function renderReadinessMeter() {
   `;
 }
 
-function startSubjectDrillFromBank(subjectName) {
-  const norm = canonSubj(subjectName);
-  const allQs = [];
-  if(Array.isArray(BANKS) && BANKS.length){
-    BANKS.forEach(b => {
-      if(Array.isArray(b.q)) allQs.push(...b.q);
+function clearDrillDeck() {
+  if (Array.isArray(DRILL_D)) {
+    DRILL_D.forEach(q => {
+      if (!q) return;
+      delete R[q.n];
+      delete W[q.n];
     });
   }
-  if(!allQs.length && Array.isArray(D)) allQs.push(...D);
-  let pool = allQs.filter(q => canonSubj(q.s) === norm);
-  if(!pool.length){
-    pool = (D || []).filter(q => canonSubj(q.s) === norm);
-  }
-  if (!pool.length) {
+  DRILL_D = [];
+  DRILL_SUBJECT = '';
+}
+
+function bankQuestionPool() {
+  const out = [], seen = new Set();
+  const add = q => {
+    if (!q) return;
+    const key = bankQuestionKey(q);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(q);
+  };
+  (BANKS || []).forEach(bank => {
+    if (Array.isArray(bank.q)) bank.q.forEach(add);
+  });
+  if (Array.isArray(D)) D.forEach(add);
+  return out;
+}
+
+function bankSubjects() {
+  const set = new Set();
+  bankQuestionPool().forEach(q => set.add(canonSubj(q.s)));
+  (D || []).forEach(q => set.add(canonSubj(q.s)));
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+function selectSubjectDrillQuestions(subjectName, requestedCount) {
+  const norm = canonSubj(subjectName);
+  const seen = new Set();
+  const pool = bankQuestionPool().filter(q => {
+    if (!q || canonSubj(q.s) !== norm) return false;
+    if (q.quarantined || isColdQuestion(q)) return false;
+    const key = qk(q);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const rank = q => {
+    const rec = V[qk(q)];
+    const history = rec && Array.isArray(rec.history) ? rec.history : [];
+    if (!history.length) return 0;
+    const last = history[history.length - 1];
+    const dueDay = rec && (typeof rec.d === 'number' ? rec.d : rec.due);
+    if ((last && !last.ok) || (typeof dueDay === 'number' && dueDay <= today())) return 1;
+    return 2;
+  };
+
+  pool.sort((a, b) => {
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    const la = effLevel(a), lb = effLevel(b);
+    if (la !== lb) return la - lb;
+    return Math.random() - 0.5;
+  });
+
+  const wanted = Number.isFinite(requestedCount) ? Math.floor(requestedCount) : 15;
+  const count = Math.max(1, Math.min(pool.length, wanted));
+  return { pool, selected: pool.slice(0, count), total: pool.length };
+}
+
+function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
+  const result = selectSubjectDrillQuestions(subjectName, requestedCount);
+  if (!result.pool.length) {
     alert('No questions found for subject: ' + subjectName);
     return;
   }
-  // Prioritize Level 0 first
-  pool = pool.slice().sort((a,b)=>{
-    const la = (typeof a.lvl==='number'?a.lvl:(typeof a.level==='number'?a.level:1));
-    const lb = (typeof b.lvl==='number'?b.lvl:(typeof b.level==='number'?b.level:1));
-    if(la !== lb) return la - lb;
-    return 0;
-  });
-  const un = pool.filter(q => !R[q.n]).map(q=>q.n);
-  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && V[qk(q)].due <= today())).map(q=>q.n);
-  const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
-  let list = [...un, ...due, ...rest];
-  // ensure uniqueness
-  const seen = new Set();
-  list = list.filter(n=>{ if(seen.has(n)) return false; seen.add(n); return true; });
-  list = list.slice(0, 20);
-  if(!list.length){ alert('No questions found for subject: ' + subjectName); return; }
-  start(list);
+  if (result.total < requestedCount) {
+    alert(`Only ${result.total} question(s) are available for ${subjectName}. Starting all available questions.`);
+  }
+  clearDrillDeck();
+  DRILL_SUBJECT = canonSubj(subjectName);
+  DRILL_D = result.selected.map((q, i) => ({ ...q, n: DRILL_N_BASE + i }));
+  start(DRILL_D.map(q => q.n));
 }
 
 // Backup Nudge
@@ -3697,6 +3944,7 @@ function home(preserveScroll = false) {
   }
   view = 'home';
   cancelAutoAdvance();
+  clearDrillDeck();
   clearInterval(TI);
   if (MK) { MK = null; Q = []; QRESULTS = []; P = 0; }
   cancelRecallTimer();
@@ -3756,6 +4004,8 @@ function home(preserveScroll = false) {
   const freshButtonText = bankForFresh
     ? (isCurrentBankSet && !currentBankSetComplete ? `📚 Continue Set ${SETI + 1}` : `📚 Next Set · ${esc(bankForFresh.name)}`)
     : `✨ Fresh Questions (up to ${Math.max(10, Math.round(todayMins * 60 / 50))} Q)`;
+  const drillSubjects = bankSubjects();
+  const drillBankCount = Math.max(1, bankQuestionPool().length);
 
   const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
   const milestone = getCurrentMilestone();
@@ -3889,10 +4139,10 @@ function home(preserveScroll = false) {
 
           <div class="row" style="margin-top:12px">
             <select id="sub-sel">
-              ${[...new Set(D.map(q => q.s))].map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
+              ${drillSubjects.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
             </select>
             <label for="sub-count">Questions</label>
-            <input id="sub-count" type="number" min="1" max="${D.length}" value="${Math.min(10, D.length)}" style="width:90px">
+            <input id="sub-count" type="number" min="1" max="${drillBankCount}" value="${Math.min(15, drillBankCount)}" style="width:90px">
             <button onclick="startSubjectDrill()">Diagnostic Subject Drill</button>
           </div>
 
@@ -4078,36 +4328,11 @@ function startSubjectDrill() {
   }
 
   const subject = $('#sub-sel').value;
-  const norm = canonSubj(subject);
-  const allQs = [];
-  if(Array.isArray(BANKS) && BANKS.length){
-    BANKS.forEach(b => {
-      if(Array.isArray(b.q)) allQs.push(...b.q);
-    });
-  }
-  if(!allQs.length && Array.isArray(D)) allQs.push(...D);
-  let pool = allQs.filter(q => canonSubj(q.s) === norm);
-  if(!pool.length) pool = (D || []).filter(q => canonSubj(q.s) === norm);
-  if (!pool.length) {
-    alert('No questions are available for this subject.');
+  if (!subject) {
+    alert('Select a subject first.');
     return;
   }
-  pool = pool.slice().sort((a,b)=>{
-    const la = (typeof a.lvl==='number'?a.lvl:(typeof a.level==='number'?a.level:1));
-    const lb = (typeof b.lvl==='number'?b.lvl:(typeof b.level==='number'?b.level:1));
-    if(la !== lb) return la - lb;
-    return 0;
-  });
-  const un = pool.filter(q => !R[q.n]).map(q=>q.n);
-  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && V[qk(q)].due <= today())).map(q=>q.n);
-  const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
-  let list = [...un, ...due, ...rest];
-  const seen = new Set();
-  list = list.filter(n=>{ if(seen.has(n)) return false; seen.add(n); return true; });
-  if (requestedCount > list.length) {
-    alert(`Only ${list.length} question(s) are available for ${subject}. Starting all available questions.`);
-  }
-  start(list.slice(0, requestedCount));
+  startSubjectDrillFromBank(subject, requestedCount);
 }
 
 function startMistakes() {
