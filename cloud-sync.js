@@ -132,6 +132,8 @@
       QRESULTS: Array.isArray(s.QRESULTS) ? s.QRESULTS : [],
       lastFreshSetDay: Number.isInteger(s.lastFreshSetDay) ? s.lastFreshSetDay : null,
       QOV: (s.QOV && typeof s.QOV === 'object' && !Array.isArray(s.QOV)) ? s.QOV : {},
+      QEDITS: (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {},
+      QDELETED: (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {},
       recallFirst: s.recallFirst !== false,
       CARDS: Array.isArray(s.CARDS) ? s.CARDS : [],
       CARD_TOMBSTONES: (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {},
@@ -167,6 +169,8 @@
     if (s.CARDS && s.CARDS.length) return true;
     if (s.V && Object.keys(s.V).length) return true;
     if (s.COLD_QS && Object.keys(s.COLD_QS).length) return true;
+    if (s.QEDITS && Object.keys(s.QEDITS).length) return true;
+    if (s.QDELETED && Object.keys(s.QDELETED).length) return true;
     return false;
   }
 
@@ -402,6 +406,28 @@
     return out;
   }
 
+  function mergeQuestionEdits(a, b) {
+    var out = {};
+    Object.keys(a || {}).forEach(function (k) { if (a[k] && typeof a[k] === 'object') out[k] = a[k]; });
+    Object.keys(b || {}).forEach(function (k) {
+      var next = b[k];
+      if (!next || typeof next !== 'object') return;
+      var prev = out[k];
+      if (!prev || (Number(next.updatedAt) || 0) >= (Number(prev.updatedAt) || 0)) out[k] = next;
+    });
+    return out;
+  }
+
+  function mergeQuestionDeletes(a, b) {
+    var out = {};
+    Object.keys(a || {}).concat(Object.keys(b || {})).forEach(function (k) {
+      var ta = Number((a || {})[k]) || 0;
+      var tb = Number((b || {})[k]) || 0;
+      out[k] = Math.max(ta, tb) || 1;
+    });
+    return out;
+  }
+
   function mergeFixDays(a, b) {
     var out = {};
     var subjects = {};
@@ -534,6 +560,8 @@
         : (local.todayMins || remote.todayMins || 15),
       lastFreshSetDay: active.lastFreshSetDay == null ? null : active.lastFreshSetDay,
       QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
+      QEDITS: mergeQuestionEdits(local.QEDITS, remote.QEDITS),
+      QDELETED: mergeQuestionDeletes(local.QDELETED, remote.QDELETED),
       recallFirst: active.recallFirst !== false,
       CARDS: mergeCards(local.CARDS, remote.CARDS, cardTombstones),
       CARD_TOMBSTONES: cardTombstones,

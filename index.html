@@ -729,6 +729,63 @@ input[type=text] { width: 100%; font: inherit; color: var(--tx); background: var
 
 /* Quiet Mode */
 body.quiet-mode .hide-quiet { display: none !important; }
+
+/* Question editor + variant refresh status */
+.q-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 14px;
+  overflow-y: auto;
+}
+.q-editor-card {
+  width: min(720px, 100%);
+  background: var(--card);
+  color: var(--tx);
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+.q-editor-card label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 12px 0 5px;
+  color: var(--mu);
+  letter-spacing: 0.02em;
+}
+.q-editor-card textarea,
+.q-editor-card input[type="text"],
+.q-editor-card select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--tx);
+  padding: 9px 10px;
+  font: inherit;
+}
+.q-editor-card textarea { resize: vertical; }
+.q-editor-card .q-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .q-editor-card .q-editor-grid { grid-template-columns: 1fr; }
+}
+.bg-gen-banner.refresh-status {
+  font-size: 12px;
+  padding: 8px 12px;
+  align-items: center;
+  gap: 8px;
+}
 </style>
 </head>
 <body>
@@ -775,13 +832,15 @@ try {
 }
 
 // Core State
-let D = null, R = {}, W = {}, Q = [], QRESULTS = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
+let D = null, R = {}, W = {}, Q = [], QRESULTS = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, REC = null, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
 let sessionHistory = [];
 let EXAM_DATE = '';
 let lastBackup = 0;
 let lastFreshSetDay = null;
 let gemVars = [];
 let QOV = {};
+let QEDITS = {};
+let QDELETED = {};
 let gemLast = 0;
 let genInProgress = false;
 let GEM_KEY = localStorage.getItem('bitmcq_gem') || '';
@@ -828,6 +887,12 @@ let todayMins = 15;
 let showMoreMenu = false;
 let bgGenQueue = [];
 let bgGenStatusText = '';
+let variantRefreshDone = 0;
+let variantRefreshSkipped = 0;
+let variantRefreshSessionCount = 0;
+let variantRefreshTouched = new Set();
+let variantRefreshCurrentKey = '';
+const VARIANT_REFRESH_SESSION_CAP = 20;
 
 function getDailyApiCount() {
   const dayKey = 'bitmcq_api_calls_' + new Date().toISOString().slice(0, 10);
@@ -844,7 +909,7 @@ function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
-      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst,
+      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, recallFirst,
       CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS
     }));
     localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
@@ -914,6 +979,8 @@ function load() {
       gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
       todayMins = s.todayMins || 15;
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
+      QEDITS = (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {};
+      QDELETED = (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {};
       recallFirst = s.recallFirst !== false;
       CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
       CARD_TOMBSTONES = (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {};
@@ -947,6 +1014,7 @@ function load() {
         QRESULTS = keptResults;
         P = Math.min(P || 0, Math.max(0, Q.length - 1));
       }
+      applyQuestionOverridesEverywhere();
       return true;
     }
   } catch (e) {
@@ -1798,6 +1866,185 @@ function setQuestionLevel(n, newLvl) {
   show();
 }
 
+function questionUid(q) {
+  if (!q || typeof q !== 'object') return '';
+  if (q._sid) return String(q._sid);
+  if (q.id != null && String(q.id).trim() !== '') {
+    return `id:${String(q.u || q.s || '').trim()}:${String(q.id).trim()}`;
+  }
+  return 'qk:' + qk(q);
+}
+
+function ensureQuestionUid(q) {
+  if (!q || typeof q !== 'object') return '';
+  if (!q._sid) q._sid = questionUid(q);
+  return String(q._sid);
+}
+
+function isQuestionDeleted(q) {
+  return !!q && !!QDELETED[questionUid(q)];
+}
+
+function applyQuestionOverride(q) {
+  if (!q || typeof q !== 'object') return q;
+  const edit = QEDITS[questionUid(q)];
+  if (!edit || typeof edit !== 'object') return q;
+  if (typeof edit.q === 'string') q.q = edit.q;
+  if (Array.isArray(edit.o)) q.o = edit.o.map(String);
+  if (Number.isInteger(edit.a)) q.a = edit.a;
+  if (Array.isArray(edit.code)) q.code = edit.code.map(String);
+  if (typeof edit.e === 'string') q.e = edit.e;
+  if (typeof edit.s === 'string' && edit.s.trim()) q.s = edit.s;
+  if (typeof edit.u === 'string') q.u = edit.u;
+  if (typeof edit.regeneratable === 'boolean') q.regeneratable = edit.regeneratable;
+  q.quick = typeof edit.quick === 'boolean' ? edit.quick : isQuickQuestion(q);
+  return q;
+}
+
+function updateQuestionCopies(uid, patch) {
+  if (!uid) return;
+  const apply = q => {
+    if (q && typeof q === 'object' && questionUid(q) === uid) Object.assign(q, patch);
+  };
+  (D || []).forEach(apply);
+  (DRILL_D || []).forEach(apply);
+  (BANKS || []).forEach(b => (b && Array.isArray(b.q) ? b.q : []).forEach(apply));
+  (A || []).forEach(a => (a && Array.isArray(a.errs) ? a.errs : []).forEach(apply));
+  if (CURRENT_Q && CURRENT_Q.origQ && questionUid(CURRENT_Q.origQ) === uid) {
+    Object.assign(CURRENT_Q.origQ, patch);
+  }
+}
+
+function findQuestionByUid(uid) {
+  if (!uid) return null;
+  const pools = [
+    D || [],
+    DRILL_D || [],
+    ...(BANKS || []).map(b => (b && Array.isArray(b.q) ? b.q : [])),
+    ...(A || []).map(a => (a && Array.isArray(a.errs) ? a.errs : []))
+  ];
+  for (const pool of pools) {
+    const found = pool.find(q => q && typeof q === 'object' && questionUid(q) === uid);
+    if (found) return found;
+  }
+  return null;
+}
+
+function pruneSessionQuestions() {
+  if (!Array.isArray(Q) || !Q.length) return;
+  const keptQ = [], keptR = [], keptH = [];
+  let changed = false;
+  Q.forEach((key, i) => {
+    if (byN(key)) {
+      keptQ.push(key);
+      keptR.push(Array.isArray(QRESULTS) ? QRESULTS[i] : null);
+      keptH.push(Array.isArray(sessionHistory) ? sessionHistory[i] : null);
+    } else {
+      changed = true;
+    }
+  });
+  if (changed) {
+    Q = keptQ;
+    QRESULTS = keptR;
+    sessionHistory = keptH;
+    P = Math.min(P || 0, Math.max(0, Q.length - 1));
+  }
+}
+
+function syncFlashcardSourceLinks() {
+  if (!Array.isArray(CARDS) || !CARDS.length) return;
+  const pool = [
+    ...(D || []),
+    ...(DRILL_D || []),
+    ...((BANKS || []).flatMap(bank => (bank && Array.isArray(bank.q)) ? bank.q : [])),
+    ...((A || []).flatMap(attempt => (attempt && Array.isArray(attempt.errs)) ? attempt.errs : []))
+  ];
+  const byUid = new Map();
+  const byQk = new Map();
+  pool.forEach(q => {
+    if (!q || typeof q !== 'object') return;
+    byUid.set(questionUid(q), q);
+    byQk.set(qk(q), q);
+  });
+  CARDS.forEach(card => {
+    if (!card || typeof card !== 'object') return;
+    const source = (card.qId != null && byUid.get(String(card.qId))) ||
+      (card.sourceQk && byQk.get(card.sourceQk)) ||
+      (card.qk && byQk.get(card.qk)) || null;
+    if (source) {
+      const sourceKey = qk(source);
+      card.sourceQk = sourceKey;
+      card.qk = sourceKey;
+      card.qId = questionUid(source);
+      card.subject = source.s || card.subject;
+      delete card.sourceMissing;
+    } else if (card.sourceQk || card.qk) {
+      card.sourceMissing = true;
+    }
+  });
+}
+
+function applyQuestionOverridesEverywhere() {
+  const prepare = arr => {
+    if (!Array.isArray(arr)) return;
+    const cleanProgress = arr === D || arr === DRILL_D;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const q = arr[i];
+      if (!q || typeof q !== 'object') { arr.splice(i, 1); continue; }
+      ensureQuestionUid(q);
+      if (isQuestionDeleted(q)) {
+        if (cleanProgress && q.n != null) { delete R[q.n]; delete W[q.n]; }
+        arr.splice(i, 1);
+        continue;
+      }
+      applyQuestionOverride(q);
+    }
+  };
+  (BANKS || []).forEach(bank => {
+    if (!bank || typeof bank !== 'object') return;
+    if (!Array.isArray(bank.q)) bank.q = [];
+    prepare(bank.q);
+    bank.sets = genSets(bank.q);
+  });
+  prepare(D);
+  prepare(DRILL_D);
+  (A || []).forEach(a => prepare(a && a.errs));
+  syncFlashcardSourceLinks();
+  pruneSessionQuestions();
+}
+
+function effRegeneratable(q) {
+  if (!q) return false;
+  const ov = QOV[qk(q)];
+  if (ov && typeof ov === 'object' && typeof ov.regeneratable === 'boolean') return ov.regeneratable;
+  return q.regeneratable === true;
+}
+
+function setQuestionRegeneratable(q, val) {
+  if (!q) return;
+  const k = qk(q);
+  if (typeof QOV[k] !== 'object' || QOV[k] === null) {
+    const prevQuick = typeof QOV[k] === 'boolean' ? QOV[k] : (q.quick !== false);
+    QOV[k] = { quick: prevQuick };
+  }
+  QOV[k].regeneratable = !!val;
+  q.regeneratable = !!val;
+  if (!val) {
+    const uid = questionUid(q);
+    bgGenQueue = bgGenQueue.filter(job => job.key !== uid);
+    if (variantRefreshCurrentKey === uid) variantRefreshCurrentKey = '';
+  }
+  save();
+}
+
+function toggleRegeneratable(n) {
+  if (MK) return;
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
+  if (!rawQ) return;
+  setQuestionRegeneratable(rawQ, !effRegeneratable(rawQ));
+  show();
+}
+
 // Question Parsers
 function parseMd(t) {
   const a = t.search(/^## A\./m), b = t.search(/^## B\./m), c = t.search(/^## C\./m), qs = [];
@@ -2180,12 +2427,18 @@ function dueKeys(quickOnly = false) {
 
 const byN = k => {
   if (k == null) return null;
+  let q = null;
   if (typeof k === 'string') {
     if (k.startsWith('v:')) return gemVars[+k.slice(2)] || null;
     const [a, i] = k.split(':');
-    return (A[a] && A[a].errs && A[a].errs[i]) ? { ...A[a].errs[i], _k: k } : null;
+    q = (A[a] && A[a].errs && A[a].errs[i]) ? { ...A[a].errs[i], _k: k } : null;
+  } else {
+    q = (D || []).find(item => item && item.n === k) || (DRILL_D || []).find(item => item && item.n === k) || null;
   }
-  return (D || []).find(q => q && q.n === k) || (DRILL_D || []).find(q => q && q.n === k) || null;
+  if (!q) return null;
+  ensureQuestionUid(q);
+  if (isQuestionDeleted(q)) return null;
+  return applyQuestionOverride(q);
 };
 
 function groupQuestionBlocks(questionKeys) {
@@ -2706,9 +2959,13 @@ function generateLocalFamilyVariant(rawQ) {
 }
 
 function regenerateCurrentQuestion() {
-  if (!CURRENT_Q || P >= Q.length) return;
+  if (MK || !CURRENT_Q || P >= Q.length) return;
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
+  if (!effRegeneratable(rawQ)) {
+    alert('Mark this question as regeneratable first (♻️), then try again.');
+    return;
+  }
 
   if (matchQuestionFamily(rawQ)) {
     generateLocalFamilyVariant(rawQ);
@@ -2718,9 +2975,13 @@ function regenerateCurrentQuestion() {
   }
 
   if (GEM_KEY) {
+    if (getDailyApiCount() >= DAILY_API_LIMIT) {
+      alert('Daily AI request limit reached. Try again tomorrow or raise the limit in Settings.');
+      return;
+    }
     const qStem = $('#q-stem');
     if (qStem) qStem.innerHTML = '<span class="c-sk">✨ Generating verified AI variant with blind validation...</span>';
-    rewriteQuestionWithGemini(rawQ).then(() => {
+    rewriteQuestionWithGemini(rawQ, { background: false }).then(() => {
       sessionHistory[P] = null;
       show();
     }).catch(err => {
@@ -2732,6 +2993,287 @@ function regenerateCurrentQuestion() {
   }
 
   alert('A Gemini API key is required to regenerate questions. Please configure your Gemini API Key in Settings (⚙).');
+}
+
+function openQuestionEditor(n) {
+  if (MK) return;
+  const q = byN(n);
+  if (!q) return;
+  openQuestionEditorForQuestion(q);
+}
+
+function openQuestionEditorByUid(uid) {
+  const q = findQuestionByUid(uid);
+  if (q) openQuestionEditorForQuestion(q);
+}
+
+function deleteQuestionByUid(uid) {
+  const q = findQuestionByUid(uid);
+  if (q) deleteQuestionByQ(q);
+}
+
+function openQuestionEditorForQuestion(q) {
+  if (!q || MK) return;
+  ensureQuestionUid(q);
+  window._qEditUid = questionUid(q);
+  const old = document.getElementById('q-editor-overlay');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'q-editor-overlay';
+  overlay.className = 'q-editor-overlay';
+  overlay.innerHTML = `
+    <div class="q-editor-card" role="dialog" aria-modal="true" aria-label="Edit question">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
+        <b>✏️ Edit MCQ</b>
+        <button class="sm" onclick="closeQuestionEditor()">✕ Close</button>
+      </div>
+      <label for="qe-stem">Question stem</label>
+      <textarea id="qe-stem" rows="4">${esc(q.q || '')}</textarea>
+      <label for="qe-code">Code / trace block (one line per row, optional)</label>
+      <textarea id="qe-code" rows="3">${esc((Array.isArray(q.code) ? q.code.join('\n') : (q.code || '')))}</textarea>
+      <div class="q-editor-grid">
+        <div>
+          <label for="qe-opt-0">Option A</label>
+          <input type="text" id="qe-opt-0" value="${esc((q.o || [])[0] || '')}">
+        </div>
+        <div>
+          <label for="qe-opt-1">Option B</label>
+          <input type="text" id="qe-opt-1" value="${esc((q.o || [])[1] || '')}">
+        </div>
+        <div>
+          <label for="qe-opt-2">Option C</label>
+          <input type="text" id="qe-opt-2" value="${esc((q.o || [])[2] || '')}">
+        </div>
+        <div>
+          <label for="qe-opt-3">Option D</label>
+          <input type="text" id="qe-opt-3" value="${esc((q.o || [])[3] || '')}">
+        </div>
+      </div>
+      <div class="q-editor-grid">
+        <div>
+          <label for="qe-answer">Correct option</label>
+          <select id="qe-answer">
+            ${['A', 'B', 'C', 'D'].map((label, i) => `<option value="${i}" ${q.a === i ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label for="qe-subject">Subject</label>
+          <input type="text" id="qe-subject" value="${esc(q.s || '')}">
+        </div>
+        <div>
+          <label for="qe-unit">Unit / code</label>
+          <input type="text" id="qe-unit" value="${esc(q.u || '')}">
+        </div>
+        <div>
+          <label for="qe-regen">Variant refresh</label>
+          <label style="display:flex;align-items:center;gap:8px;margin:0;text-transform:none;font-weight:500;font-size:13px;color:inherit">
+            <input type="checkbox" id="qe-regen" ${effRegeneratable(q) ? 'checked' : ''} style="width:auto">
+            Mark this MCQ as regeneratable
+          </label>
+        </div>
+      </div>
+      <label for="qe-exp">Explanation / why</label>
+      <textarea id="qe-exp" rows="3">${esc(q.e || '')}</textarea>
+      <div class="row" style="justify-content:space-between;margin-top:16px;gap:8px;flex-wrap:wrap">
+        <button class="sm" style="color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionFromEditor()">🗑 Delete MCQ</button>
+        <div class="row" style="gap:8px">
+          <button class="sm" onclick="closeQuestionEditor()">Cancel</button>
+          <button class="p sm" onclick="saveQuestionEditor()">Save changes</button>
+        </div>
+      </div>
+      <div class="mu sm" style="margin-top:10px">Deleting an MCQ keeps its linked flashcards. This is disabled during a timed mock.</div>
+    </div>
+  `;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeQuestionEditor(); });
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closeQuestionEditor(); } });
+  document.body.appendChild(overlay);
+  const stem = document.getElementById('qe-stem');
+  if (stem) setTimeout(() => stem.focus(), 30);
+}
+
+function closeQuestionEditor() {
+  const overlay = document.getElementById('q-editor-overlay');
+  if (overlay) overlay.remove();
+  window._qEditUid = '';
+}
+
+function saveQuestionEditor() {
+  const uid = window._qEditUid;
+  const target = findQuestionByUid(uid);
+  if (!target) {
+    alert('Could not find this question anymore.');
+    closeQuestionEditor();
+    return;
+  }
+  const stem = ((document.getElementById('qe-stem') || {}).value || '').trim();
+  const options = [0, 1, 2, 3].map(i => ((document.getElementById('qe-opt-' + i) || {}).value || '').trim());
+  const answer = parseInt(((document.getElementById('qe-answer') || {}).value || '0'), 10);
+  const codeText = ((document.getElementById('qe-code') || {}).value || '').trim();
+  const explanation = ((document.getElementById('qe-exp') || {}).value || '').trim();
+  const subject = ((document.getElementById('qe-subject') || {}).value || '').trim();
+  const unit = ((document.getElementById('qe-unit') || {}).value || '').trim();
+  const regeneratable = !!((document.getElementById('qe-regen') || {}).checked);
+  if (!stem) { alert('The question stem cannot be empty.'); return; }
+  if (options.some(o => !o)) { alert('All four options are required.'); return; }
+  if (!(answer >= 0 && answer < 4)) { alert('Choose a valid correct option.'); return; }
+
+  const oldQk = qk(target);
+  const stableUid = ensureQuestionUid(target);
+  const patch = {
+    q: stem,
+    o: options,
+    a: answer,
+    code: codeText ? codeText.split('\n') : [],
+    e: explanation,
+    s: subject ? canonSubj(subject) : target.s,
+    u: unit,
+    regeneratable,
+    updatedAt: Date.now()
+  };
+  const quickProbe = { ...target, ...patch };
+  delete quickProbe.quick;
+  patch.quick = isQuickQuestion(quickProbe);
+  QEDITS[stableUid] = { ...patch };
+  updateQuestionCopies(stableUid, { ...patch, _sid: stableUid });
+  const newQk = qk(target);
+  if (newQk !== oldQk) {
+    if (V[oldQk]) {
+      V[newQk] = Object.assign({}, V[oldQk], V[newQk] || {});
+      delete V[oldQk];
+    }
+    if (QOV[oldQk]) {
+      QOV[newQk] = Object.assign({}, QOV[oldQk], QOV[newQk] || {});
+      delete QOV[oldQk];
+    }
+    for (let i = 0; i < sessionHistory.length; i++) {
+      if (sessionHistory[i] && sessionHistory[i].qKey === oldQk) sessionHistory[i] = null;
+    }
+  }
+  (L || []).forEach(rec => {
+    if (rec && (rec.k === oldQk || rec.k === newQk)) {
+      rec.k = newQk;
+      rec.s = patch.s;
+      rec.q = stem.slice(0, 120);
+    }
+  });
+  (CARDS || []).forEach(card => {
+    if (card && (card.sourceQk === oldQk || card.qk === oldQk || card.sourceQk === newQk || card.qk === newQk)) {
+      card.sourceQk = newQk;
+      card.qk = newQk;
+      card.subject = patch.s || card.subject;
+      card.updatedAt = Date.now();
+    }
+  });
+  const k = qk(target);
+  if (typeof QOV[k] !== 'object' || QOV[k] === null) {
+    QOV[k] = { quick: typeof QOV[k] === 'boolean' ? QOV[k] : (target.quick !== false) };
+  }
+  QOV[k].regeneratable = regeneratable;
+  target.regeneratable = regeneratable;
+  (BANKS || []).forEach(bank => { if (bank && Array.isArray(bank.q)) bank.sets = genSets(bank.q); });
+  syncFlashcardSourceLinks();
+  save();
+  closeQuestionEditor();
+  rerenderAfterQuestionChange();
+}
+
+function deleteQuestionFromEditor() {
+  const target = findQuestionByUid(window._qEditUid);
+  closeQuestionEditor();
+  if (target) deleteQuestionByQ(target);
+}
+
+function deleteQuestionByN(n) {
+  if (MK) return;
+  const q = byN(n);
+  if (q) deleteQuestionByQ(q);
+}
+
+function deleteQuestionByQ(q) {
+  if (!q || MK) return;
+  if (!confirm('Delete this MCQ? Linked flashcards will be kept and will show as missing their source. This cannot be undone from history.')) return;
+  const uid = ensureQuestionUid(q);
+  const oldQk = qk(q);
+  const removedNs = new Set();
+  const matches = item => !!item && (questionUid(item) === uid || qk(item) === oldQk);
+  const collect = arr => {
+    (arr || []).forEach(item => { if (matches(item) && item.n != null) removedNs.add(item.n); });
+  };
+  collect(D);
+  collect(DRILL_D);
+  (BANKS || []).forEach(bank => collect(bank && bank.q));
+
+  let removedSession = false;
+  let removedBeforeP = 0;
+  if (Array.isArray(Q) && Q.length) {
+    const keptQ = [], keptR = [], keptH = [];
+    Q.forEach((key, i) => {
+      const item = byN(key);
+      if (item && matches(item)) {
+        removedSession = true;
+        if (i < P) removedBeforeP++;
+      } else {
+        keptQ.push(key);
+        keptR.push(Array.isArray(QRESULTS) ? QRESULTS[i] : null);
+        keptH.push(Array.isArray(sessionHistory) ? sessionHistory[i] : null);
+      }
+    });
+    if (removedSession) {
+      Q = keptQ;
+      QRESULTS = keptR;
+      sessionHistory = keptH;
+    }
+  }
+
+  const remove = arr => {
+    if (!Array.isArray(arr)) return;
+    for (let i = arr.length - 1; i >= 0; i--) if (matches(arr[i])) arr.splice(i, 1);
+  };
+  remove(D);
+  remove(DRILL_D);
+  (BANKS || []).forEach(bank => {
+    if (!bank || !Array.isArray(bank.q)) return;
+    remove(bank.q);
+    bank.sets = genSets(bank.q);
+  });
+  (A || []).forEach(attempt => remove(attempt && attempt.errs));
+  (CARDS || []).forEach(card => {
+    if (card && (card.sourceQk === oldQk || card.qk === oldQk)) {
+      card.sourceMissing = true;
+      card.updatedAt = Date.now();
+    }
+  });
+  syncFlashcardSourceLinks();
+  removedNs.forEach(n => { delete R[n]; delete W[n]; });
+  delete V[oldQk];
+  delete QOV[oldQk];
+  QDELETED[uid] = Date.now();
+  delete QEDITS[uid];
+  if (removedSession) P = Math.min(Math.max(0, P - removedBeforeP), Math.max(0, Q.length - 1));
+  save();
+  if (view === 'q') {
+    if (!Q.length) { done(); return; }
+    show();
+    return;
+  }
+  rerenderAfterQuestionChange();
+}
+
+function rerenderAfterQuestionChange() {
+  if (view === 'q') {
+    if (!Q.length) { done(); return; }
+    show();
+    return;
+  }
+  if (view === 'cardmgr' && typeof renderCardManagerView === 'function') {
+    renderCardManagerView();
+    return;
+  }
+  if (view === 'cards' && typeof renderFlashcardView === 'function') {
+    renderFlashcardView();
+    return;
+  }
+  if (typeof home === 'function') home(true);
 }
 
 
@@ -3285,6 +3827,14 @@ function renderFlashcardView() {
     return;
   }
   const due = ACTIVE_FC_SESSION_IDS.map(id => CARDS.find(c=>c.id===id)).filter(Boolean);
+  const sourceQuestion = findSourceQuestionForCard(curCard);
+  const sourceUid = sourceQuestion ? questionUid(sourceQuestion) : '';
+  const flashRes = getRecommendedResource(
+    sourceQuestion ? sourceQuestion.s : curCard.subject,
+    false,
+    sourceQuestion ? sourceQuestion.q : '',
+    sourceQuestion ? [sourceQuestion.t, sourceQuestion.u] : []
+  );
   clearMath($('#app'));
   $('#app').innerHTML = `
     <div class="top">
@@ -3308,8 +3858,23 @@ function renderFlashcardView() {
         ` : `
           <button class="p big-btn" style="margin-top:24px" onclick="event.stopPropagation();flipCard()">🔍 Show Answer</button>
         `}
+        ${flashRes ? `
+          <a href="${flashRes.url}" target="_blank" rel="noopener noreferrer" class="res-pill"
+             style="margin-top:16px;position:relative;z-index:2"
+             onclick="event.stopPropagation();markResource('${flashRes.id}','visited')"
+             title="${esc(flashRes.desc)}">
+            📚 ${esc(flashRes.title)} · ${esc(flashRes.provider)} ↗
+          </a>
+        ` : ''}
       </div>
     </div>
+
+    ${sourceQuestion ? `
+      <div class="row" style="justify-content:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button class="sm" onclick="openQuestionEditorByUid(${esc(JSON.stringify(sourceUid))})">✏️ Edit source MCQ</button>
+        <button class="sm" style="color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionByUid(${esc(JSON.stringify(sourceUid))})">🗑 Delete source MCQ</button>
+      </div>
+    ` : (curCard.sourceMissing ? '<p class="mu sm" style="text-align:center;margin-top:8px">Source MCQ was deleted; this flashcard is kept.</p>' : '')}
 
     ${ACTIVE_FC_SHOW_BACK ? `
       <div class="card" style="margin-top:14px">
@@ -4441,6 +5006,7 @@ function navBack() {
 }
 
 function navForward() {
+  if (P < Q.length) enqueueCurrentVariantRefresh();
   if (P >= Q.length - 1) {
     const hist = sessionHistory[P];
     if (hist && (hist.locked || (MK && MK.a[byN(Q[P])?.n] !== undefined))) {
@@ -4488,13 +5054,6 @@ function show() {
   }
   const vRec = V[qk(rawQ)];
 
-  // Auto-generate fresh variant if regeneratable/calc and student previously got it right
-  if ((rawQ.regeneratable || matchQuestionFamily(rawQ)) && (R[rawQ.n] === 'c' || (vRec && vRec.stab > 1)) && !vRec?._variant && !rawQ._variant) {
-    if (matchQuestionFamily(rawQ)) {
-      generateLocalFamilyVariant(rawQ);
-    }
-  }
-
   // Session History Stack: restore exact options and answer if navigated back
   let hist = sessionHistory[P];
   if (!hist || hist.qKey !== qk(rawQ)) {
@@ -4521,7 +5080,7 @@ function show() {
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
   const curLvl = effLevel(rawQ);
-  const canRegen = !!((rawQ.regeneratable === true) || (rawQ.calc === true) || (Array.isArray(rawQ.code) && rawQ.code.length > 0) || matchQuestionFamily(rawQ) || (GEM_KEY));
+  const isRegen = effRegeneratable(rawQ);
 
   // Memory Anchor
   const mnemonicAnchor = vRec?.mnemonic ? `
@@ -4560,6 +5119,9 @@ function show() {
             <option value="2" ${curLvl === 2 ? 'selected' : ''}>L2 · Exact</option>
             <option value="3" ${curLvl === 3 ? 'selected' : ''}>L3 · Advanced</option>
           </select>
+          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isRegen ? 'background:var(--ac-bg);color:var(--ac);border-color:var(--ac)' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleRegeneratable(${rawQ.n})" title="Only marked questions receive fresh verified variants in the background">
+            ${isRegen ? '♻️ Regeneratable' : '♻️ Mark regenerate'}
+          </button>` : ''}
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
           ${isShowingVariant && activeVariant && activeVariant.verified === false ? '<span class="badge-unverified" title="Generated single-pass without blind verify">unverified</span>' : ''}
         </div>
@@ -4573,9 +5135,9 @@ function show() {
       <div class="row" style="justify-content:space-between;margin-top:4px;align-items:center">
         <span class="mu">Question ${P + 1} of ${Q.length} · Q${rawQ.n} · ${esc(rawQ.s)}</span>
         <div class="row" style="gap:6px">
-          ${canRegen ? `
-            <button class="sm" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate fresh values/scenario for this question">
-              ✨ New Numbers
+          ${!MK && isRegen ? `
+            <button class="sm" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified variant for this marked question">
+              ✨ Refresh now
             </button>
           ` : ''}
           ${hasVariant ? `
@@ -4586,12 +5148,20 @@ function show() {
           ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
           </button>` : ''}
+          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
+            ✏️ Edit
+          </button>
+          <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionByN(${rawQ.n})" title="Delete this MCQ everywhere; linked flashcards are kept">
+            🗑 Delete
+          </button>` : ''}
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
             🚩 Looks wrong
           </button>
         </div>
       </div>
     </div>
+
+    <div id="bg-gen-box" class="bg-gen-banner refresh-status" style="display:none"></div>
 
     ${subjectBannerHtml}
 
@@ -4659,6 +5229,7 @@ function show() {
     <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b> back · <b>N</b> forward · <b>S</b> don't know · <b>Enter</b> continue</p>
   `;
   typesetMath($('#app'));
+  updateVariantQueueStatus();
 
   if (isReview && !MK && recallFirst && !hist.locked) {
     recallWaiting = true;
@@ -5054,6 +5625,7 @@ function fin() {
     REC.unfixed = !REC.fix;
   }
   save();
+  enqueueCurrentVariantRefresh();
   next();
 }
 
@@ -5062,44 +5634,122 @@ function next() {
   show();
 }
 
-// Background Question Mutation Engine: Creates safe concept variants for calc/trace questions
-async function triggerBackgroundVariantUpgrades(sessionKeys) {
-  if (!GEM_KEY) return;
-  const candidates = [];
-  const seenKeys = new Set();
-
-  sessionKeys.forEach(k => {
-    const q = byN(k);
-    if (!q || seenKeys.has(qk(q))) return;
-    
-    // Safety Rule 1: ONLY rewrite calculation, code, or trace items. Factual items are NEVER rewritten.
-    const isCalcOrTrace = typeof q.regeneratable === 'boolean'
-      ? q.regeneratable
-      : (!effQuick(q) || (q.code && q.code.length > 0) || (q.t && /[CTP]/i.test(q.t)));
-    if (!isCalcOrTrace) return;
-
-    const lastAttempt = [...L].reverse().find(l => l.k === qk(q));
-    if (!lastAttempt) return;
-    if (!lastAttempt.ok) {
-      seenKeys.add(qk(q));
-      candidates.push(q);
+// Background variant refresh queue: only user-marked questions, one at a time,
+// verified commits only. Failures stay silent and keep the current question.
+function updateVariantQueueStatus(message = '') {
+  const boxes = document.querySelectorAll('#bg-gen-box');
+  if (!boxes.length) return;
+  let text = message;
+  if (!text) {
+    const pending = bgGenQueue.length + (genInProgress ? 1 : 0);
+    if (pending) {
+      text = `✨ Refreshing marked variants in background: ${pending} queued · ${variantRefreshDone} refreshed · ${variantRefreshSkipped} skipped`;
+    } else if (variantRefreshDone || variantRefreshSkipped) {
+      text = `✨ Variant refresh: ${variantRefreshDone} refreshed · ${variantRefreshSkipped} skipped`;
     }
+  }
+  boxes.forEach(box => {
+    if (!text) { box.style.display = 'none'; box.textContent = ''; return; }
+    box.style.display = 'flex';
+    box.textContent = text;
   });
+}
 
-  if (!candidates.length) return;
-  const topCandidates = candidates.slice(0, 3); // Stagger up to 3 calc concepts per set
+function enqueueVariantRefresh(q, opts = {}) {
+  if (!q || !GEM_KEY || MK) return false;
+  if (!effRegeneratable(q) || isQuestionDeleted(q)) return false;
+  const uid = ensureQuestionUid(q);
+  if (variantRefreshTouched.has(uid) || variantRefreshCurrentKey === uid || bgGenQueue.some(job => job.key === uid)) return false;
+  if (variantRefreshSessionCount + bgGenQueue.length >= VARIANT_REFRESH_SESSION_CAP) return false;
+  bgGenQueue.push({
+    key: uid,
+    q: Object.assign({}, q),
+    priority: opts.priority ? 1 : 0,
+    queuedAt: Date.now()
+  });
+  bgGenQueue.sort((a, b) => (b.priority - a.priority) || (a.queuedAt - b.queuedAt));
+  variantRefreshTouched.add(uid);
+  updateVariantQueueStatus();
+  drainVariantQueue();
+  return true;
+}
 
-  const bgBox = $('#bg-gen-box');
-  if (bgBox) {
-    bgBox.style.display = 'flex';
-    bgBox.innerHTML = `<span>✨ Background: Generating verified math/trace variants with dual-blind validation for ${topCandidates.length} question(s)...</span>`;
+function enqueueEligibleVariantRefresh(sessionKeys) {
+  if (!GEM_KEY) return 0;
+  let added = 0;
+  (sessionKeys || []).forEach(key => {
+    const q = byN(key);
+    if (q && effRegeneratable(q) && enqueueVariantRefresh(q)) added++;
+  });
+  return added;
+}
+
+function enqueueCurrentVariantRefresh() {
+  if (!CURRENT_Q || P >= Q.length) return;
+  const rawQ = CURRENT_Q.origQ || byN(Q[P]);
+  if (rawQ) enqueueVariantRefresh(rawQ, { priority: true });
+}
+
+async function drainVariantQueue() {
+  if (genInProgress || !bgGenQueue.length) {
+    updateVariantQueueStatus();
+    return;
+  }
+  if (MK) {
+    updateVariantQueueStatus('✨ Variant refresh paused during the timed mock.');
+    return;
+  }
+  if (!GEM_KEY) {
+    bgGenQueue = [];
+    updateVariantQueueStatus('✨ Variant refresh paused: add a Gemini API key in Settings.');
+    return;
+  }
+  if (variantRefreshSessionCount >= VARIANT_REFRESH_SESSION_CAP) {
+    bgGenQueue = [];
+    updateVariantQueueStatus(`✨ Variant refresh paused at the ${VARIANT_REFRESH_SESSION_CAP}-question session cap.`);
+    return;
+  }
+  if (getDailyApiCount() + 2 > DAILY_API_LIMIT) {
+    bgGenQueue = [];
+    updateVariantQueueStatus('✨ Variant refresh paused at today’s API limit.');
+    return;
   }
 
-  topCandidates.forEach((q, idx) => {
-    setTimeout(() => {
-      rewriteQuestionWithGemini(q);
-    }, idx * 4000);
-  });
+  const job = bgGenQueue.shift();
+  genInProgress = true;
+  variantRefreshCurrentKey = job.key;
+  variantRefreshSessionCount++;
+  updateVariantQueueStatus();
+
+  try {
+    const current = findQuestionByUid(job.key) || job.q;
+    if (!current || isQuestionDeleted(current) || !effRegeneratable(current)) {
+      variantRefreshSkipped++;
+    } else {
+      await rewriteQuestionWithGemini(current, { background: true });
+      variantRefreshDone++;
+    }
+  } catch (err) {
+    if (err && err.code === 'mock-paused') {
+      bgGenQueue.unshift(job);
+      variantRefreshTouched.delete(job.key);
+      variantRefreshSessionCount = Math.max(0, variantRefreshSessionCount - 1);
+    } else {
+      variantRefreshSkipped++;
+      console.warn('Background variant refresh skipped:', err && err.message ? err.message : err);
+    }
+  } finally {
+    genInProgress = false;
+    variantRefreshCurrentKey = '';
+    save();
+    updateVariantQueueStatus();
+    if (bgGenQueue.length && !MK) setTimeout(drainVariantQueue, 350);
+  }
+}
+
+// Kept as a compatibility alias for older call sites.
+function triggerBackgroundVariantUpgrades(sessionKeys) {
+  return enqueueEligibleVariantRefresh(sessionKeys);
 }
 
 // Safe JSON extractor that handles markdown code fences, conversational preambles, and unescaped characters
@@ -5242,7 +5892,15 @@ async function fillExplanationsWithGemini() {
   }
 }
 
-async function rewriteQuestionWithGemini(targetQ) {
+function normalizeVariantAnswer(raw) {
+  if (typeof raw === 'number' && raw >= 0 && raw < 4) return raw;
+  const text = String(raw == null ? '' : raw).trim().toUpperCase();
+  if (/^[0-3]$/.test(text)) return parseInt(text, 10);
+  if (/^[A-D]$/.test(text)) return 'ABCD'.indexOf(text);
+  return -1;
+}
+
+async function rewriteQuestionWithGemini(targetQ, opts = {}) {
   if (!GEM_KEY) return Promise.reject(new Error('No API key'));
   try {
     const k = qk(targetQ);
@@ -5260,72 +5918,73 @@ async function rewriteQuestionWithGemini(targetQ) {
       avoid: pastValues
     };
 
-    // Prompt B & C from gemini_prompts.md
-    const promptB = 'You are an expert STEM exam writer. Create ONE new MCQ testing the SAME concept and reasoning as the source question. Change the numbers/values AND the scenario. Rules: 1. Same type, same level, one fact or small step. 2. Solve it step by step yourself first in "working". 3. Each wrong option is a specific slip named in "slips". 4. Four options within ~20% of same length. The correct option must not be the longest. 5. Avoid degenerate values (0, 1, equal numbers) and a key that appears in the stem. 6. Do not reuse any numbers in "avoid". Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
+    const promptB = 'You are an expert exam writer. Create ONE new MCQ testing the SAME concept, skill, and reasoning as the source question. If the source is calculation/trace/code, change the numbers/values AND the scenario. If the source is factual, definitional, or programming-concept based, keep the same tested fact but vary the wording, example, or code context. Rules: 1. Same topic and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers) and do not reuse numbers from "avoid". 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
 
-    // Primary call uses GEM_GEN_MODEL (default gemini-3.8-flash) with fallback to gemini-2.0-flash-lite
     const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
-    if (!v.stem || !Array.isArray(v.options) || v.options.length !== 4 || typeof v.answer !== 'number') return;
-
-    // App-side check: reject if correct option is the longest option by >30%
-    const correctOpt = v.options[v.answer];
-    const lens = v.options.map(o => String(o).length);
-    const maxLen = Math.max(...lens);
-    if (String(correctOpt).length === maxLen && maxLen > Math.min(...lens) * 1.5) {
-      console.warn('[AI Variant Discarded] Correct option is excessively long giveaway.');
-      return;
+    const generatedOptions = Array.isArray(v.options)
+      ? v.options.slice()
+      : (v.options && typeof v.options === 'object'
+        ? ['A', 'B', 'C', 'D'].map(key => v.options[key] != null ? v.options[key] : v.options[key.toLowerCase()])
+        : null);
+    const generatedAnswer = normalizeVariantAnswer(v.answer);
+    if (!v.stem || !generatedOptions || generatedOptions.length !== 4 ||
+        generatedOptions.some(option => option == null || String(option).trim() === '') ||
+        generatedAnswer < 0) {
+      throw new Error('Gemini returned an invalid variant shape.');
     }
 
-    // Step 2: Dual Blind Second Solve Validation
-    const blindPrompt = 'Solve this multiple choice question step by step without bias. Identify the single correct option index (0 for first, 1 for second, 2 for third, 3 for fourth). Return ONLY valid JSON: {"answer":0,"why":"string"}';
-    let isVerified = false;
-    try {
-      const genUsed = (genResult && genResult.modelUsed) ? genResult.modelUsed : (GEM_GEN_MODEL||'');
-      const verifyPref = (String(genUsed).includes('lite')) ? (GEM_FALLBACK_MODEL || 'gemini-2.5-flash-lite') : (GEM_VERIFY_MODEL || GEM_GEN_MODEL);
-      const blindResultRaw = await fetchGeminiWithFallback(
-        blindPrompt + '\n\nQuestion to solve:\n' + JSON.stringify({ stem: v.stem, code: v.code || [], options: v.options }),
-        0.2,
-        verifyPref,
-        15000,
-        true
-      );
-      const blindResult = extractJson(blindResultRaw.text);
-      if (blindResult.answer === v.answer) {
-        isVerified = true;
-      } else {
-        console.warn(`[AI Variant Blind Mismatch] Gen=${v.answer}, Verify=${blindResult.answer}`);
-        throw new Error('Blind verification mismatch');
+    const blindPrompt = 'Solve this multiple choice question step by step without bias. Identify the single correct option index (0 for first, 1 for second, 2 for third, 3 for fourth; A-D is also accepted). Return ONLY valid JSON: {"answer":0,"why":"string"}';
+    const genUsed = (genResult && genResult.modelUsed) ? genResult.modelUsed : (GEM_GEN_MODEL || '');
+    const verifyPref = (String(genUsed).includes('lite')) ? (GEM_FALLBACK_MODEL || 'gemini-2.5-flash-lite') : (GEM_VERIFY_MODEL || GEM_GEN_MODEL);
+    const blindResultRaw = await fetchGeminiWithFallback(
+      blindPrompt + '\n\nQuestion to solve:\n' + JSON.stringify({ stem: v.stem, code: v.code || [], options: generatedOptions }),
+      0.2,
+      verifyPref,
+      15000,
+      true
+    );
+    const blindResult = extractJson(blindResultRaw.text);
+    const verifiedAnswer = normalizeVariantAnswer(blindResult.answer);
+    if (verifiedAnswer !== generatedAnswer) {
+      throw new Error(`Blind verification mismatch (generated ${generatedAnswer}, verifier ${blindResult.answer}).`);
+    }
+
+    const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+    const randomizedOpts = origIndices.map(idx => generatedOptions[idx]);
+    const newAnswerIdx = origIndices.indexOf(generatedAnswer);
+
+    if (opts.background && (isQuestionDeleted(targetQ) || !effRegeneratable(targetQ))) {
+      throw new Error('Question is no longer eligible for background refresh.');
+    }
+    if (opts.background && MK) {
+      const paused = new Error('Background refresh paused during timed mock.');
+      paused.code = 'mock-paused';
+      throw paused;
+    }
+
+    vRec._pastValues = [...pastValues.slice(-6), String(v.stem).slice(0, 30)];
+    vRec._variant = {
+      q: String(v.stem),
+      o: randomizedOpts.map(String),
+      a: newAnswerIdx,
+      e: v.why || v.working || targetQ.e || '',
+      code: Array.isArray(v.code) ? v.code.map(String) : [],
+      verified: true,
+      modelUsed: genResult.modelUsed,
+      date: Date.now()
+    };
+    vRec._useOriginal = false;
+    save();
+
+    if (!opts.background) {
+      const bgBox = $('#bg-gen-box');
+      if (bgBox) {
+        bgBox.style.display = 'flex';
+        bgBox.textContent = `✓ Q${targetQ.n != null ? targetQ.n : ''} (${targetQ.s}): Variant generated via ${genResult.modelUsed} (verified).`;
       }
-    } catch (verErr) {
-      console.warn('Blind verification call error:', verErr);
-      throw verErr;
     }
-
-      // App-side randomization of key position
-      const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
-      const randomizedOpts = origIndices.map(idx => v.options[idx]);
-      const newAnswerIdx = origIndices.indexOf(v.answer);
-
-      vRec._pastValues = [...pastValues.slice(-6), String(v.stem).slice(0, 30)];
-      vRec._variant = {
-        q: String(v.stem),
-        o: randomizedOpts.map(String),
-        a: newAnswerIdx,
-        e: v.why || v.working || targetQ.e || '',
-        code: Array.isArray(v.code) ? v.code.map(String) : [],
-        verified: isVerified,
-        modelUsed: genResult.modelUsed,
-        date: Date.now()
-      };
-      vRec._useOriginal = false;
-      save();
-
-    const bgBox = $('#bg-gen-box');
-    if (bgBox) {
-      bgBox.style.display = 'flex';
-      bgBox.innerHTML = `<span>✓ Q${targetQ.n} (${esc(targetQ.s)}): Variant generated via ${esc(genResult.modelUsed)} ${isVerified ? '(verified)' : '(unverified)'}.</span>`;
-    }
+    return vRec._variant;
   } catch (err) {
     console.warn('AI variant generation error:', err);
     throw err;
@@ -5534,8 +6193,9 @@ function done() {
     </div>
   `;
 
-  // Trigger background AI upgrades for weak/slow questions
-  triggerBackgroundVariantUpgrades(Q);
+  // Refresh only questions the user explicitly marked as regeneratable.
+  enqueueEligibleVariantRefresh(Q);
+  updateVariantQueueStatus();
   if (GEM_KEY) fillExplanationsWithGemini();
 }
 
@@ -5723,6 +6383,7 @@ function mockEnd() {
   clearInterval(TI);
   if (!MK) return;
   const isDiag = !!MK.isDiagnostic;
+  const refreshKeys = Q.slice();
   localStorage.removeItem('bitmcq_mock_state');
 
   const sub = {}, bad = [], n = Q.length;
@@ -5778,6 +6439,7 @@ function mockEnd() {
         <tr><th>Subject</th><th>Score</th><th>Accuracy</th></tr>
         ${Object.entries(sub).map(([s, x]) => `<tr><td>${esc(s)}</td><td>${x[0]}/${x[1]}</td><td>${Math.round(x[0] / x[1] * 100) || 0}%</td></tr>`).join('')}
       </table>
+      <div id="bg-gen-box" class="bg-gen-banner refresh-status" style="display:none"></div>
       <p class="row" style="margin-top:16px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
     </div>
     <div class="card">
@@ -5792,11 +6454,15 @@ function mockEnd() {
       `).join('') || '<p class="c-ok">Perfect score! No misses.</p>'}
     </div>
   `;
+  enqueueEligibleVariantRefresh(refreshKeys);
+  updateVariantQueueStatus();
+  if (bgGenQueue.length) setTimeout(drainVariantQueue, 0);
 }
 
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (document.getElementById('q-editor-overlay')) return;
   if (view !== 'q' || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
 
@@ -5881,6 +6547,12 @@ function bankQuestionKey(q) {
 
 function importBank(x, defaultName, replaceExisting = false) {
   const r = parseBank(x);
+  r.qs = r.qs
+    .filter(q => q && !isQuestionDeleted(q))
+    .map(q => {
+      ensureQuestionUid(q);
+      return applyQuestionOverride(q);
+    });
   const requestedName = x.name || x.title || defaultName || '';
   let bank = requestedName
     ? BANKS.find(item => String(item.name || '').trim().toLowerCase() === String(requestedName).trim().toLowerCase())
@@ -5918,6 +6590,8 @@ function importBank(x, defaultName, replaceExisting = false) {
     });
   }
   bank.name = name;
+  bank.q = bank.q.filter(q => q && !isQuestionDeleted(q));
+  bank.q.forEach(q => { ensureQuestionUid(q); applyQuestionOverride(q); });
   bank.sets = genSets(bank.q);
 
   if (SETBANK === bank.id && SETI >= 0 && D && view !== 'q') {
@@ -5932,6 +6606,7 @@ function importBank(x, defaultName, replaceExisting = false) {
     });
     R = nextR; W = nextW; Q = []; QRESULTS = []; P = 0;
   }
+  syncFlashcardSourceLinks();
   return bank;
 }
 
@@ -5966,8 +6641,16 @@ function loadSet(bankId, k, startFresh = false) {
   if (D && Object.keys(R).length) { A.push(compact()); S = A.length + 1; }
   else S = A.length + 1;
   SETBANK = bankId; SETI = k;
-  D = bank.sets[k].map((ix, j) => ({ n: j + 1, ...bank.q[ix] }));
+  D = bank.sets[k]
+    .map(ix => bank.q[ix])
+    .filter(q => q && !isQuestionDeleted(q))
+    .map((q, j) => {
+      ensureQuestionUid(q);
+      applyQuestionOverride(q);
+      return { n: j + 1, ...q };
+    });
   R = {}; W = {}; Q = []; QRESULTS = []; P = 0; loadMode = 0; impMode = 0;
+  syncFlashcardSourceLinks();
   save();
   if (startFresh) start(D.map(q => q.n));
   else home();
@@ -6001,8 +6684,8 @@ function compact() {
     subj,
     ...(SETBANK !== null && SETI >= 0 ? { bankId: SETBANK, bi: SETI } : {}),
     errs: D.filter(q => R[q.n] === 'w' || R[q.n] === 's').map(q => ({
-      n: q.n, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e, p: W[q.n] ?? -1, r: R[q.n], fx: 0,
-      quick: effQuick(q), level: effLevel(q), _orig: q._orig
+      n: q.n, id: q.id, _sid: q._sid, u: q.u, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e,
+      p: W[q.n] ?? -1, r: R[q.n], fx: 0, quick: effQuick(q), level: effLevel(q), _orig: q._orig
     }))
   };
 }
@@ -6019,6 +6702,10 @@ function retake() {
 
 function start(q) {
   REV = null; RA.clear(); sessionLeechCount = 0;
+  variantRefreshDone = 0;
+  variantRefreshSkipped = 0;
+  variantRefreshSessionCount = 0;
+  variantRefreshTouched = new Set();
   Q = MK ? q : groupQuestionBlocks(q); P = 0;
   QRESULTS = Array(Q.length).fill(null);
   sessionHistory = [];
@@ -6367,7 +7054,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, recallFirst, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, recallFirst, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
   apply: (s, opts = {}) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const currentView = typeof view !== 'undefined' ? view : 'home';
@@ -6389,6 +7076,8 @@ window.AppState = {
     gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
     todayMins = typeof s.todayMins === 'number' ? s.todayMins : 15;
     QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
+    QEDITS = (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {};
+    QDELETED = (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {};
     recallFirst = s.recallFirst !== false;
     CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
     CARD_TOMBSTONES = (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {};
@@ -6411,6 +7100,7 @@ window.AppState = {
         }
       }
     });
+    applyQuestionOverridesEverywhere();
     save();
     if (window.CloudSync) CloudSync.refreshUI();
     if (opts && opts.silent) return;
