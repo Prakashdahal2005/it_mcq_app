@@ -25,8 +25,29 @@
     dirty: false,
     busy: false,
     suppress: false,
-    timer: null
+    timer: null,
+    initialSettled: false,
+    initialWaiters: []
   };
+
+  function settleInitialSync() {
+    if (state.initialSettled) return;
+    state.initialSettled = true;
+    var waiters = state.initialWaiters.splice(0);
+    waiters.forEach(function (fn) {
+      try { fn(); } catch (e) { console.warn('Initial sync callback failed:', e); }
+    });
+  }
+
+  function whenInitialSyncSettled(cb) {
+    if (typeof cb !== 'function') return;
+    if (state.initialSettled) {
+      setTimeout(cb, 0);
+      return;
+    }
+    state.initialWaiters.push(cb);
+    setTimeout(settleInitialSync, 5000);
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -134,7 +155,6 @@
       QOV: (s.QOV && typeof s.QOV === 'object' && !Array.isArray(s.QOV)) ? s.QOV : {},
       QEDITS: (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {},
       QDELETED: (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {},
-      recallFirst: s.recallFirst !== false,
       CARDS: Array.isArray(s.CARDS) ? s.CARDS : [],
       CARD_TOMBSTONES: (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {},
       RESOURCE_MARKS: (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : {},
@@ -142,6 +162,7 @@
       DIAGNOSTIC_DONE: !!s.DIAGNOSTIC_DONE,
       QUIET_MODE: !!s.QUIET_MODE,
       PB_MOCK_SCORE: typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : 0,
+      WEEKLY_MOCK: (s.WEEKLY_MOCK && typeof s.WEEKLY_MOCK === 'object' && !Array.isArray(s.WEEKLY_MOCK)) ? s.WEEKLY_MOCK : {},
       COLD_QS: (s.COLD_QS && typeof s.COLD_QS === 'object' && !Array.isArray(s.COLD_QS)) ? s.COLD_QS : {},
       schemaVer: typeof s.schemaVer === 'number' ? s.schemaVer : 1
     };
@@ -443,6 +464,27 @@
     return out;
   }
 
+  function mergeWeeklyMock(a, b) {
+    a = a || {};
+    b = b || {};
+    var out = {};
+    var aDone = Number(a.lastCompletedAt) || 0;
+    var bDone = Number(b.lastCompletedAt) || 0;
+    if (aDone || bDone) {
+      var doneLatest = aDone >= bDone ? a : b;
+      out.lastCompletedWeek = doneLatest.lastCompletedWeek || '';
+      out.lastCompletedAt = Math.max(aDone, bDone);
+    }
+    var aStart = Number(a.startedAt) || 0;
+    var bStart = Number(b.startedAt) || 0;
+    if (aStart || bStart) {
+      var startLatest = aStart >= bStart ? a : b;
+      out.startedWeek = startLatest.startedWeek || '';
+      out.startedAt = Math.max(aStart, bStart);
+    }
+    return out;
+  }
+
   function mergeAppStates(local, remote, genSets, options) {
     options = options || {};
     var conflicts = [];
@@ -562,7 +604,6 @@
       QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
       QEDITS: mergeQuestionEdits(local.QEDITS, remote.QEDITS),
       QDELETED: mergeQuestionDeletes(local.QDELETED, remote.QDELETED),
-      recallFirst: active.recallFirst !== false,
       CARDS: mergeCards(local.CARDS, remote.CARDS, cardTombstones),
       CARD_TOMBSTONES: cardTombstones,
       COLD_QS: mergeColdQs(local.COLD_QS, remote.COLD_QS),
@@ -571,6 +612,7 @@
       DIAGNOSTIC_DONE: !!(local.DIAGNOSTIC_DONE || remote.DIAGNOSTIC_DONE),
       QUIET_MODE: local.QUIET_MODE !== undefined ? !!local.QUIET_MODE : !!remote.QUIET_MODE,
       PB_MOCK_SCORE: Math.max(local.PB_MOCK_SCORE || 0, remote.PB_MOCK_SCORE || 0),
+      WEEKLY_MOCK: mergeWeeklyMock(local.WEEKLY_MOCK, remote.WEEKLY_MOCK),
       schemaVer: Math.max(local.schemaVer || 1, remote.schemaVer || 1)
     };
     return { appState: merged, conflicts: conflicts };
@@ -660,6 +702,7 @@
     opts = opts || {};
     if (!navigator.onLine) {
       setStatus('offline', 'Offline. Changes will sync when connection returns.');
+      settleInitialSync();
       return;
     }
     if (state.busy) return;
@@ -766,6 +809,7 @@
           state.busy = false;
           refreshUI();
         }
+        settleInitialSync();
       }
     }
   }
@@ -823,6 +867,7 @@
       }, 1200);
     } else {
       setStatus('offline', 'Offline mode');
+      settleInitialSync();
     }
   }
 
@@ -977,6 +1022,8 @@
   // Public Interface
   window.CloudSync = {
     init: init,
+    whenInitialSyncSettled: whenInitialSyncSettled,
+    isInitialSyncSettled: function () { return state.initialSettled; },
     onLocalSave: onLocalSave,
     settingsHTML: settingsHTML,
     refreshUI: refreshUI,

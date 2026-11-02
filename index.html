@@ -805,6 +805,27 @@ const $ = s => document.querySelector(s);
 const KEY = 'bitmcq1';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+function showToast(msg, type) {
+  let host = document.getElementById('toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'toast-host';
+    host.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:92vw';
+    document.body.appendChild(host);
+  }
+  const el = document.createElement('div');
+  const color = type === 'error' ? '#ef4444' : (type === 'warn' ? '#f59e0b' : '#10b981');
+  el.style.cssText = `background:#111827;color:#fff;border:1px solid ${color};border-left:4px solid ${color};padding:9px 14px;border-radius:8px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .15s,transform .15s;transform:translateY(6px);pointer-events:auto`;
+  el.textContent = String(msg || '');
+  host.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(6px)';
+    setTimeout(() => el.remove(), 200);
+  }, 3200);
+}
+
 function typesetMath(element) {
   const mathJax = window.MathJax;
   if (!element || !mathJax || typeof mathJax.typesetPromise !== 'function') return;
@@ -833,6 +854,8 @@ try {
 
 // Core State
 let D = null, R = {}, W = {}, Q = [], QRESULTS = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, REC = null, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
+let MOCK_D = [];
+let WEEKLY_MOCK = {};
 let sessionHistory = [];
 let EXAM_DATE = '';
 let lastBackup = 0;
@@ -877,9 +900,11 @@ let DRILL_SUBJECT = '';
 let ACTIVE_FC_INDEX = 0;
 let ACTIVE_FC_SESSION_IDS = [];
 let ACTIVE_FC_SHOW_BACK = false;
+let ACTIVE_FC_RATED = new Set();
+let FC_SESSION_TOTAL = 0;
 let sessionLeechCount = 0;
 let recallWaiting = false;
-let recallFirst = true;
+  let recallFirst = true; // kept for compatibility, always session-scoped
 let CURRENT_Q = null;
 let defaultBankLoading = false;
 let defaultBankLoadError = '';
@@ -895,12 +920,12 @@ let variantRefreshCurrentKey = '';
 const VARIANT_REFRESH_SESSION_CAP = 20;
 
 function getDailyApiCount() {
-  const dayKey = 'bitmcq_api_calls_' + new Date().toISOString().slice(0, 10);
+  const dayKey = 'bitmcq_api_calls_' + localDateKey();
   return parseInt(localStorage.getItem(dayKey) || '0', 10);
 }
 
 function recordApiCall() {
-  const dayKey = 'bitmcq_api_calls_' + new Date().toISOString().slice(0, 10);
+  const dayKey = 'bitmcq_api_calls_' + localDateKey();
   const cur = getDailyApiCount();
   localStorage.setItem(dayKey, String(cur + 1));
 }
@@ -909,8 +934,8 @@ function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
-      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, recallFirst,
-      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS
+      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
+      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK
     }));
     localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
     localStorage.setItem('bitmcq_rmarks', JSON.stringify(RESOURCE_MARKS));
@@ -981,7 +1006,7 @@ function load() {
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
       QEDITS = (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {};
       QDELETED = (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {};
-      recallFirst = s.recallFirst !== false;
+      recallFirst = true;
       CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
       CARD_TOMBSTONES = (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {};
       pruneCardTombstones();
@@ -991,6 +1016,7 @@ function load() {
       DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE || localStorage.getItem('bitmcq_diag_done') === '1';
       QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
       PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+      WEEKLY_MOCK = (s.WEEKLY_MOCK && typeof s.WEEKLY_MOCK === 'object') ? s.WEEKLY_MOCK : {};
       COLD_QS = (s.COLD_QS && typeof s.COLD_QS === 'object') ? s.COLD_QS : {};
       if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
       try {
@@ -1908,6 +1934,7 @@ function updateQuestionCopies(uid, patch) {
   };
   (D || []).forEach(apply);
   (DRILL_D || []).forEach(apply);
+  (MOCK_D || []).forEach(apply);
   (BANKS || []).forEach(b => (b && Array.isArray(b.q) ? b.q : []).forEach(apply));
   (A || []).forEach(a => (a && Array.isArray(a.errs) ? a.errs : []).forEach(apply));
   if (CURRENT_Q && CURRENT_Q.origQ && questionUid(CURRENT_Q.origQ) === uid) {
@@ -1920,6 +1947,7 @@ function findQuestionByUid(uid) {
   const pools = [
     D || [],
     DRILL_D || [],
+    MOCK_D || [],
     ...(BANKS || []).map(b => (b && Array.isArray(b.q) ? b.q : [])),
     ...(A || []).map(a => (a && Array.isArray(a.errs) ? a.errs : []))
   ];
@@ -1928,6 +1956,50 @@ function findQuestionByUid(uid) {
     if (found) return found;
   }
   return null;
+}
+
+function findQuestionByRecord(rec) {
+  if (!rec || typeof rec !== 'object') return null;
+  if (rec.uid) {
+    const byUid = findQuestionByUid(rec.uid);
+    if (byUid) return byUid;
+  }
+  if (rec.qid) {
+    const byQid = findQuestionByUid(rec.qid);
+    if (byQid) return byQid;
+  }
+  if (rec.k != null) {
+    const byKey = byN(rec.k);
+    if (byKey) return byKey;
+  }
+  return null;
+}
+
+function recordIdentity(rec) {
+  if (!rec || typeof rec !== 'object') return '';
+  return rec.uid || rec.qid || rec.k || '';
+}
+
+function questionLevelValue(q) {
+  if (!q) return 1;
+  if (typeof q.lvl === 'number') return q.lvl;
+  if (typeof q.level === 'number') return q.level;
+  return 1;
+}
+
+function recordLevelValue(rec) {
+  if (!rec || typeof rec !== 'object') return 1;
+  if (typeof rec.lvl === 'number') return rec.lvl;
+  const q = findQuestionByRecord(rec);
+  return q ? effLevel(q) : 1;
+}
+
+function recordPointValue(rec) {
+  if (!rec || rec.ok !== true) return 0;
+  if (rec.cf === 1) return 0;
+  if (rec.cf === 2) return 0.5;
+  if (rec.cf === 3) return 1;
+  return 0.5;
 }
 
 function pruneSessionQuestions() {
@@ -2264,7 +2336,19 @@ function canonSubj(s) {
   return str;
 }
 const cl = s => canonSubj(s);
-const today = () => Math.floor(Date.now() / 864e5);
+const DAY_MS = 86400000;
+const localDateKey = (ts = Date.now()) => {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const localDayIndex = (ts = Date.now()) => {
+  const d = new Date(ts);
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+};
+const today = () => localDayIndex(Date.now());
 const hl = s => String(s).replace(/\b(NOT|EXCEPT|FALSE|INCORRECT|ALWAYS|ONLY|NEVER)\b/g, '<mark>$1</mark>');
 
 function getDaysLeft() {
@@ -2294,7 +2378,8 @@ function getMaxInterval() {
 }
 
 function isLockedIn(q) {
-  const v = V[qk(q)];
+  const key = typeof q === 'string' ? q : qk(q);
+  const v = V[key];
   if (!v || !Array.isArray(v.history) || v.history.length < 2) return false;
   const correctHits = [];
   for (const h of v.history) {
@@ -2370,7 +2455,7 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
     }
     // Track dates of misses for stuck-concept trigger (3 misses across >=2 days)
     if (!Array.isArray(v.missDates)) v.missDates = [];
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localDateKey();
     if (!v.missDates.includes(todayStr)) v.missDates.push(todayStr);
     if (v.missCount >= 3) {
       v.leech = true;
@@ -2425,15 +2510,51 @@ function dueKeys(quickOnly = false) {
   return dueItems.map(item => item.n);
 }
 
+function findQuestionByRawKey(key) {
+  if (key == null) return null;
+  const raw = String(key);
+  const byUid = raw.startsWith('qk:') || raw.startsWith('id:') || raw.startsWith('sid:');
+  const pools = [
+    D || [],
+    DRILL_D || [],
+    ...(BANKS || []).map(b => (b && Array.isArray(b.q) ? b.q : [])),
+    ...(A || []).map(a => (a && Array.isArray(a.errs) ? a.errs : []))
+  ];
+  for (const pool of pools) {
+    for (const q of pool) {
+      if (!q || typeof q !== 'object') continue;
+      if (byUid) {
+        if (questionUid(q) === raw) return q;
+      } else if (qk(q) === raw) {
+        return q;
+      }
+    }
+  }
+  return null;
+}
+
 const byN = k => {
   if (k == null) return null;
   let q = null;
   if (typeof k === 'string') {
     if (k.startsWith('v:')) return gemVars[+k.slice(2)] || null;
-    const [a, i] = k.split(':');
-    q = (A[a] && A[a].errs && A[a].errs[i]) ? { ...A[a].errs[i], _k: k } : null;
+    if (/^\d+:\d+$/.test(k)) {
+      const [a, i] = k.split(':');
+      q = (A[a] && A[a].errs && A[a].errs[i]) ? { ...A[a].errs[i], _k: k } : null;
+    } else if (/^\d+$/.test(k)) {
+      const n = Number(k);
+      if (typeof MK !== 'undefined' && MK && Array.isArray(MOCK_D)) {
+        q = MOCK_D.find(item => item && item.n === n) || null;
+      }
+      q = q || (D || []).find(item => item && item.n === n) || (DRILL_D || []).find(item => item && item.n === n) || null;
+    } else {
+      q = findQuestionByRawKey(k);
+    }
   } else {
-    q = (D || []).find(item => item && item.n === k) || (DRILL_D || []).find(item => item && item.n === k) || null;
+    if (typeof MK !== 'undefined' && MK && Array.isArray(MOCK_D)) {
+      q = MOCK_D.find(item => item && item.n === k) || null;
+    }
+    q = q || (D || []).find(item => item && item.n === k) || (DRILL_D || []).find(item => item && item.n === k) || null;
   }
   if (!q) return null;
   ensureQuestionUid(q);
@@ -2480,7 +2601,7 @@ function stats() {
 }
 
 function streak() {
-  const d = new Set(L.map(r => Math.floor(r.t / 864e5)));
+  const d = new Set(L.map(r => localDayIndex(r.t)));
   let n = 0, t = today();
   if (!d.has(t)) t--;
   while (d.has(t)) { n++; t--; }
@@ -3145,10 +3266,25 @@ function saveQuestionEditor() {
       QOV[newQk] = Object.assign({}, QOV[oldQk], QOV[newQk] || {});
       delete QOV[oldQk];
     }
-    for (let i = 0; i < sessionHistory.length; i++) {
-      if (sessionHistory[i] && sessionHistory[i].qKey === oldQk) sessionHistory[i] = null;
-    }
   }
+  if (V[newQk]) {
+    delete V[newQk]._variant;
+    delete V[newQk]._pastValues;
+    delete V[newQk]._useOriginal;
+  }
+  delete target._variant;
+  delete target._pastValues;
+  delete target._useOriginal;
+  if (QOV[newQk] && typeof QOV[newQk] === 'object') {
+    delete QOV[newQk]._useOriginal;
+  }
+  for (let i = 0; i < sessionHistory.length; i++) {
+    if (sessionHistory[i] && (sessionHistory[i].qKey === oldQk || sessionHistory[i].qKey === newQk)) sessionHistory[i] = null;
+  }
+  bgGenQueue = (bgGenQueue || []).filter(job => job && job.key !== stableUid && job.key !== oldQk && job.key !== newQk);
+  variantRefreshTouched.delete(stableUid);
+  variantRefreshTouched.delete(oldQk);
+  variantRefreshTouched.delete(newQk);
   (L || []).forEach(rec => {
     if (rec && (rec.k === oldQk || rec.k === newQk)) {
       rec.k = newQk;
@@ -3520,20 +3656,20 @@ function conceptCardHtml(data) {
 
 function saveConceptCard(rawQ, data, opts = {}) {
   if (!rawQ || !data) return { card: null };
-  const todayDate = new Date().toISOString().slice(0, 10);
+  const todayDate = localDateKey();
   const conceptKey = conceptKeyFor(rawQ.s, data.concept);
   const sourceQk = qk(rawQ);
   let existing = null;
   if (opts.replaceId) existing = (CARDS || []).find(c => c.id === opts.replaceId) || null;
   if (!existing && !opts.allowDuplicate) existing = (CARDS || []).find(c => c.conceptKey === conceptKey && !c.grad) || null;
   if (existing && !opts.replaceId) return { card: existing, duplicate: true };
-  if (!existing) {
-    const createdToday = (CARDS || []).filter(c => c.createdDate === todayDate).length;
-    if (createdToday >= 20) return { card: null, limit: true };
-  }
 
   const html = conceptCardHtml(data);
   const now = Date.now();
+  const frontText = String(data.front || '').trim();
+  const backText = String(data.back || '').trim();
+  const trap = String(data.trap || '').trim();
+  const memoryHook = String(data.memoryHook || '').trim();
   const card = existing || {
     id: 'fc_' + now + '_' + Math.random().toString(36).slice(2, 7),
     qk: sourceQk,
@@ -3544,6 +3680,10 @@ function saveConceptCard(rawQ, data, opts = {}) {
     concept: String(data.concept || '').trim(),
     conceptKey,
     origin: data.origin || 'local',
+    frontText,
+    backText,
+    trap,
+    memoryHook,
     front: html.front,
     back: html.back,
     stab: 1.0,
@@ -3566,6 +3706,10 @@ function saveConceptCard(rawQ, data, opts = {}) {
     existing.concept = String(data.concept || '').trim();
     existing.conceptKey = conceptKey;
     existing.origin = data.origin || 'local';
+    existing.frontText = frontText;
+    existing.backText = backText;
+    existing.trap = trap;
+    existing.memoryHook = memoryHook;
     existing.front = html.front;
     existing.back = html.back;
     existing.convertedAt = now;
@@ -3584,6 +3728,114 @@ function findSourceQuestionForCard(card) {
   return pool.find(q => keys.includes(qk(q))) || null;
 }
 
+async function generateFreeformFlashcards(promptText, subject, count) {
+  const topic = String(promptText || '').trim();
+  if (!topic) throw new Error('Enter a topic or prompt first.');
+  if (!GEM_KEY) throw new Error('AI generation needs an API key in Settings.');
+  if (getDailyApiCount() >= DAILY_API_LIMIT) throw new Error('Daily API limit reached. Try again tomorrow.');
+  const n = Math.max(1, Math.min(12, parseInt(count, 10) || 5));
+  const subj = canonSubj(subject || 'General');
+  const prompt = `You create active-recall flashcards for a BSc CSIT student preparing for the MIT entrance exam.
+
+Topic or request: ${topic}
+Subject: ${subj}
+Create exactly ${n} cards. Each card must test ONE idea, not trivia.
+Rules:
+1. "concept" is a short label for the idea.
+2. "front" asks the student to explain, compare, or apply the idea. Do not use multiple-choice wording.
+3. "back" teaches it in 2-4 sentences.
+4. "trap" names the most common mistake in one sentence.
+5. "memory_hook" is an optional short mnemonic, or "".
+6. Plain text only. No HTML, no markdown.
+Return ONLY valid JSON: {"cards":[{"concept":"...","front":"...","back":"...","trap":"...","memory_hook":"..."}]}`;
+  const res = await fetchGeminiWithFallback(prompt, 0.5, GEM_GEN_MODEL, 30000, true);
+  const parsed = extractJson(res.text);
+  const arr = Array.isArray(parsed) ? parsed : (parsed && (parsed.cards || parsed.flashcards)) || [];
+  if (!Array.isArray(arr) || !arr.length) throw new Error('AI did not return any flashcards.');
+  const before = new Set((CARDS || []).map(c => c.id));
+  let added = 0;
+  let duplicates = 0;
+  for (const item of arr.slice(0, n)) {
+    const concept = String(item && item.concept || '').trim();
+    const front = String(item && item.front || '').trim();
+    const back = String(item && item.back || '').trim();
+    if (!concept || !front || !back) continue;
+    const rawQ = {
+      s: subj,
+      q: ('Freeform card: ' + topic).slice(0, 120),
+      o: [],
+      a: 0,
+      e: '',
+      t: 'Freeform',
+      _sid: 'freeform_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)
+    };
+    const result = saveConceptCard(rawQ, {
+      concept,
+      front,
+      back,
+      trap: String(item.trap || '').trim(),
+      memoryHook: String(item.memory_hook || item.memoryHook || '').trim(),
+      origin: 'ai'
+    }, { deferSave: true });
+    if (result.duplicate) {
+      duplicates++;
+      continue;
+    }
+    if (result.card && !before.has(result.card.id)) {
+      result.card.qk = '';
+      result.card.sourceQk = '';
+      result.card.qId = '';
+      added++;
+    }
+  }
+  save();
+  return { added, duplicates, requested: n };
+}
+
+function exportDueFlashcards() {
+  const due = (CARDS || []).filter(c => !c.grad && (c.due || 0) <= today());
+  if (!due.length) {
+    alert('No due flashcards to export.');
+    return;
+  }
+  const lines = ['# Flashcards due ' + localDateKey(), ''];
+  due.forEach((c, i) => {
+    lines.push(`## ${i + 1}. ${c.concept || 'Flashcard'} (${cl(c.subject || 'General')})`);
+    lines.push('');
+    lines.push('**Front:** ' + flashcardPlainText(c, 'front').replace(/\n/g, ' '));
+    lines.push('');
+    lines.push('**Back:** ' + flashcardPlainText(c, 'back').replace(/\n/g, ' '));
+    if (c.trap) lines.push('', '**Trap:** ' + String(c.trap).replace(/\n/g, ' '));
+    if (c.memoryHook) lines.push('', '**Hook:** ' + String(c.memoryHook).replace(/\n/g, ' '));
+    lines.push('');
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'flashcards-due-' + localDateKey() + '.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function generateFreeformFlashcardsFromUI() {
+  const btn = $('#fcgen_btn');
+  const promptText = ($('#fcgen_prompt') || {}).value || '';
+  const subject = ($('#fcgen_subject') || {}).value || '';
+  const count = ($('#fcgen_count') || {}).value || 5;
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+  try {
+    const result = await generateFreeformFlashcards(promptText, subject, count);
+    alert(`${result.added} card(s) added${result.duplicates ? ', ' + result.duplicates + ' duplicate(s) skipped' : ''}.`);
+    renderCardManagerView();
+  } catch (err) {
+    alert('Could not generate flashcards: ' + (err.message || err));
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate cards'; }
+  }
+}
+
 async function addFlashcardForCurrent() {
   const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
@@ -3597,7 +3849,6 @@ async function addFlashcardForCurrent() {
     const data = await generateConceptCardData(rawQ);
     const result = saveConceptCard(rawQ, data);
     if (result.duplicate) alert('A concept card for this idea is already in your review deck.');
-    else if (result.limit) alert('Daily flashcard limit reached (20). Try again tomorrow.');
     else if (result.card) alert(data.origin === 'ai' ? 'AI concept card added to your review deck.' : 'Concept card added to your review deck.');
     else alert('Could not add flashcard.');
   } catch (err) {
@@ -3709,11 +3960,15 @@ function startFlashcardReview() {
     ACTIVE_FC_SESSION_IDS = [];
     ACTIVE_FC_INDEX = 0;
     ACTIVE_FC_SHOW_BACK = false;
+    ACTIVE_FC_RATED = new Set();
+    FC_SESSION_TOTAL = 0;
     return;
   }
   ACTIVE_FC_SESSION_IDS = due.map(c => c.id);
   ACTIVE_FC_INDEX = 0;
   ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_RATED = new Set();
+  FC_SESSION_TOTAL = due.length;
   view = 'cards';
   renderFlashcardView();
 }
@@ -3742,6 +3997,16 @@ function renderCardManagerView(){
         ${legacyCount ? `<button class="sm" onclick="convertAllLegacyFlashcards()">🧠 AI convert legacy (${legacyCount})</button>` : ''}
       </div>
       <input type="text" id="cardmgr-search" placeholder="Search cards..." value="${esc(window._cardmgrSearch||'')}" oninput="window._cardmgrSearch=this.value;renderCardManagerView()">
+      <div class="card" style="margin-top:12px;background:var(--bg);border:1px dashed var(--bd)">
+        <b class="sm">Generate cards from a prompt</b>
+        <textarea id="fcgen_prompt" rows="2" placeholder="e.g. normalization forms with examples, or common OS deadlock mistakes" style="margin:6px 0;width:100%"></textarea>
+        <div class="row" style="gap:6px;flex-wrap:wrap">
+          <input type="text" id="fcgen_subject" placeholder="Subject (optional)" style="flex:1;min-width:150px">
+          <input type="number" id="fcgen_count" value="5" min="1" max="12" style="width:70px">
+          <button class="p" id="fcgen_btn" onclick="generateFreeformFlashcardsFromUI()">Generate cards</button>
+          <button onclick="exportDueFlashcards()">Export due (.md)</button>
+        </div>
+      </div>
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
         <span class="chip">Due: <b>${due}</b></span>
         <span class="chip">Learning: <b>${learning}</b></span>
@@ -3770,23 +4035,116 @@ function deleteFlashcard(id){
   const idx = (CARDS||[]).findIndex(c=>c.id===id);
   if(idx<0) return;
   if(!confirm('Delete this flashcard?')) return;
+  const inReview = view === 'cards' && ACTIVE_FC_SESSION_IDS.includes(id);
   CARD_TOMBSTONES[id] = Date.now();
   CARDS.splice(idx,1);
+  ACTIVE_FC_RATED.delete(id);
+  if(inReview){
+    const pos = ACTIVE_FC_SESSION_IDS.indexOf(id);
+    if(pos >= 0) ACTIVE_FC_SESSION_IDS.splice(pos,1);
+    save();
+    if(!ACTIVE_FC_SESSION_IDS.length){
+      finishFlashcardSession();
+      return;
+    }
+    if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) ACTIVE_FC_INDEX = ACTIVE_FC_SESSION_IDS.length - 1;
+    ACTIVE_FC_SHOW_BACK = false;
+    renderFlashcardView();
+    return;
+  }
   save();
-  renderCardManagerView();
+  if(view === 'cardmgr') renderCardManagerView();
+  else renderFlashcardView();
+}
+
+function flashcardPlainText(c, field){
+  const key = field + 'Text';
+  if(c[key] != null && String(c[key]).trim()) return String(c[key]);
+  const html = String(c[field] || '');
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .trim();
 }
 
 function editFlashcard(id){
   const c = (CARDS||[]).find(x=>x.id===id);
   if(!c) return;
-  const front = prompt('Edit front (HTML allowed)', c.front||'');
-  if(front===null) return;
-  const back = prompt('Edit back (HTML allowed)', c.back||'');
-  if(back===null) return;
-  c.front = front; c.back = back;
+  window._fcEditReturn = view === 'cards' ? 'cards' : 'cardmgr';
+  view = 'cardedit';
+  $('#app').innerHTML = `
+    <div class="top"><div class="row" style="justify-content:space-between">
+      <b>Edit Flashcard</b>
+      <button onclick="cancelFlashcardEdit()">Cancel</button>
+    </div></div>
+    <div class="card">
+      <label class="mu sm">Concept</label>
+      <input type="text" id="fce_concept" value="${esc(c.concept || '')}" style="margin:4px 0 12px;width:100%">
+      <label class="mu sm">Front (prompt)</label>
+      <textarea id="fce_front" rows="5" style="margin:4px 0 12px;width:100%">${esc(flashcardPlainText(c, 'front'))}</textarea>
+      <label class="mu sm">Back (answer)</label>
+      <textarea id="fce_back" rows="6" style="margin:4px 0 12px;width:100%">${esc(flashcardPlainText(c, 'back'))}</textarea>
+      <label class="mu sm">Common trap</label>
+      <textarea id="fce_trap" rows="3" style="margin:4px 0 12px;width:100%">${esc(c.trap || '')}</textarea>
+      <label class="mu sm">Memory hook</label>
+      <input type="text" id="fce_hook" value="${esc(c.memoryHook || '')}" style="margin:4px 0 12px;width:100%">
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="p" onclick="saveFlashcardEdits(${esc(JSON.stringify(c.id))})">Save changes</button>
+        <button onclick="cancelFlashcardEdit()">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function cancelFlashcardEdit(){
+  const ret = window._fcEditReturn || 'cardmgr';
+  view = ret;
+  if(ret === 'cards') renderFlashcardView();
+  else renderCardManagerView();
+}
+
+function saveFlashcardEdits(id){
+  const c = (CARDS||[]).find(x=>x.id===id);
+  if(!c) return;
+  const data = {
+    concept: ($('#fce_concept')?.value || '').trim(),
+    front: ($('#fce_front')?.value || '').trim(),
+    back: ($('#fce_back')?.value || '').trim(),
+    trap: ($('#fce_trap')?.value || '').trim(),
+    memoryHook: ($('#fce_hook')?.value || '').trim()
+  };
+  if(!data.concept || !data.front || !data.back){
+    alert('Concept, front, and back are required.');
+    return;
+  }
+  const html = conceptCardHtml(data);
+  c.concept = data.concept;
+  c.conceptKey = conceptKeyFor(c.subject, data.concept);
+  c.frontText = data.front;
+  c.backText = data.back;
+  c.trap = data.trap;
+  c.memoryHook = data.memoryHook;
+  c.front = html.front;
+  c.back = html.back;
   c.updatedAt = Date.now();
   save();
-  renderCardManagerView();
+  const ret = window._fcEditReturn || 'cardmgr';
+  view = ret;
+  if(ret === 'cards' && ACTIVE_FC_SESSION_IDS.includes(id)){
+    ACTIVE_FC_SHOW_BACK = false;
+    renderFlashcardView();
+  } else {
+    renderCardManagerView();
+  }
 }
 
 function renderFlashcardView() {
@@ -3796,39 +4154,36 @@ function renderFlashcardView() {
     if(!dueInit.length){
       $('#app').innerHTML = `
         <div class="card" style="text-align:center;padding:36px">
-          <h2>🃏 Flashcard Review Complete!</h2>
+          <h2>Flashcard Review Complete</h2>
           <p class="mu">No due flashcards right now.</p>
-          <p style="margin-top:20px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
+          <div class="row" style="justify-content:center;gap:8px;margin-top:20px;flex-wrap:wrap">
+            <button class="big-btn" style="background:var(--card);border:2px solid var(--bd)" onclick="renderCardManagerView()">Manage Flashcards</button>
+            <button class="p big-btn" onclick="home()">Back to Dashboard</button>
+          </div>
         </div>
       `;
       return;
     }
     ACTIVE_FC_SESSION_IDS = dueInit.map(c=>c.id);
     ACTIVE_FC_INDEX = 0;
+    FC_SESSION_TOTAL = dueInit.length;
+    ACTIVE_FC_RATED = new Set();
   }
   if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) {
-    ACTIVE_FC_SESSION_IDS = [];
-    ACTIVE_FC_INDEX = 0;
-    $('#app').innerHTML = `
-      <div class="card" style="text-align:center;padding:36px">
-        <h2>🃏 Flashcard Review Complete!</h2>
-        <p class="mu">You have reviewed all due flashcard(s) for this session.</p>
-        <p style="margin-top:20px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
-      </div>
-    `;
+    finishFlashcardSession();
     return;
   }
 
   const cardId = ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX];
   let curCard = CARDS.find(c => c.id === cardId);
-  if(!curCard || curCard.grad || (curCard.due || 0) > todayTs){
+  if(!curCard){
     ACTIVE_FC_INDEX++;
-    renderFlashcardView();
+    if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) finishFlashcardSession();
+    else renderFlashcardView();
     return;
   }
-  const due = ACTIVE_FC_SESSION_IDS.map(id => CARDS.find(c=>c.id===id)).filter(Boolean);
+  const sessionLen = ACTIVE_FC_SESSION_IDS.length;
   const sourceQuestion = findSourceQuestionForCard(curCard);
-  const sourceUid = sourceQuestion ? questionUid(sourceQuestion) : '';
   const flashRes = getRecommendedResource(
     sourceQuestion ? sourceQuestion.s : curCard.subject,
     false,
@@ -3839,16 +4194,17 @@ function renderFlashcardView() {
   $('#app').innerHTML = `
     <div class="top">
       <div class="row" style="justify-content:space-between">
-        <b>🃏 Flashcard Review (${ACTIVE_FC_INDEX + 1} of ${due.length})</b>
-        <button onclick="home()">☰ Dashboard</button>
+        <b>Flashcard Review (${ACTIVE_FC_INDEX + 1} of ${sessionLen})</b>
+        <button onclick="home()">Dashboard</button>
       </div>
-      <div class="bar"><i style="width:${(ACTIVE_FC_INDEX / due.length) * 100}%"></i></div>
+      <div class="bar"><i style="width:${((ACTIVE_FC_INDEX + 1) / sessionLen) * 100}%"></i></div>
     </div>
 
     <div class="fc-card" onclick="flipCard()">
       <div class="fc-inner">
         <span class="fc-badge ${curCard.type === 'calc' ? 'c-sk' : (curCard.type === 'lure' ? 'c-no' : 'c-ok')}">
-          ${esc(curCard.concept || curCard.type || 'Concept')} · ${esc(curCard.subject)}${curCard.origin === 'ai' ? ' · AI' : ''}
+          ${esc(curCard.concept || curCard.type || 'Concept')} &middot; ${esc(curCard.subject)}${curCard.origin === 'ai' ? ' &middot; AI' : ''}
+          ${ACTIVE_FC_RATED.has(curCard.id) ? ' &middot; reviewed' : ''}
         </span>
         <div style="font-size:16px;line-height:1.5">${curCard.front}</div>
         ${ACTIVE_FC_SHOW_BACK ? `
@@ -3856,37 +4212,41 @@ function renderFlashcardView() {
             ${curCard.back}
           </div>
         ` : `
-          <button class="p big-btn" style="margin-top:24px" onclick="event.stopPropagation();flipCard()">🔍 Show Answer</button>
+          <button class="p big-btn" style="margin-top:24px" onclick="event.stopPropagation();flipCard()">Show Answer</button>
         `}
         ${flashRes ? `
           <a href="${flashRes.url}" target="_blank" rel="noopener noreferrer" class="res-pill"
              style="margin-top:16px;position:relative;z-index:2"
              onclick="event.stopPropagation();markResource('${flashRes.id}','visited')"
              title="${esc(flashRes.desc)}">
-            📚 ${esc(flashRes.title)} · ${esc(flashRes.provider)} ↗
+            ${esc(flashRes.title)} &middot; ${esc(flashRes.provider)}
           </a>
         ` : ''}
       </div>
     </div>
 
-    ${sourceQuestion ? `
-      <div class="row" style="justify-content:center;gap:6px;margin-top:8px;flex-wrap:wrap">
-        <button class="sm" onclick="openQuestionEditorByUid(${esc(JSON.stringify(sourceUid))})">✏️ Edit source MCQ</button>
-        <button class="sm" style="color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionByUid(${esc(JSON.stringify(sourceUid))})">🗑 Delete source MCQ</button>
-      </div>
-    ` : (curCard.sourceMissing ? '<p class="mu sm" style="text-align:center;margin-top:8px">Source MCQ was deleted; this flashcard is kept.</p>' : '')}
+    <div class="row" style="justify-content:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <button class="sm" onclick="editFlashcard(${esc(JSON.stringify(curCard.id))})">Edit card</button>
+      <button class="sm" style="color:var(--no);border-color:var(--no-bd)" onclick="deleteFlashcard(${esc(JSON.stringify(curCard.id))})">Delete card</button>
+    </div>
+    ${!sourceQuestion && curCard.sourceMissing ? '<p class="mu sm" style="text-align:center;margin-top:8px">Source MCQ was deleted; this flashcard is kept.</p>' : ''}
 
     ${ACTIVE_FC_SHOW_BACK ? `
       <div class="card" style="margin-top:14px">
         <div class="mu sm" style="text-align:center;margin-bottom:8px">Rate your active recall quality:</div>
-        <div class="row" style="justify-content:center;gap:8px">
-          <button class="sm" style="background:var(--no-bg);color:var(--no);border-color:var(--no-bd)" onclick="rateCard(1)">1 · Again (+0d)</button>
-          <button class="sm" style="background:var(--sk-bg);color:var(--sk);border-color:var(--sk-bd)" onclick="rateCard(2)">2 · Hard (+1d)</button>
-          <button class="sm p" onclick="rateCard(3)">3 · Good (+3d)</button>
-          <button class="sm" style="background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)" onclick="rateCard(4)">4 · Easy (+7d)</button>
+        <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap">
+          <button class="sm" style="background:var(--no-bg);color:var(--no);border-color:var(--no-bd)" onclick="rateCard(1)">1 &middot; Again (+1d)</button>
+          <button class="sm" style="background:var(--sk-bg);color:var(--sk);border-color:var(--sk-bd)" onclick="rateCard(2)">2 &middot; Hard</button>
+          <button class="sm p" onclick="rateCard(3)">3 &middot; Good</button>
+          <button class="sm" style="background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)" onclick="rateCard(4)">4 &middot; Easy</button>
         </div>
       </div>
     ` : ''}
+
+    <div class="row" style="justify-content:space-between;gap:8px;margin-top:14px">
+      <button class="sm" onclick="fcPrevious()" ${ACTIVE_FC_INDEX === 0 ? 'disabled' : ''}>Previous</button>
+      <button class="sm" onclick="fcNext()">${ACTIVE_FC_INDEX === sessionLen - 1 ? 'Finish session' : 'Next card'}</button>
+    </div>
   `;
   typesetMath($('#app'));
 }
@@ -3896,30 +4256,67 @@ function flipCard() {
   renderFlashcardView();
 }
 
+function finishFlashcardSession() {
+  const reviewed = ACTIVE_FC_RATED.size;
+  const total = Math.max(FC_SESSION_TOTAL, ACTIVE_FC_SESSION_IDS.length, reviewed);
+  ACTIVE_FC_SESSION_IDS = [];
+  ACTIVE_FC_INDEX = 0;
+  ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_RATED = new Set();
+  FC_SESSION_TOTAL = 0;
+  const dueNow = CARDS.filter(c => !c.grad && (c.due || 0) <= today()).length;
+  view = 'cards';
+  $('#app').innerHTML = `
+    <div class="card" style="text-align:center;padding:36px">
+      <h2>🃏 Flashcard Review Complete</h2>
+      <p style="font-size:18px;margin:10px 0"><b>${reviewed}</b> reviewed, <b>${dueNow}</b> still due</p>
+      <p class="mu sm">Session started with ${total} due card(s).</p>
+      <div class="row" style="justify-content:center;gap:8px;margin-top:20px;flex-wrap:wrap">
+        ${dueNow ? `<button class="p big-btn" onclick="startFlashcardReview()">Review remaining (${dueNow})</button>` : ''}
+        <button class="big-btn" style="background:var(--card);border:2px solid var(--bd)" onclick="renderCardManagerView()">Manage Flashcards</button>
+        <button class="big-btn" style="background:var(--card);border:2px solid var(--bd)" onclick="home()">Back to Dashboard</button>
+      </div>
+    </div>
+  `;
+}
+
+function fcPrevious() {
+  if (ACTIVE_FC_INDEX <= 0) return;
+  ACTIVE_FC_INDEX--;
+  ACTIVE_FC_SHOW_BACK = false;
+  renderFlashcardView();
+}
+
+function fcNext() {
+  if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length - 1) {
+    finishFlashcardSession();
+    return;
+  }
+  ACTIVE_FC_INDEX++;
+  ACTIVE_FC_SHOW_BACK = false;
+  renderFlashcardView();
+}
+
 function rateCard(grade) {
   const todayTs = today();
   if(!Array.isArray(ACTIVE_FC_SESSION_IDS) || !ACTIVE_FC_SESSION_IDS.length){
     const due = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
     ACTIVE_FC_SESSION_IDS = due.map(c=>c.id);
+    FC_SESSION_TOTAL = due.length;
     ACTIVE_FC_INDEX = 0;
+    ACTIVE_FC_RATED = new Set();
   }
   if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length){
-    ACTIVE_FC_SESSION_IDS = [];
-    ACTIVE_FC_INDEX = 0;
-    const dueNow = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
-    if(dueNow.length === 0){
-      $('#app').innerHTML = `<div class="card"><h2>Review Complete!</h2><p class="mu">All due flashcards reviewed.</p><button class="p" onclick="home()">Back to Dashboard</button></div>`;
-      return;
-    }
-    renderFlashcardView();
+    finishFlashcardSession();
     return;
   }
   const cardId = ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX];
   let card = CARDS.find(c => c.id === cardId);
-  if(!card || card.grad || (card.due || 0) > todayTs){
+  if(!card){
     ACTIVE_FC_INDEX++;
     ACTIVE_FC_SHOW_BACK = false;
-    rateCard(grade);
+    if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) finishFlashcardSession();
+    else renderFlashcardView();
     return;
   }
 
@@ -3927,7 +4324,7 @@ function rateCard(grade) {
     card.lapses = (card.lapses || 0) + 1;
     card.consecOk = 0;
     card.stab = Math.max(0.5, (card.stab || 1.0) * 0.6);
-    card.due = todayTs;
+    card.due = todayTs + 1;
   } else if (grade === 2) {
     card.consecOk = (card.consecOk || 0) + 1;
     card.stab = (card.stab || 1.0) * 1.2;
@@ -3948,18 +4345,12 @@ function rateCard(grade) {
 
   card.lastReviewed = Date.now();
   card.updatedAt = card.lastReviewed;
+  ACTIVE_FC_RATED.add(card.id);
   save();
   ACTIVE_FC_INDEX++;
   ACTIVE_FC_SHOW_BACK = false;
   if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length){
-    ACTIVE_FC_SESSION_IDS = [];
-    ACTIVE_FC_INDEX = 0;
-    const dueNow = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
-    if(dueNow.length === 0){
-      $('#app').innerHTML = `<div class="card"><h2>Review Complete!</h2><p class="mu">All due flashcards reviewed.</p><button class="p" onclick="home()">Back to Dashboard</button></div>`;
-      return;
-    }
-    renderFlashcardView();
+    finishFlashcardSession();
     return;
   }
   renderFlashcardView();
@@ -3968,23 +4359,16 @@ function rateCard(grade) {
 // Milestone Management (M1 to M7)
 function getCurrentMilestone() {
   if (!DIAGNOSTIC_DONE) {
-    return { id: 1, tag: 'M1', title: 'Day-1 Diagnostic Mock', desc: 'Complete a full timed mock exam with confidence tags to establish your baseline.', done: false };
+    return { id: 1, tag: 'M1', title: 'Day-1 Diagnostic Mock', desc: 'Complete a full timed mock exam to establish your baseline.', done: false };
   }
 
-  const subjData = agg();
-  const rows = Object.entries(subjData)
-    .filter(([k, o]) => (o.c + o.w + o.k) > 0)
-    .map(([k, o]) => {
-      const tot = o.c + o.w + o.k;
-      const acc = tot ? o.c / tot : 0;
-      // Evaluate subjects even from diagnostic mock sets (2+ attempts)
-      const isWeak = tot >= 2 && acc <= 0.40;
-      const isBorderline = tot >= 2 && acc > 0.40 && acc < 0.81;
-      return { k, tot, c: o.c, acc, isWeak, isBorderline };
-    });
-
-  const redSubjs = rows.filter(r => r.isWeak);
-  const amberSubjs = rows.filter(r => r.isBorderline);
+  const readiness = readinessStats();
+  const practice = readiness.subjects;
+  const l0 = readiness.l0;
+  const diag = diagnosticSubjectStats();
+  const signals = milestoneSubjectSignals();
+  const redSubjs = signals.filter(s => s.isWeak);
+  const amberSubjs = signals.filter(s => s.isBorderline);
   const redIncomplete = redSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 2));
   const amberIncomplete = amberSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 1));
   if (redIncomplete.length > 0 || amberIncomplete.length > 0) {
@@ -3994,7 +4378,12 @@ function getCurrentMilestone() {
     return { id: 2, tag: 'M2', title: 'Targeted Fix Days', desc: `Reinforce weak subjects across calendar days (${count} pending: ${sample}).`, done: false };
   }
 
-  // Count distinct completed mock sessions
+  const l0Fails = Object.entries(l0).filter(([_, v]) => v.attempts >= 5 && !v.mastered).map(([k]) => k);
+  if (l0Fails.length > 0) {
+    const sample = l0Fails.slice(0, 2).join(', ') + (l0Fails.length > 2 ? ` +${l0Fails.length - 2} more` : '');
+    return { id: 2, tag: 'M2', title: 'Level 0 Core Mastery', desc: `Get every subject to ≥85% on at least 5 L0 attempts (${l0Fails.length}: ${sample}).`, done: false };
+  }
+
   const mockAttempts = (L || []).filter(r => r.mock === 1);
   const mockSessions = [];
   mockAttempts.forEach(r => {
@@ -4012,17 +4401,17 @@ function getCurrentMilestone() {
     return { id: 3, tag: 'M3', title: 'First Full Mock', desc: 'Complete and review your first timed mock exam.', done: false };
   }
 
-  if (PB_MOCK_SCORE < 81) {
-    return { id: 5, tag: 'M5', title: '81% Target Threshold', desc: `Push past the 81% entrance safety buffer on a timed mock exam (current best: ${PB_MOCK_SCORE || 0}%).`, done: false };
+  if (PB_MOCK_SCORE < 75) {
+    return { id: 5, tag: 'M5', title: '75% Practice Readiness', desc: `Push toward 75% practice readiness / mock target (current best: ${PB_MOCK_SCORE || 0}%).`, done: false };
   }
 
   const days = getDaysLeft();
   if (days > 2) {
-    return { id: 6, tag: 'M6', title: 'Retention & Spaced Mastery', desc: `Maintain your ≥81% retention edge across the remaining ${days} days with daily spaced retrieval and variants.`, done: false };
+    return { id: 6, tag: 'M6', title: 'Retention & Spaced Mastery', desc: `Maintain readiness across the remaining ${days} days with daily spaced retrieval and variants.`, done: false };
   }
 
   if (days === 2) {
-    return { id: 6, tag: 'M6', title: 'Final 48h Rehearsal', desc: 'Final 48-hour countdown: Low-stress consolidation, memory anchors, and calm formula review.', done: false };
+    return { id: 6, tag: 'M6', title: 'Final 48h Rehearsal', desc: 'Final 48-hour countdown: Low-stress consolidation, memory anchors, and formula review.', done: false };
   }
 
   return { id: 7, tag: 'M7', title: 'Exam Day Ready', desc: 'All milestone targets achieved. Trust your recall, stay calm, and execute!', done: true };
@@ -4031,7 +4420,7 @@ function getCurrentMilestone() {
 function recordFixDay(subject) {
   if (!subject) return;
   const s = canonSubj(subject);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateKey();
   FIX_DAYS[s] = FIX_DAYS[s] || [];
   if (!FIX_DAYS[s].includes(todayStr)) {
     FIX_DAYS[s].push(todayStr);
@@ -4165,12 +4554,8 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     }
   }
 
-  // Identify Red/Weak subjects (accuracy <= 40%)
-  const subjMap = agg();
-  const redSubjects = new Set(
-    Object.entries(subjMap)
-      .filter(([k, o]) => (o.c + o.w + o.k) >= 5 && (o.c / (o.c + o.w + o.k)) <= 0.40)
-      .map(([k]) => k)
+  const weakSubjects = new Set(
+    milestoneSubjectSignals().filter(s => s.isWeak).map(s => s.k)
   );
 
   const session = [];
@@ -4200,11 +4585,10 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     add(candidateN);
   }
 
-  // Red/Weak subjects: pull L0/L1 items heavily (75% L0, 20% L1)
-  if (redSubjects.size > 0) {
-    const redPool = pool.filter(q => redSubjects.has(cl(q.s)) && (effLevel(q) === 0 || effLevel(q) === 1));
-    redPool.sort(() => Math.random() - 0.5);
-    for (const q of redPool) {
+  if (weakSubjects.size > 0) {
+    const weakPool = pool.filter(q => weakSubjects.has(cl(q.s)) && (effLevel(q) === 0 || effLevel(q) === 1));
+    weakPool.sort(() => Math.random() - 0.5);
+    for (const q of weakPool) {
       if (session.length >= targetQ - 2) break;
       add(q.n);
     }
@@ -4282,113 +4666,240 @@ function agg() {
   return m;
 }
 
+const TIER_A_SUBJECTS = new Set([
+  'Introduction to IT',
+  'Digital Logic',
+  'E-Commerce',
+  'Management Information System',
+  'Computer Graphics',
+  'Artificial Intelligence',
+  'Systems Analysis and Design',
+  'Software Engineering',
+  'Web Technology'
+]);
+
+function subjectTarget(subject) {
+  return TIER_A_SUBJECTS.has(canonSubj(subject)) ? 0.85 : 0.75;
+}
+
+function isProvisionalSubject(subject) {
+  return !TIER_A_SUBJECTS.has(canonSubj(subject));
+}
+
+function firstPracticeAttempts() {
+  const map = new Map();
+  (L || []).forEach(rec => {
+    if (!rec || rec.mock === 1) return;
+    const key = recordIdentity(rec);
+    if (!key) return;
+    const prev = map.get(key);
+    if (!prev || (rec.t || 0) < (prev.t || 0)) map.set(key, rec);
+  });
+  return [...map.values()];
+}
+
+function scoreRecords(records) {
+  const attempts = records.length;
+  let points = 0;
+  records.forEach(rec => { points += recordPointValue(rec); });
+  const score = attempts ? (points + 7.5) / (attempts + 10) : 0;
+  return { attempts, points, score, raw: rawAccuracy(records), provisional: attempts < 15 };
+}
+
+function rawAccuracy(records) {
+  if (!records.length) return 0;
+  let ok = 0;
+  records.forEach(rec => { if (rec.ok) ok++; });
+  return ok / records.length;
+}
+
+function readinessStats() {
+  const first = firstPracticeAttempts();
+  const bySubject = {};
+  const l0BySubject = {};
+  first.forEach(rec => {
+    const q = findQuestionByRecord(rec);
+    const subject = canonSubj(rec.s || (q && q.s) || '');
+    if (!subject) return;
+    (bySubject[subject] = bySubject[subject] || []).push(rec);
+    const lvl = recordLevelValue(rec);
+    if (lvl === 0) (l0BySubject[subject] = l0BySubject[subject] || []).push(rec);
+  });
+
+  const subjects = {};
+  Object.entries(bySubject).forEach(([subject, records]) => {
+    const scored = scoreRecords(records);
+    subjects[subject] = {
+      ...scored,
+      subject,
+      target: subjectTarget(subject),
+      raw: rawAccuracy(records)
+    };
+  });
+
+  const l0 = {};
+  Object.entries(l0BySubject).forEach(([subject, records]) => {
+    const scored = scoreRecords(records);
+    l0[subject] = {
+      ...scored,
+      subject,
+      raw: rawAccuracy(records),
+      mastered: records.length >= 5 && rawAccuracy(records) >= 0.85
+    };
+  });
+
+  const overall = scoreRecords(first);
+  return { overall, subjects, l0, first };
+}
+
+function diagnosticSubjectStats() {
+  const mockRecords = (L || []).filter(rec => rec && rec.mock === 1);
+  if (!mockRecords.length) return { available: false, subjects: {}, source: 'none' };
+  const tagged = mockRecords.filter(rec => rec.diag === 1);
+  let records = [];
+  if (tagged.length) {
+    const lastDiagTime = Math.max(...tagged.map(rec => rec.t || 0));
+    records = tagged.filter(rec => Math.abs((rec.t || 0) - lastDiagTime) <= 4 * 3600 * 1000);
+  } else if (DIAGNOSTIC_DONE) {
+    const groups = [];
+    mockRecords
+      .slice()
+      .sort((a, b) => (a.t || 0) - (b.t || 0))
+      .forEach(rec => {
+        const t = rec.t || 0;
+        const last = groups[groups.length - 1];
+        if (!last || t - last.lastT > 2 * 3600 * 1000) groups.push({ lastT: t, records: [rec] });
+        else { last.lastT = t; last.records.push(rec); }
+      });
+    const baseline = groups.find(group => group.records.length >= 40);
+    records = baseline ? baseline.records : [];
+  }
+  if (!records.length) return { available: false, subjects: {}, source: 'none' };
+  const bySubject = {};
+  records.forEach(rec => {
+    const q = findQuestionByRecord(rec);
+    const subject = canonSubj(rec.s || (q && q.s) || '');
+    if (!subject) return;
+    const bucket = bySubject[subject] = bySubject[subject] || { total: 0, correct: 0 };
+    bucket.total++;
+    if (rec.ok) bucket.correct++;
+  });
+  const subjects = {};
+  Object.entries(bySubject).forEach(([subject, bucket]) => {
+    const acc = bucket.total ? bucket.correct / bucket.total : 0;
+    subjects[subject] = {
+      subject,
+      total: bucket.total,
+      correct: bucket.correct,
+      acc,
+      weak: bucket.total >= 3 && acc <= 0.40,
+      borderline: bucket.total >= 3 && acc > 0.40 && acc < 0.80
+    };
+  });
+  return { available: true, subjects, source: tagged.length ? 'diagnostic' : 'legacy-diagnostic' };
+}
+
+function milestoneSubjectSignals() {
+  const practice = readinessStats().subjects;
+  const diagnostic = diagnosticSubjectStats();
+  const names = new Set([...Object.keys(practice), ...Object.keys(diagnostic.subjects)]);
+  const rows = [];
+  names.forEach(subject => {
+    const p = practice[subject];
+    if (p && p.attempts >= 15) {
+      rows.push({
+        k: subject,
+        tot: p.attempts,
+        acc: p.score,
+        target: p.target,
+        source: 'practice',
+        isWeak: p.score <= 0.40,
+        isBorderline: p.score > 0.40 && p.score < p.target
+      });
+      return;
+    }
+    const d = diagnostic.subjects[subject];
+    if (d) {
+      rows.push({
+        k: subject,
+        tot: d.total,
+        acc: d.acc,
+        target: d.total >= 4 ? 0.80 : 0.80,
+        source: diagnostic.source,
+        isWeak: d.weak,
+        isBorderline: d.borderline
+      });
+    }
+  });
+  return rows;
+}
+
+function syncStatusChip() {
+  const st = window.CloudSync && CloudSync._state;
+  if (!st) return '';
+  const age = st.lastSync ? (Date.now() - st.lastSync) : 0;
+  const stale = !!st.lastSync && age > 24 * 60 * 60 * 1000;
+  if (!['offline', 'unauthorized', 'error'].includes(st.status) && !stale) return '';
+  const label = st.status === 'offline' ? 'Offline' : st.status === 'unauthorized' ? 'Sync locked' : st.status === 'error' ? 'Sync error' : 'Sync stale';
+  const cls = st.status === 'offline' ? 'c-sk' : 'c-no';
+  return `<button class="chip ${cls}" style="cursor:pointer" onclick="openSettings()" title="${esc(st.message || label)}">${label}</button>`;
+}
+
 function renderReadinessMeter() {
   if (!D || !D.length) return '';
-  const TARGET_MARK = 81;
-  const subjData = agg();
+  const TARGET_MARK = 75;
+  const stats = readinessStats();
+  const overall = stats.overall;
+  const projectedMark = Math.round(overall.score * 1000) / 10;
+  const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
 
-  // Global "Locked In" across all studied questions
   const studiedQuestionKeys = Object.keys(V).filter(k => V[k] && Array.isArray(V[k].history) && V[k].history.length > 0);
-  const lockedCount = studiedQuestionKeys.filter(k => {
-    const v = V[k];
-    if (!v || !Array.isArray(v.history) || v.history.length < 2) return false;
-    const correctHits = [];
-    for (const h of v.history) {
-      if (!h.ok) correctHits.length = 0;
-      else correctHits.push(h.t);
-    }
-    if (correctHits.length < 2) return false;
-    for (let i = 0; i < correctHits.length - 1; i++) {
-      for (let j = i + 1; j < correctHits.length; j++) {
-        if (correctHits[j] - correctHits[i] >= 3 * 864e5) return true;
-      }
-    }
-    return false;
-  }).length;
-
-  let fsOk = 0, fsTot = 0, rpOk = 0, rpTot = 0;
-  if (L.length) {
-    const kFirst = new Map();
-    L.forEach(r => { if (!kFirst.has(r.k) || r.t < kFirst.get(r.k)) kFirst.set(r.k, r.t); });
-    fsTot = kFirst.size;
-    L.forEach(r => {
-      if (kFirst.get(r.k) === r.t) fsOk += r.ok ? 1 : 0;
-      else { rpOk += r.ok ? 1 : 0; rpTot++; }
-    });
-  }
-
-  const studiedTotal = Math.max(studiedQuestionKeys.length, fsTot);
+  const lockedCount = studiedQuestionKeys.filter(k => isLockedIn(k)).length;
+  const studiedTotal = Math.max(studiedQuestionKeys.length, overall.attempts);
   const lockedPct = studiedTotal ? Math.round(lockedCount / studiedTotal * 100) : 0;
 
-  // Calibrated thresholds per MIT Entrance Scope Guide (Target 81%):
-  // Red <= 40%, Amber 41-80%, Green >= 81%, Calibrating < 5 attempts
-  const rows = Object.entries(subjData)
-    .filter(([k, o]) => (o.c + o.w + o.k) > 0)
-    .map(([k, o]) => {
-      const tot = o.c + o.w + o.k;
-      const acc = tot ? o.c / tot : 0;
-      const isCalibrated = tot >= 5;
-      const gap = acc - (TARGET_MARK / 100);
-      return { k, tot, c: o.c, acc, isCalibrated, gap };
-    }).sort((a, b) => {
+  const rows = Object.values(stats.subjects)
+    .map(r => ({
+      k: r.subject,
+      tot: r.attempts,
+      acc: r.score,
+      raw: r.raw,
+      target: r.target,
+      isCalibrated: r.attempts >= 15
+    }))
+    .sort((a, b) => {
       const priority = r => {
-        if (r.isCalibrated && r.acc <= 0.40) return 1; // Red
-        if (r.isCalibrated && r.acc < (TARGET_MARK / 100)) return 2;  // Amber
-        if (!r.isCalibrated) return 3;                 // Calibrating
-        return 4;                                      // Green (>=81%)
+        if (r.isCalibrated && r.acc <= 0.40) return 1;
+        if (r.isCalibrated && r.acc < r.target) return 2;
+        if (!r.isCalibrated) return 3;
+        return 4;
       };
       return priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
     });
-  const calibratedRows = rows.filter(r => r.isCalibrated);
 
-  const mockAttempts = L.filter(r => r.mock === 1);
-  const mockOk = mockAttempts.filter(r => r.ok).length;
-  const mockTot = mockAttempts.length;
-  const mockAcc = mockTot >= 10 ? (mockOk / mockTot) : null;
-  const fsAcc = fsTot ? (fsOk / fsTot) : 0;
-  
-  // Effective mock accuracy: use verified PB_MOCK_SCORE if available, otherwise raw mock log
-  let effectiveMockAcc = null;
-  if (typeof PB_MOCK_SCORE === 'number' && PB_MOCK_SCORE > 0) {
-    effectiveMockAcc = PB_MOCK_SCORE / 100;
-  } else if (mockAcc !== null) {
-    effectiveMockAcc = mockAcc;
-  }
-
-  let projectedAcc = fsAcc;
-  if (effectiveMockAcc !== null && fsTot >= 10) {
-    // Balanced 50/50 blend between verified mock exam score and first-attempt unseen practice
-    projectedAcc = (effectiveMockAcc * 0.50) + (fsAcc * 0.50);
-  } else if (effectiveMockAcc !== null) {
-    projectedAcc = effectiveMockAcc;
-  } else if (!fsTot && calibratedRows.length) {
-    projectedAcc = calibratedRows.reduce((sum, r) => sum + r.acc, 0) / calibratedRows.length;
-  }
-
-  const projectedMark = Math.round(projectedAcc * 1000) / 10;
-  const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
+  const l0Rows = Object.values(stats.l0);
+  const l0Mastered = l0Rows.filter(r => r.mastered).length;
+  const l0Tracked = l0Rows.length;
 
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
-  const unattemptedInDeck = [...activeDeckSubjs].filter(s => {
-    const o = subjData[s];
-    return !o || (o.c + o.w + o.k) === 0;
-  });
+  const unattemptedInDeck = [...activeDeckSubjs].filter(s => !stats.subjects[s]);
 
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (Math.min(100, Math.max(0, projectedMark)) / 100) * circumference;
-  const ringColor = projectedMark >= TARGET_MARK ? 'var(--ok)' : (projectedMark >= 60 ? 'var(--sk)' : 'var(--no)');
+  const ringColor = projectedMark >= TARGET_MARK ? 'var(--ok)' : (projectedMark >= 55 ? 'var(--sk)' : 'var(--no)');
 
   return `
   <div class="card">
     <div class="row" style="justify-content:space-between;align-items:center">
-      <h2 style="margin:0">📊 Calibrated Readiness Meter</h2>
+      <h2 style="margin:0">📊 Practice Readiness</h2>
       <div class="row" style="gap:6px">
+        ${overall.provisional ? `<span class="chip c-sk">Provisional · ${overall.attempts}/15 evidence</span>` : `<span class="chip c-ok">Calibrated · ${overall.attempts} attempts</span>`}
         ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
       </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">Honest projection based on first-attempts and timed mocks. Repeat memory practice is excluded.</p>
-    
+    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded.</p>
+
     <div class="readiness-container">
       <div class="readiness-ring-wrap">
         <svg width="104" height="104">
@@ -4406,26 +4917,27 @@ function renderReadinessMeter() {
           <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">Gap: <b>${markGap >= 0 ? '+' : ''}${markGap} marks</b></span>
         </div>
         <div class="row sm mu" style="gap:10px">
-          <span>🎯 First attempt: <b>${fsTot ? Math.round(fsOk / fsTot * 100) : 0}%</b> (${fsOk}/${fsTot})</span>
-          <span>Repeat memory: ${rpTot ? Math.round(rpOk / rpTot * 100) : 0}% (${rpOk}/${rpTot})</span>
+          <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions</span>
+          <span>✅ Raw first-attempt: <b>${Math.round(overall.raw * 100)}%</b></span>
+          <span>🎯 L0 mastered: <b>${l0Mastered}/${l0Tracked}</b> subjects</span>
         </div>
       </div>
     </div>
 
     <div class="row" style="justify-content:space-between;align-items:center;margin-top:18px">
       <b>Subject Status &amp; Targeted Drills</b>
-      <span class="mu sm">Tap any subject to launch a 15-question targeted drill</span>
+      <span class="mu sm">Tier A target 85% · Tier B target 75% · 15 attempts to calibrate</span>
     </div>
 
     <div class="subject-card-grid">
       ${rows.map(r => {
         const fixCount = (FIX_DAYS[r.k] || []).length;
         let dotClass = 'dot-gray';
-        let statusText = `Calibrating (${r.tot}/5)`;
+        let statusText = `Calibrating (${r.tot}/15)`;
         if (r.isCalibrated) {
-          if (r.acc >= (TARGET_MARK / 100)) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
+          if (r.acc >= r.target) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
           else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
-          else { dotClass = 'dot-amber'; statusText = `${Math.round(r.acc * 100)}% · Borderline`; }
+          else { dotClass = 'dot-amber'; statusText = `${Math.round(r.acc * 100)}% · Building`; }
         }
         return `
           <div class="subject-card" onclick="startSubjectDrillFromBank('${esc(r.k)}')">
@@ -4583,7 +5095,7 @@ function home(preserveScroll = false) {
   cancelAutoAdvance();
   clearDrillDeck();
   clearInterval(TI);
-  if (MK) { MK = null; Q = []; QRESULTS = []; P = 0; }
+  if (MK) { MK = null; MOCK_D = []; MK_PAUSED = false; MK_REM = 0; Q = []; QRESULTS = []; P = 0; }
   cancelRecallTimer();
 
   const daysLeft = getDaysLeft();
@@ -4646,22 +5158,32 @@ function home(preserveScroll = false) {
 
   const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
   const milestone = getCurrentMilestone();
+  const weeklyMock = weeklyMockStatus();
 
   let resumeMockBanner = '';
   try {
     const rawMock = localStorage.getItem('bitmcq_mock_state');
     if (rawMock) {
       const parsed = JSON.parse(rawMock);
-      if (parsed.MK && parsed.MK.end > Date.now()) {
-        const minsLeft = Math.round((parsed.MK.end - Date.now()) / 60000);
+      if (parsed.MK) {
+        const mk = parsed.MK;
+        const paused = !!mk.paused;
+        const expired = !!mk.expired || (!paused && (mk.end || 0) <= Date.now());
+        const remainingMs = paused
+          ? (typeof mk.remainingMs === 'number' ? mk.remainingMs : Math.max(0, (mk.end || 0) - Date.now()))
+          : Math.max(0, (mk.end || 0) - Date.now());
+        const minsLeft = Math.ceil(remainingMs / 60000);
+        const stateText = expired
+          ? '⏱ Time expired — submit to record your score'
+          : (paused ? `⏸ Paused · ${minsLeft} min remaining` : `▶ ${minsLeft} min remaining`);
         resumeMockBanner = `
-          <div class="milestone-banner" style="border-color:var(--ac);background:var(--ac-bg);margin-bottom:12px">
+          <div class="milestone-banner" style="border-color:${expired ? 'var(--no-bd)' : 'var(--ac)'};background:${expired ? 'var(--no-bg)' : 'var(--ac-bg)'};margin-bottom:12px">
             <div>
-              <b>⏱ Active Mock Exam in Progress</b>
-              <div class="mu sm">${minsLeft} min remaining · ${parsed.Q.length} questions</div>
+              <b>${expired ? 'Mock Exam Ready to Submit' : (paused ? 'Mock Exam Paused' : 'Active Mock Exam in Progress')}</b>
+              <div class="mu sm">${stateText} · ${(parsed.Q || []).length} questions</div>
             </div>
             <div class="row" style="gap:6px">
-              <button class="p sm" onclick="resumeActiveMock()">▶ Resume Mock</button>
+              <button class="p sm" onclick="resumeActiveMock()">${expired ? 'Open & Submit' : (paused ? 'Resume Mock' : 'Resume Mock')}</button>
               <button class="sm" onclick="cancelActiveMock()">Cancel</button>
             </div>
           </div>
@@ -4703,7 +5225,9 @@ function home(preserveScroll = false) {
         </div>
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
-          <span class="chip c-ok">Due: <b>${due.length}</b></span>
+          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
+          <span class="chip ${weeklyMock.completed ? 'c-ok' : 'c-sk'}">📅 Weekly mock: <b>${weeklyMock.completed ? 'done' : 'due'}</b></span>
+          ${syncStatusChip()}
         </div>
       </div>
 
@@ -4717,7 +5241,7 @@ function home(preserveScroll = false) {
       <button class="p big-btn" onclick="startToday()">
         ${(() => {
           try {
-            const d = new Date().toISOString().slice(0,10);
+            const d = localDateKey();
             if(localStorage.getItem('bitmcq_today_date')===d && parseInt(localStorage.getItem('bitmcq_today_done')||'0',10)>=todayMins){
               return `✓ Today's Practice Completed · Tap for Bonus Session`;
             }
@@ -4729,21 +5253,23 @@ function home(preserveScroll = false) {
       </button>
 
       ${dueCards.length ? `
-      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="big-btn" style="flex:1;min-width:200px;background:var(--card);border:2px solid var(--bd)" onclick="startFlashcardReview()">
-          🃏 Review Due Flashcards (<b>${dueCards.length}</b> due)
-        </button>
-        <button class="big-btn" style="flex:1;min-width:200px;background:var(--card);border:2px solid var(--bd)" onclick="renderCardManagerView()">
-          🃏 Manage Flashcards
-        </button>
-      </div>
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFlashcardReview()">
+        Review Due Flashcards (<b>${dueCards.length}</b> due)
+      </button>
       ` : ''}
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="renderCardManagerView()">
+        Manage Flashcards
+      </button>
+
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startQuickMode()">
         ⚡ Quick Questions Only (L0 Core First · Mobile Friendly)
       </button>
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
+      </button>
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCalcTraceSession()">
+        🧮 Calc &amp; Tracing · 10–15 Q (L0 priority)
       </button>
       <div class="mu sm" style="text-align:center;margin-top:6px">Prioritized by spaced-repetition due date and weak areas</div>
 
@@ -4972,6 +5498,35 @@ function startSubjectDrill() {
   startSubjectDrillFromBank(subject, requestedCount);
 }
 
+function startDueReview() {
+  const due = dueKeys();
+  if (!due.length) { alert('No MCQs are due right now.'); return; }
+  start(due.slice(0, 15));
+}
+
+function startCalcTraceSession() {
+  const seen = new Set();
+  const candidates = bankQuestionPool().filter(q => {
+    if (!q || isQuestionDeleted(q)) return false;
+    const type = String(q.type || '').toLowerCase();
+    if (!(q.calc || q.needs_paper || type === 'calc' || type === 'trace')) return false;
+    const key = questionUid(q) || qk(q);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!candidates.length) {
+    alert('No calculation or tracing questions are available in the loaded bank.');
+    return;
+  }
+  candidates.sort((a, b) => {
+    const lvl = effLevel(a) - effLevel(b);
+    if (lvl) return lvl;
+    return Math.random() - 0.5;
+  });
+  start(candidates.slice(0, 15).map(q => questionUid(q) || qk(q)));
+}
+
 function startMistakes() {
   const wr = D.filter(q => R[q.n] === 'w').map(q => q.n);
   if (!wr.length) { alert('No mistakes yet.'); return; }
@@ -5030,7 +5585,7 @@ function show() {
 
   if (P >= Q.length) {
     try {
-      const d = new Date().toISOString().slice(0,10);
+      const d = localDateKey();
       if(localStorage.getItem('bitmcq_today_date')===d){
         const doneToday = parseInt(localStorage.getItem('bitmcq_today_done')||'0',10);
         const add = Math.max(1, Math.min(10, Math.round((Q.length||1)*0.6)));
@@ -5101,7 +5656,7 @@ function show() {
   ` : '';
 
   let pauseBtn = '';
-  if (MK) {
+  if (MK && !MK.expired) {
     pauseBtn = `<button class="sm" id="pb" onclick="togglePause()">${MK_PAUSED ? '▶ Resume' : '⏸ Pause'}</button>`;
   }
 
@@ -5110,8 +5665,9 @@ function show() {
     <div class="top">
       <div class="row" style="justify-content:space-between;align-items:center">
         <div class="row" style="gap:6px;align-items:center">
-          ${MK ? '<span class="chip" id="tm"></span><span class="chip c-no" id="unans-chip"></span>' : stats()}
+          ${MK ? `<span class="chip" id="tm">${MK.expired ? '⏱ 0:00' : ''}</span><span class="chip c-no" id="unans-chip"></span>` : stats()}
           ${pauseBtn}
+          <button class="sm" onclick="toggleCalcPanel()" title="Calculator (Alt+C)">Calc</button>
           <span class="chip mu">${isQuick ? '⚡ Quick' : '📝 Pen &amp; Paper'}</span>
           <select class="chip" style="font-size:11.5px;padding:2px 4px;cursor:pointer;background:var(--card);border:1px solid var(--bd);color:inherit" onchange="setQuestionLevel(${rawQ.n}, this.value)" title="Change question difficulty level">
             <option value="0" ${curLvl === 0 ? 'selected' : ''}>L0 · Core</option>
@@ -5145,6 +5701,7 @@ function show() {
               ${isShowingVariant ? '↺ View original' : '✨ View variant'}
             </button>
           ` : ''}
+          ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
           ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
           </button>` : ''}
@@ -5162,6 +5719,23 @@ function show() {
     </div>
 
     <div id="bg-gen-box" class="bg-gen-banner refresh-status" style="display:none"></div>
+
+    <div id="calc-panel" class="card" style="display:none;margin-top:10px;padding:10px 12px">
+      <div class="row" style="gap:6px;align-items:center">
+        <input id="calc-input" type="text" placeholder="e.g. (12*8)/(3+1)" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter'){event.preventDefault();evalCalc();}">
+        <button class="sm p" onclick="evalCalc()">=</button>
+        <button class="sm" onclick="toggleCalcPanel()">Close</button>
+      </div>
+      <div id="calc-result" class="mu sm" style="margin-top:6px"></div>
+    </div>
+
+    ${MK && MK.expired ? `
+      <div class="card" style="border-color:var(--no-bd);background:var(--no-bg);margin-top:10px">
+        <b class="c-no">⏱ Time is up — your answers are frozen.</b>
+        <p class="mu" style="margin:6px 0 10px">You can still review every question. Submit the mock to record your score and see the answer review.</p>
+        <button class="p sm" onclick="confirmSubmitMock()">Submit Mock</button>
+      </div>
+    ` : ''}
 
     ${subjectBannerHtml}
 
@@ -5195,6 +5769,16 @@ function show() {
               </div>
             `}
 
+            ${(!MK && !hist.locked && !(isReview && recallFirst)) ? `
+              <div class="card" style="margin-top:10px;padding:10px 12px">
+                <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+                  <input id="typed-answer" type="text" placeholder="Optional: type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();showTypedAnswerPanel();}">
+                  <button class="sm" onclick="showTypedAnswerPanel()">Check typed</button>
+                </div>
+                <div class="mu sm" style="margin-top:6px">Typed answers are self-graded as Confidence 2 (Unsure). MCQ buttons stay primary.</div>
+                <div id="typed-answer-panel"></div>
+              </div>
+            ` : ''}
             <div id="fb">${hist.locked ? (hist.feedbackHtml || '') : ''}</div>
           </div>
         </div>
@@ -5233,6 +5817,8 @@ function show() {
 
   if (isReview && !MK && recallFirst && !hist.locked) {
     recallWaiting = true;
+  } else {
+    recallWaiting = false;
   }
 
   if (MK) {
@@ -5259,6 +5845,7 @@ function toggleOriginalStem(n) {
 
 function renderOptionsHtml(q, hist) {
   const isMock = !!MK;
+  const frozen = !!(MK && MK.expired);
   const rawQ = q.origQ || byN(Q[P]);
   const mockAnswer = isMock ? (
     MK.displayA && MK.displayA[rawQ.n] !== undefined
@@ -5274,6 +5861,7 @@ function renderOptionsHtml(q, hist) {
     let stateIcon = '';
     if (isMock) {
       if (mockAnswer === i) cls += ' ans';
+      if (frozen) disabled = true;
     } else if (hist && hist.locked) {
       disabled = true;
       if (i === q.displayA) {
@@ -5361,8 +5949,72 @@ function updateConfidence(cf) {
   save();
 }
 
-function pick(i) {
+function toggleCalcPanel() {
+  const panel = $('#calc-panel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') {
+    const input = $('#calc-input');
+    if (input) setTimeout(() => input.focus(), 20);
+  }
+}
+
+function evalCalc() {
+  const input = $('#calc-input');
+  const out = $('#calc-result');
+  if (!input || !out) return;
+  const expr = String(input.value || '').trim();
+  if (!expr) { out.textContent = ''; return; }
+  if (!/^[0-9+\-*/().%\s]+$/.test(expr)) {
+    out.textContent = 'Only numbers and + - * / ( ) % are allowed.';
+    return;
+  }
+  try {
+    const value = Function('"use strict";return (' + expr + ')')();
+    out.innerHTML = `= <b>${esc(String(value))}</b>`;
+  } catch (err) {
+    out.textContent = 'Invalid expression.';
+  }
+}
+
+function showTypedAnswerPanel() {
+  if (!CURRENT_Q || locked) return;
+  const input = $('#typed-answer');
+  const text = input ? String(input.value || '').trim() : '';
+  if (!text) { alert('Type an answer first.'); return; }
+  window._typedAnswerText = text;
+  const panel = $('#typed-answer-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border:1px solid var(--bd);border-radius:8px">
+      <div class="sm"><b>Your answer:</b> ${esc(text)}</div>
+      <div class="mu sm" style="margin-top:4px">Compare it yourself, then record it as Confidence 2 (Unsure).</div>
+      <div class="row" style="gap:6px;margin-top:8px">
+        <button class="sm p" onclick="typedAnswerGrade(true)">I was correct</button>
+        <button class="sm" onclick="typedAnswerGrade(false)">I was wrong</button>
+      </div>
+    </div>
+  `;
+}
+
+function typedAnswerGrade(correct) {
+  if (!CURRENT_Q || locked) return;
+  const text = window._typedAnswerText || '';
+  window._typedAnswerText = '';
+  const wrongIndex = [0, 1, 2, 3].find(i => i !== CURRENT_Q.displayA);
+  pick(correct ? CURRENT_Q.displayA : (wrongIndex == null ? 0 : wrongIndex), 2);
+  const fb = $('#fb');
+  const hist = sessionHistory[P];
+  if (text && fb) {
+    fb.insertAdjacentHTML('afterbegin', `<div class="mu sm" style="margin-bottom:6px"><b>Typed answer:</b> ${esc(text)}</div>`);
+    if (hist) hist.feedbackHtml = fb.innerHTML;
+    save();
+  }
+}
+
+function pick(i, cfOverride) {
   if (locked) return;
+  if (MK && MK.expired) return;
   if (recallWaiting) revealRecallOptions();
 
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
@@ -5378,7 +6030,7 @@ function pick(i) {
     hist.chosenIdx = i;
     hist.origPickedIndex = chosenIndex;
     hist.ok = (i === CURRENT_Q.displayA);
-    localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q, P }));
+    persistMockState();
     save();
     next();
     return;
@@ -5390,6 +6042,7 @@ function pick(i) {
   QRESULTS[P] = ok ? 'c' : 'w';
   const origPickedIndex = CURRENT_Q.origO.indexOf(CURRENT_Q.displayOpts[i]);
   const timeTakenMs = Math.max(500, Date.now() - (questionStartTime || Date.now()));
+  const confidence = cfOverride === 2 ? 2 : 3;
 
   const bs = [...document.querySelectorAll('.opt')];
   bs.forEach(b => b.disabled = true);
@@ -5408,18 +6061,20 @@ function pick(i) {
     hist.recordedFirstAttempt = true;
     REC = {
       k: qk(rawQ),
+      uid: ensureQuestionUid(rawQ),
+      lvl: effLevel(rawQ),
       t: Date.now(),
       s: cl(rawQ.s),
       u: rawQ.u || '',
       q: rawQ.q.slice(0, 120),
       ch: origPickedIndex,
       ok,
-      cf: 3,
+      cf: confidence,
       tm: Math.round(timeTakenMs / 1000),
       set: S
     };
     L.push(REC);
-    sr(rawQ, ok, 3, timeTakenMs);
+    sr(rawQ, ok, confidence, timeTakenMs);
   }
 
   const vRec = V[qk(rawQ)];
@@ -5466,9 +6121,9 @@ function pick(i) {
         <b class="c-ok">${isFastMastery ? '⚡ Correct in <15s (Mastery Recall)' : 'Correct.'}</b>
         <div class="row" style="margin-top:6px;gap:6px;align-items:center">
           <span class="mu sm">Confidence:</span>
-          <button type="button" class="cf-btn" data-cf="1" onclick="updateConfidence(1)" title="Count as lucky guess (miss)">1 · Guess (Miss)</button>
-          <button type="button" class="cf-btn" data-cf="2" onclick="updateConfidence(2)">2 · Unsure</button>
-          <button type="button" class="cf-btn on" data-cf="3" onclick="updateConfidence(3)">3 · Sure</button>
+          <button type="button" class="cf-btn${confidence === 1 ? ' on' : ''}" data-cf="1" onclick="updateConfidence(1)" title="Count as lucky guess (miss)">1 · Guess (Miss)</button>
+          <button type="button" class="cf-btn${confidence === 2 ? ' on' : ''}" data-cf="2" onclick="updateConfidence(2)">2 · Unsure</button>
+          <button type="button" class="cf-btn${confidence === 3 ? ' on' : ''}" data-cf="3" onclick="updateConfidence(3)">3 · Sure</button>
         </div>
         <div id="current-exp-container" style="margin-top:6px">
           ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
@@ -5551,13 +6206,16 @@ function dontKnow() {
     hist.recordedFirstAttempt = true;
     REC = {
       k: qk(rawQ),
+      uid: ensureQuestionUid(rawQ),
+      lvl: effLevel(rawQ),
       t: Date.now(),
       s: cl(rawQ.s),
       u: rawQ.u || '',
       q: rawQ.q.slice(0, 120),
       ch: -1,
       ok: false,
-      set: S
+      set: S,
+      skipped: true
     };
     L.push(REC);
     if (rawQ._k) mark(rawQ._k, 0, -1);
@@ -5826,6 +6484,8 @@ async function fetchExplanationForCurrent() {
   if (!CURRENT_Q || P >= Q.length) return;
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
+  const targetUid = ensureQuestionUid(rawQ);
+  const targetQk = qk(rawQ);
   if (!GEM_KEY) {
     alert('Please enter your Gemini API Key in Settings (⚙) to generate AI explanations.');
     return;
@@ -5848,13 +6508,19 @@ async function fetchExplanationForCurrent() {
     const expText = parsed.explanation || (typeof parsed === 'string' ? parsed : '');
     if (expText) {
       rawQ.e = expText;
+      const target = findQuestionByUid(targetUid) || byN(targetQk);
+      if (target) target.e = expText;
       save();
-      const expContainer = $('#current-exp-container');
+      const nowQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : (P < Q.length ? byN(Q[P]) : null);
+      const nowUid = nowQ ? (nowQ.uid || ensureQuestionUid(nowQ)) : '';
+      const stillCurrent = !!nowUid && nowUid === targetUid;
+      const expContainer = stillCurrent ? $('#current-exp-container') : null;
       if (expContainer) {
         expContainer.innerHTML = explanationHtml(expText);
         typesetMath(expContainer);
+        showToast('Explanation saved.');
       } else {
-        show();
+        showToast('Explanation ready for the question you left.');
       }
     } else {
       throw new Error('Model did not return explanation');
@@ -6006,6 +6672,13 @@ function deleteVariant(n) {
   show();
 }
 
+function backToLastQuestion() {
+  if (!Array.isArray(Q) || !Q.length) { home(); return; }
+  P = Q.length - 1;
+  view = 'q';
+  show();
+}
+
 // Session Complete Screen
 function done() {
   view = 'done';
@@ -6050,12 +6723,12 @@ function done() {
   const acc = Math.round(c / (Q.length || 1) * 100);
 
   // Recovery calculation: questions correct today that had a prior miss in L on an earlier calendar day
-  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const todayDateStr = localDateKey();
   let recoveredCount = 0;
   Q.forEach((k, idx) => {
     if (r[idx] === 'c') {
       const q = byN(k);
-      const priorMiss = L.find(item => item.k === qk(q) && !item.ok && new Date(item.t).toISOString().slice(0, 10) !== todayDateStr);
+      const priorMiss = L.find(item => item.k === qk(q) && !item.ok && localDateKey(item.t) !== todayDateStr);
       if (priorMiss) recoveredCount++;
     }
   });
@@ -6119,7 +6792,7 @@ function done() {
           <h2 style="margin:0 0 4px">Calm, Focused Practice Complete</h2>
           <div class="mu sm">Every active retrieval strengthens your neural recall pathways.</div>
         </div>
-        <span class="chip ${acc >= 81 ? 'c-ok' : 'c-sk'}">
+        <span class="chip ${acc >= 75 ? 'c-ok' : 'c-sk'}">
           Accuracy: <b>${acc}%</b>
         </span>
       </div>
@@ -6160,7 +6833,7 @@ function done() {
                   <span><b>${esc(s)}</b></span>
                   <span class="mu">${data.correct}/${data.total} (${pct}%)</span>
                 </div>
-                <div class="mini"><i style="width:${pct}%;background:${pct >= 81 ? 'var(--ok)' : (pct >= 50 ? 'var(--sk)' : 'var(--no)')}"></i></div>
+                <div class="mini"><i style="width:${pct}%;background:${pct >= 75 ? 'var(--ok)' : (pct >= 50 ? 'var(--sk)' : 'var(--no)')}"></i></div>
               </div>
             `;
           }).join('')}
@@ -6189,6 +6862,7 @@ function done() {
       <p class="row" style="margin-top:20px;justify-content:space-between">
         <button class="p big-btn" onclick="home()">Back to Dashboard</button>
         ${revisitKeys.length ? `<button class="big-btn" onclick="start(${JSON.stringify(revisitKeys)})">Retry Missteps Now</button>` : ''}
+        <button class="big-btn" onclick="backToLastQuestion()">Back to Last Question</button>
       </p>
     </div>
   `;
@@ -6202,72 +6876,223 @@ function done() {
 // Timed Mock Exam Fix
 let MK_PAUSED = false, MK_REM = 0;
 
-function mock(count = 100, isDiagnostic = false) {
-  const mathSubjs = new Set(['Engineering Mathematics', 'Linear Algebra', 'Calculus', 'Statistics', 'Probability', 'Discrete Mathematics'].map(canonSubj));
-  const mathPool = [];
-  const csPool = {};
+const MOCK_MATH_SUBJECTS = [
+  'Basic Mathematics: Calculus & Functions',
+  'Linear & Abstract Algebra',
+  'Basic Statistics'
+];
+const MOCK_COMPUTING_SUBJECTS = [
+  'C Programming',
+  'Object Oriented Programming - C++',
+  'Data Structures & Algorithms',
+  'Database Management System',
+  'Network & Data Communications',
+  'Microprocessor & Computer Architecture',
+  'Operating Systems',
+  'Introduction to IT',
+  'Digital Logic',
+  'E-Commerce',
+  'Management Information System',
+  'Computer Graphics',
+  'Artificial Intelligence',
+  'Systems Analysis & Design',
+  'Software Engineering',
+  'Web Technology'
+].map(canonSubj);
 
-  D.forEach(q => {
-    const s = canonSubj(q.s);
-    if (mathSubjs.has(s)) {
-      mathPool.push(q.n);
-    } else {
-      csPool[s] = csPool[s] || [];
-      csPool[s].push(q.n);
-    }
+function mockBlueprint(half) {
+  const b = {};
+  if (half) {
+    b['Basic Mathematics: Calculus & Functions'] = 5;
+    b['Linear & Abstract Algebra'] = 3;
+    b['Basic Statistics'] = 2;
+    MOCK_COMPUTING_SUBJECTS.forEach(s => { b[s] = 2; });
+    const extras = MOCK_COMPUTING_SUBJECTS.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < 8; i++) b[extras[i % extras.length]]++;
+  } else {
+    b['Basic Mathematics: Calculus & Functions'] = 9;
+    b['Linear & Abstract Algebra'] = 6;
+    b['Basic Statistics'] = 5;
+    MOCK_COMPUTING_SUBJECTS.forEach(s => { b[s] = 5; });
+  }
+  return b;
+}
+
+function localWeekKey(ts = Date.now()) {
+  const dayIdx = localDayIndex(ts);
+  const d = new Date(ts);
+  const offset = (d.getDay() + 6) % 7;
+  return String(dayIdx - offset);
+}
+
+function weeklyMockStatus() {
+  const currentWeek = localWeekKey();
+  const lastWeek = WEEKLY_MOCK.lastCompletedWeek || '';
+  return {
+    currentWeek,
+    completed: lastWeek === currentWeek,
+    due: lastWeek !== currentWeek,
+    started: WEEKLY_MOCK.startedWeek === currentWeek
+  };
+}
+
+function mockPool(rawPool) {
+  const seen = new Set();
+  const out = [];
+  (rawPool || []).forEach(q => {
+    if (!q || q.quarantined) return;
+    const id = questionUid(q) || qk(q);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(q);
   });
+  return out;
+}
 
-  const mathCount = count === 50 ? 15 : 30;
-  const csCount = count - mathCount;
+function mockPoolStatus(pool, half) {
+  const blueprint = mockBlueprint(half);
+  const counts = {};
+  pool.forEach(q => {
+    const s = canonSubj(q.s);
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  const missing = Object.entries(blueprint)
+    .filter(([s, need]) => (counts[s] || 0) < need)
+    .map(([s, need]) => ({ subject: s, need, have: counts[s] || 0 }));
+  return { ok: missing.length === 0, missing, blueprint };
+}
 
-  // Shuffle math
-  mathPool.sort(() => Math.random() - 0.5);
-  const selectedMath = mathPool.slice(0, mathCount);
-
-  // Group computing subjects in blocks of 5
-  const selectedCs = [];
-  const csKeys = Object.keys(csPool).sort(() => Math.random() - 0.5);
-  while (selectedCs.length < csCount && csKeys.some(k => csPool[k].length > 0)) {
-    for (const k of csKeys) {
-      if (selectedCs.length >= csCount) break;
-      const available = csPool[k];
-      if (available && available.length) {
-        available.sort(() => Math.random() - 0.5);
-        selectedCs.push(...available.splice(0, Math.min(5, csCount - selectedCs.length)));
-      }
+function pickMockLevelQuestions(pool, quota) {
+  const buckets = { 0: [], 1: [], 2: [], 3: [] };
+  pool.forEach(q => {
+    const lvl = Math.max(0, Math.min(3, effLevel(q)));
+    buckets[lvl].push(q);
+  });
+  Object.values(buckets).forEach(bucket => bucket.sort(() => Math.random() - 0.5));
+  const out = [];
+  const take = (level, n) => {
+    while (n > 0 && buckets[level].length) {
+      out.push(buckets[level].pop());
+      n--;
     }
-  }
+  };
+  const core0 = Math.round(quota * 0.4);
+  const core1 = Math.round(quota * 0.4);
+  take(0, core0);
+  take(1, core1);
+  take(2, quota - out.length);
+  take(3, quota - out.length);
+  [0, 1, 2, 3].forEach(level => {
+    if (out.length < quota) take(level, quota - out.length);
+  });
+  return out.slice(0, quota);
+}
 
-  const k = [...selectedMath, ...selectedCs];
-  if (!k.length) {
-    alert('No questions available in question bank to assemble mock exam.');
-    return;
-  }
+function chooseMockSource(half) {
+  const current = mockPool(D || []);
+  const currentStatus = mockPoolStatus(current, half);
+  if (currentStatus.ok) return { pool: current, source: 'current set' };
 
-  const durationMin = count === 50 ? 60 : 120;
+  const bank = mockPool(bankQuestionPool());
+  const bankStatus = mockPoolStatus(bank, half);
+  if (bankStatus.ok) return { pool: bank, source: 'saved question bank' };
+
+  const best = bankStatus.missing.length <= currentStatus.missing.length ? bankStatus : currentStatus;
+  const detail = best.missing
+    .map(m => `• ${m.subject}: need ${m.need}, have ${m.have}`)
+    .join('\n');
+  alert(`Cannot build a ${half ? 'half' : 'full'} mock: the available questions do not cover the guide blueprint.\n\n${detail}\n\nLoad a larger question bank or restore your saved banks, then try again.`);
+  return null;
+}
+
+function buildMockSnapshots(half) {
+  const source = chooseMockSource(half);
+  if (!source) return null;
+  const grouped = {};
+  source.pool.forEach(q => {
+    const s = canonSubj(q.s);
+    (grouped[s] = grouped[s] || []).push(q);
+  });
+  const blueprint = mockBlueprint(half);
+  const orderedSubjects = [...MOCK_MATH_SUBJECTS, ...MOCK_COMPUTING_SUBJECTS];
+  const selected = [];
+  orderedSubjects.forEach(subject => {
+    const quota = blueprint[subject] || 0;
+    if (!quota) return;
+    const picked = pickMockLevelQuestions(grouped[subject] || [], quota);
+    selected.push(...picked);
+  });
+  if (selected.length !== (half ? 50 : 100)) {
+    alert(`Mock assembly produced ${selected.length} questions instead of ${half ? 50 : 100}. Please try again or load a larger bank.`);
+    return null;
+  }
+  const snapshots = selected.map((q, i) => {
+    const copy = JSON.parse(JSON.stringify(q));
+    copy.n = i + 1;
+    copy._mockOrigUid = ensureQuestionUid(q);
+    copy._mockOrigN = q.n;
+    return copy;
+  });
+  return { snapshots, source: source.source };
+}
+
+function mock(count = 100, isDiagnostic = false) {
+  const half = count === 50;
+  const built = buildMockSnapshots(half);
+  if (!built) return;
+  MOCK_D = built.snapshots;
+  const k = MOCK_D.map(q => q.n);
+  const durationMin = half ? 60 : 120;
   const durationMs = durationMin * 60000;
+  const now = Date.now();
 
   MK = {
     a: {},
     displayA: {},
     flagged: {},
     n: k.length,
-    end: Date.now() + durationMs,
+    start: now,
+    end: now + durationMs,
+    remainingMs: durationMs,
+    paused: false,
+    expired: false,
     isDiagnostic: !!isDiagnostic,
-    isHalf: count === 50,
-    durationMs
+    isHalf: half,
+    durationMs,
+    source: built.source,
+    weekKey: localWeekKey(now)
   };
   MK_PAUSED = false;
   MK_REM = 0;
-  localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q: k, P: 0 }));
+  WEEKLY_MOCK.startedWeek = MK.weekKey;
+  WEEKLY_MOCK.startedAt = now;
+  persistMockState();
+  save();
   start(k);
 }
 
 function startDiagnosticMock() {
-  if (!confirm('Start the Day-1 Diagnostic Mock Exam?\n\n• 100 questions (Math & Stats first, then Computing subjects in blocks of 5)\n• 120 minutes\n• Requires confidence tags on your answers to calibrate your spaced repetition ladder.')) {
+  if (!confirm('Start the Day-1 Diagnostic Mock Exam?\n\n• 100 blueprint-balanced questions (Math & Statistics first, then all 16 computing subjects)\n• 120 minutes\n• Results are used as a one-time baseline until each subject has 15 practice attempts.')) {
     return;
   }
   mock(100, true);
+}
+
+function persistMockState() {
+  try {
+    if (!MK) {
+      localStorage.removeItem('bitmcq_mock_state');
+      return;
+    }
+    localStorage.setItem('bitmcq_mock_state', JSON.stringify({
+      MK,
+      Q,
+      P,
+      MOCK_D
+    }));
+  } catch (e) {
+    console.error('Failed to persist mock state:', e);
+  }
 }
 
 function resumeActiveMock() {
@@ -6276,11 +7101,16 @@ function resumeActiveMock() {
     if (!rawMock) return;
     const parsed = JSON.parse(rawMock);
     MK = parsed.MK;
-    Q = parsed.Q;
+    if (!MK) return;
+    MOCK_D = Array.isArray(parsed.MOCK_D) ? parsed.MOCK_D : [];
+    Q = parsed.Q || [];
     P = parsed.P || 0;
-    MK_PAUSED = false;
-    MK_REM = 0;
+    MK_PAUSED = !!MK.paused;
+    MK_REM = typeof MK.remainingMs === 'number'
+      ? MK.remainingMs
+      : Math.max(0, (MK.end || Date.now()) - Date.now());
     start(Q);
+    if (MK && !MK.expired && !MK.paused && (MK.end || 0) <= Date.now()) expireMock();
   } catch (e) {
     console.error('Failed to resume mock:', e);
   }
@@ -6290,16 +7120,19 @@ function cancelActiveMock() {
   if (confirm('Cancel active mock exam? Unsubmitted answers will be discarded.')) {
     localStorage.removeItem('bitmcq_mock_state');
     MK = null;
+    MOCK_D = [];
+    MK_PAUSED = false;
+    MK_REM = 0;
     home();
   }
 }
 
 function toggleFlag() {
-  if (!MK) return;
+  if (!MK || MK.expired) return;
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
   MK.flagged = MK.flagged || {};
   MK.flagged[rawQ.n] = !MK.flagged[rawQ.n];
-  localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q, P }));
+  persistMockState();
   const b = $('#flag-btn');
   if (b) b.classList.toggle('p', !!MK.flagged[rawQ.n]);
   const btn = document.getElementById('pal-' + P);
@@ -6307,31 +7140,52 @@ function toggleFlag() {
 }
 
 function togglePause() {
-  if (!MK) return;
-  MK_PAUSED = !MK_PAUSED;
-  if (MK_PAUSED) {
-    MK_REM = MK.end - Date.now();
-    clearInterval(TI);
-  } else {
-    MK.end = Date.now() + MK_REM;
+  if (!MK || MK.expired) return;
+  if (MK.paused) {
+    MK.paused = false;
+    MK.end = Date.now() + (MK.remainingMs || 0);
+    MK_PAUSED = false;
+    MK_REM = 0;
     TI = setInterval(tick, 1000);
     tick();
+  } else {
+    MK.remainingMs = Math.max(0, MK.end - Date.now());
+    MK.paused = true;
+    MK_PAUSED = true;
+    MK_REM = MK.remainingMs;
+    clearInterval(TI);
   }
-  const pb = $('#pb');
-  if (pb) pb.textContent = MK_PAUSED ? '▶ Resume' : '⏸ Pause';
+  persistMockState();
+  show();
+}
+
+function expireMock() {
+  if (!MK || MK.expired) return;
+  MK.remainingMs = 0;
+  MK.end = Date.now();
+  MK.paused = false;
+  MK.expired = true;
+  MK_PAUSED = false;
+  MK_REM = 0;
+  clearInterval(TI);
+  persistMockState();
+  show();
 }
 
 function tick() {
-  if (!MK || MK_PAUSED) return;
+  if (!MK || MK.paused || MK.expired) return;
   const r = Math.max(0, MK.end - Date.now());
   const tm = $('#tm');
   if (tm) tm.textContent = '⏱ ' + Math.floor(r / 6e4) + ':' + String(Math.floor(r / 1e3) % 60).padStart(2, '0');
   
-  const unans = Q.filter(n => MK.a[byN(n).n] === undefined).length;
+  const unans = Q.filter(n => {
+    const q = byN(n);
+    return q && MK.a[q.n] === undefined;
+  }).length;
   const uc = $('#unans-chip');
   if (uc) uc.textContent = unans ? `Unanswered: ${unans}` : 'All answered ✓';
 
-  if (!r) mockEnd();
+  if (!r) expireMock();
 }
 
 function renderMockPalette() {
@@ -6365,12 +7219,15 @@ function renderMockPalette() {
 
 function jumpMock(idx) {
   P = idx;
-  localStorage.setItem('bitmcq_mock_state', JSON.stringify({ MK, Q, P }));
+  persistMockState();
   show();
 }
 
 function confirmSubmitMock() {
-  const unans = Q.filter(n => MK.a[byN(n).n] === undefined).length;
+  const unans = Q.filter(n => {
+    const q = byN(n);
+    return q && MK.a[q.n] === undefined;
+  }).length;
   if (unans > 0) {
     if (!confirm(`⚠️ You have ${unans} unanswered question(s)!\n\nUnanswered questions earn 0 marks. The MIT exam's negative-marking rule is unconfirmed.\n\nAre you sure you want to submit now?`)) {
       return;
@@ -6383,7 +7240,8 @@ function mockEnd() {
   clearInterval(TI);
   if (!MK) return;
   const isDiag = !!MK.isDiagnostic;
-  const refreshKeys = Q.slice();
+  const isHalf = !!MK.isHalf;
+  const refreshKeys = (MOCK_D || []).map(q => q && q._mockOrigUid).filter(Boolean);
   localStorage.removeItem('bitmcq_mock_state');
 
   const sub = {}, bad = [], n = Q.length;
@@ -6397,18 +7255,15 @@ function mockEnd() {
     const s = cl(q.s), x = sub[s] = sub[s] || [0, 0];
     x[1]++;
     L.push({
-      k: qk(q), t: Date.now(), s, u: q.u || '', q: q.q.slice(0, 120),
-      ch: a === undefined ? -1 : a, ok, set: S, mock: 1, unfixed: !ok
+      k: qk(q), uid: q.uid || q._mockOrigUid || ensureQuestionUid(q), lvl: effLevel(q), t: Date.now(), s, u: q.u || '', q: q.q.slice(0, 120),
+      ch: a === undefined ? -1 : a, ok, set: S, mock: 1, diag: isDiag ? 1 : 0, unfixed: !ok
     });
     try { sr(q, ok, 3, 30000); } catch (e) { }
     if (ok) {
-      c++; x[0]++; R[q.n] = 'c'; delete W[q.n];
+      c++; x[0]++;
     } else {
-      R[q.n] = a === undefined ? 's' : 'w';
-      if (a !== undefined) W[q.n] = a;
       bad.push([q, a]);
     }
-    recordFixDay(q.s);
   });
 
   const pct = Math.round(c / n * 100);
@@ -6418,12 +7273,17 @@ function mockEnd() {
     localStorage.setItem('bitmcq_diag_done', '1');
   }
 
+  if (!isHalf && n >= 100) {
+    WEEKLY_MOCK.lastCompletedWeek = localWeekKey();
+    WEEKLY_MOCK.lastCompletedAt = Date.now();
+  }
+
   if (pct > PB_MOCK_SCORE) {
     PB_MOCK_SCORE = pct;
     localStorage.setItem('bitmcq_pb_mock', String(PB_MOCK_SCORE));
   }
 
-  MK = null; MK_PAUSED = false; MK_REM = 0; Q = []; QRESULTS = []; P = 0;
+  MK = null; MK_PAUSED = false; MK_REM = 0; Q = []; QRESULTS = []; P = 0; MOCK_D = [];
   save();
   view = 'done';
 
@@ -6431,7 +7291,7 @@ function mockEnd() {
     <h1>Mock Exam Result ${isDiag ? '(Day-1 Diagnostic)' : ''}</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
-        Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 81 ? '<span class="c-ok">Target Met (≥81%) 🎉</span>' : '<span class="c-no">Below 81% target</span>'}
+        Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%) 🎉</span>' : '<span class="c-no">Below 75% target</span>'}
       </p>
       ${pct >= PB_MOCK_SCORE && PB_MOCK_SCORE > 0 ? `<p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score!</p>` : ''}
       ${isDiag ? `<p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>` : ''}
@@ -6439,7 +7299,7 @@ function mockEnd() {
         <tr><th>Subject</th><th>Score</th><th>Accuracy</th></tr>
         ${Object.entries(sub).map(([s, x]) => `<tr><td>${esc(s)}</td><td>${x[0]}/${x[1]}</td><td>${Math.round(x[0] / x[1] * 100) || 0}%</td></tr>`).join('')}
       </table>
-      <div id="bg-gen-box" class="bg-gen-banner refresh-status" style="display:none"></div>
+    <div id="bg-gen-box" class="bg-gen-banner refresh-status" style="display:none"></div>
       <p class="row" style="margin-top:16px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
     </div>
     <div class="card">
@@ -6463,6 +7323,11 @@ function mockEnd() {
 document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (document.getElementById('q-editor-overlay')) return;
+  if (view === 'q' && e.altKey && e.key.toLowerCase() === 'c') {
+    e.preventDefault();
+    toggleCalcPanel();
+    return;
+  }
   if (view !== 'q' || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
 
@@ -6613,6 +7478,11 @@ function importBank(x, defaultName, replaceExisting = false) {
 function loadDefaultBank() {
   defaultBankLoading = true;
   defaultBankLoadError = '';
+  if (D && (BANKS || []).some(b => b && Array.isArray(b.q) && b.q.length)) {
+    defaultBankLoading = false;
+    home();
+    return;
+  }
   if (!D && !loadMode) home();
   fetch('./question_bank.json').then(response => {
     if (!response.ok) throw new Error(`Question bank request failed (${response.status}).`);
@@ -6678,7 +7548,7 @@ function compact() {
     t: Date.now(),
     doneAt: Date.now(),
     no: S,
-    date: new Date().toISOString().slice(0, 10),
+    date: localDateKey(),
     total: D.length,
     completed: D.length > 0 && D.every(q => !!R[q.n]),
     subj,
@@ -6702,6 +7572,7 @@ function retake() {
 
 function start(q) {
   REV = null; RA.clear(); sessionLeechCount = 0;
+  recallFirst = true;
   variantRefreshDone = 0;
   variantRefreshSkipped = 0;
   variantRefreshSessionCount = 0;
@@ -6833,33 +7704,42 @@ function exportLog(copy) {
   const scope = $('#xs').value;
   const isMd = $('#xf').value === 'md';
   const m = $('#xm');
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateKey();
   let text = `# Recall Error Log - ${todayStr}\n\n`;
   const results = [];
 
-  // From current deck
-  (D||[]).forEach(q => {
-    if (R[q.n] === 'w') results.push({ q, type: 'w', src: 'current' });
-    if (R[q.n] === 's') results.push({ q, type: 's', src: 'current' });
+  function addResult(q, type, src, cf, identity) {
+    if (!q) return;
+    const id = identity || questionUid(q) || qk(q);
+    if (!id) return;
+    results.push({ q, type, src, cf, identity: id });
+  }
+
+  (D || []).forEach(q => {
+    const id = questionUid(q) || qk(q);
+    if (R[q.n] === 'w') addResult(q, 'w', 'current', null, id);
+    if (R[q.n] === 's') addResult(q, 's', 'current', null, id);
   });
 
-  // From history log L (all sessions)
-  (L||[]).forEach(rec => {
+  (L || []).forEach(rec => {
     try {
-      const d = new Date(rec.t || Date.now()).toISOString().slice(0,10);
-      if (d !== todayStr) return;
-      const q = byN(rec.k) || (BANKS||[]).flatMap(b=>b.q||[]).find(x=>qk(x)===rec.k) || null;
+      if (localDateKey(rec.t || Date.now()) !== todayStr) return;
+      const q = findQuestionByRecord(rec);
       if (!q) return;
-      if (rec.ok === false) results.push({ q, type: 'w', src: 'log', cf: rec.cf });
-      if (rec.ch === -2 || rec.skipped) results.push({ q, type: 's', src: 'log', cf: rec.cf });
-      if (rec.cf === 1 || rec.cf === 2) results.push({ q, type: 'ug', src: 'log', cf: rec.cf });
+      const id = recordIdentity(rec) || questionUid(q) || qk(q);
+      const isSkip = rec.ch < 0 || rec.skipped || rec.ch === -2;
+      if (isSkip) {
+        addResult(q, 's', 'log', rec.cf, id);
+      } else if (rec.ok === false) {
+        addResult(q, 'w', 'log', rec.cf, id);
+      }
+      if (!isSkip && (rec.cf === 1 || rec.cf === 2)) addResult(q, 'ug', 'log', rec.cf, id);
     } catch(e){}
   });
 
-  // Deduplicate by question number
   const seen = new Set();
   const unique = results.filter(r => {
-    const key = r.q.n + '|' + r.type;
+    const key = `${r.identity}|${r.type}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -6869,48 +7749,25 @@ function exportLog(copy) {
   const sList = unique.filter(r => r.type === 's');
   const ugList = unique.filter(r => r.type === 'ug');
 
-  if (scope === 'all' || scope === 'wsk') {
-    if (scope !== 's' && (scope === 'all' || scope === 'wsk' || scope === 'w')) {
-      if (scope === 'all' || scope === 'wsk' || scope === 'w') {
-        text += `## Mistakes (${wList.length})\n\n`;
-        wList.forEach(r => {
-          const q = r.q;
-          text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nYour confidence: ${r.cf||'-'}\nReason: ${q.e || ''}\n\n`;
-        });
-      }
-    }
-    if (scope === 'all' || scope === 'wsk' || scope === 's') {
-      text += `## Skipped (${sList.length})\n\n`;
-      sList.forEach(r => {
-        const q = r.q;
-        text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nReason: ${q.e || ''}\n\n`;
-      });
-    }
-    if (scope === 'all') {
-      text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
-      ugList.forEach(r => {
-        const q = r.q;
-        text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nConfidence: ${r.cf}\nReason: ${q.e || ''}\n\n`;
-      });
-    }
-  } else if (scope === 'w') {
+  function renderEntry(r, showConfidence) {
+    const q = r.q;
+    const answer = q && Array.isArray(q.o) && q.a != null ? `${'ABCD'[q.a]}) ${q.o[q.a]}` : 'Unavailable';
+    return `### ${q.n != null ? 'Q' + q.n : 'Question'} (${q.s || 'General'})\n${q.q || ''}\nCorrect: ${answer}\n` +
+      (showConfidence ? `Confidence: ${r.cf || '-'}\n` : '') +
+      (q.e ? `Reason: ${q.e}\n` : '') + '\n';
+  }
+
+  if (scope === 'all' || scope === 'wsk' || scope === 'w') {
     text += `## Mistakes (${wList.length})\n\n`;
-    wList.forEach(r => {
-      const q = r.q;
-      text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nReason: ${q.e || ''}\n\n`;
-    });
-  } else if (scope === 's') {
+    wList.forEach(r => { text += renderEntry(r, true); });
+  }
+  if (scope === 'all' || scope === 'wsk' || scope === 's') {
     text += `## Skipped (${sList.length})\n\n`;
-    sList.forEach(r => {
-      const q = r.q;
-      text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nReason: ${q.e || ''}\n\n`;
-    });
-  } else if (scope === 'ug') {
+    sList.forEach(r => { text += renderEntry(r, false); });
+  }
+  if (scope === 'all' || scope === 'ug') {
     text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
-    ugList.forEach(r => {
-      const q = r.q;
-      text += `### Q${q.n} (${q.s})\n${q.q}\nCorrect: ${'ABCD'[q.a]}) ${q.o[q.a]}\nConfidence: ${r.cf}\nReason: ${q.e || ''}\n\n`;
-    });
+    ugList.forEach(r => { text += renderEntry(r, true); });
   }
 
   if (!copy) {
@@ -7054,7 +7911,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, recallFirst, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, WEEKLY_MOCK: (WEEKLY_MOCK && typeof WEEKLY_MOCK === 'object') ? WEEKLY_MOCK : {}, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
   apply: (s, opts = {}) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const currentView = typeof view !== 'undefined' ? view : 'home';
@@ -7078,7 +7935,6 @@ window.AppState = {
     QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
     QEDITS = (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {};
     QDELETED = (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {};
-    recallFirst = s.recallFirst !== false;
     CARDS = Array.isArray(s.CARDS) ? s.CARDS : (JSON.parse(localStorage.getItem('bitmcq_cards') || '[]'));
     CARD_TOMBSTONES = (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {};
     pruneCardTombstones();
@@ -7088,6 +7944,7 @@ window.AppState = {
     DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE;
     QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
     PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
+    WEEKLY_MOCK = (s.WEEKLY_MOCK && typeof s.WEEKLY_MOCK === 'object') ? s.WEEKLY_MOCK : {};
     COLD_QS = (s.COLD_QS && typeof s.COLD_QS === 'object') ? s.COLD_QS : {};
     // Synchronize Leitner/FSRS V cold flags with COLD_QS
     Object.entries(COLD_QS).forEach(([nStr, val]) => {
@@ -7146,8 +8003,13 @@ try {
 
 load();
 home();
-if (window.CloudSync) CloudSync.init();
-loadDefaultBank();
+if (window.CloudSync) {
+  CloudSync.init();
+  if (CloudSync.whenInitialSyncSettled) CloudSync.whenInitialSyncSettled(loadDefaultBank);
+  else loadDefaultBank();
+} else {
+  loadDefaultBank();
+}
 const mathJaxScript = document.createElement('script');
 mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js';
 mathJaxScript.async = true;
@@ -7286,7 +8148,7 @@ function fixMockOptionScrambleBug() {
       </p>
       <div class="mu sm" style="line-height:1.6">
         ✓ Restored <b>${repairedCount}</b> falsely-failed questions to Correct.<br>
-        ✓ True Score: <b>${correctCount}/${total} (${pct}%)</b> — <span class="c-ok" style="font-weight:700">${pct >= 81 ? 'Target Met (≥81%)!' : 'Below 81% target'}</span><br>
+        ✓ True Score: <b>${correctCount}/${total} (${pct}%)</b> — <span class="c-ok" style="font-weight:700">${pct >= 75 ? 'Target Met (≥75%)!' : 'Below 75% target'}</span><br>
         ✓ Reset FSRS neural stability (cleared false priority lapses, leech flags, and urgent retest schedules).<br>
         ✓ Updated Personal Best Mock Score to <b>${pct}%</b>.<br>
         ✓ Option-shuffling in mock exams has been disabled and button indices mapped back safely.
@@ -7296,7 +8158,7 @@ function fixMockOptionScrambleBug() {
     <h1>Mock Exam Result (Day-1 Diagnostic · Repaired)</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
-        Score: <b>${correctCount}/${total} (${pct}%)</b> — ${pct >= 81 ? '<span class="c-ok">Target Met (≥81%) 🎉</span>' : '<span class="c-no">Below 81% target</span>'}
+        Score: <b>${correctCount}/${total} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%) 🎉</span>' : '<span class="c-no">Below 75% target</span>'}
       </p>
       <p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score: ${pct}%!</p>
       <p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>
