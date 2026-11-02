@@ -5292,7 +5292,7 @@ function home(preserveScroll = false) {
           <div class="row" style="margin-bottom:12px;gap:6px">
             <button class="p sm" onclick="mock(100)">⏱ Full Mock (100 Q, 120m)</button>
             <button class="sm" onclick="mock(50)">⏱ Half Mock (50 Q, 60m)</button>
-            <button class="sm" onclick="startDiagnosticMock()">🎯 Day-1 Diagnostic Mock</button>
+            ${!DIAGNOSTIC_DONE ? `<button class="sm" onclick="startDiagnosticMock()">🎯 Day-1 Diagnostic Mock</button>` : ''}
           </div>
           <div class="row" style="margin-bottom:12px;gap:6px">
             <button class="sm" onclick="startMistakes()" ${wr.length ? '' : 'disabled'}>Retry mistakes (capped at 5)</button>
