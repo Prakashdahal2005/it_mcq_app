@@ -5010,13 +5010,14 @@ function renderReadinessMeter() {
       isCalibrated: r.attempts >= 15
     }))
     .sort((a, b) => {
+      const tierPriority = r => TIER_A_SUBJECTS.has(canonSubj(r.k)) ? 0 : 1;
       const priority = r => {
         if (r.isCalibrated && r.acc <= 0.40) return 1;
         if (r.isCalibrated && r.acc < r.target) return 2;
         if (!r.isCalibrated) return 3;
         return 4;
       };
-      return priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
+      return tierPriority(a) - tierPriority(b) || priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
     });
 
   const l0Rows = Object.values(stats.l0);
