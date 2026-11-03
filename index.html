@@ -4253,13 +4253,6 @@ function renderFlashcardView() {
   if (!ACTIVE_FC_SHOW_BACK_MAP) ACTIVE_FC_SHOW_BACK_MAP = {};
   if (!ACTIVE_FC_RATED_MAP) ACTIVE_FC_RATED_MAP = {};
   ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX]];
-    ACTIVE_FC_SESSION_IDS = dueInit.map(c=>c.id);
-  ACTIVE_FC_INDEX = 0;
-  FC_SESSION_TOTAL = dueInit.length;
-  ACTIVE_FC_RATED = new Set();
-  ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
-  ACTIVE_FC_RATED_MAP = ACTIVE_FC_RATED_MAP || {};
-  }
   if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) {
     finishFlashcardSession();
     return;
