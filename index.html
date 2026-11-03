@@ -900,7 +900,9 @@ let DRILL_SUBJECT = '';
 let ACTIVE_FC_INDEX = 0;
 let ACTIVE_FC_SESSION_IDS = [];
 let ACTIVE_FC_SHOW_BACK = false;
+let ACTIVE_FC_SHOW_BACK_MAP = {};
 let ACTIVE_FC_RATED = new Set();
+let ACTIVE_FC_RATED_MAP = {};
 let FC_SESSION_TOTAL = 0;
 let sessionLeechCount = 0;
 let recallWaiting = false;
@@ -3118,7 +3120,8 @@ function regenerateCurrentQuestion() {
 
 function openQuestionEditor(n) {
   if (MK) return;
-  const q = byN(n);
+  const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
+  const q = rawQ || byN(n);
   if (!q) return;
   openQuestionEditorForQuestion(q);
 }
@@ -3254,7 +3257,7 @@ function saveQuestionEditor() {
   const quickProbe = { ...target, ...patch };
   delete quickProbe.quick;
   patch.quick = isQuickQuestion(quickProbe);
-  QEDITS[stableUid] = { ...patch };
+  QEDITS[stableUid] = { ...(QEDITS[stableUid] || {}), ...patch };
   updateQuestionCopies(stableUid, { ...patch, _sid: stableUid });
   const newQk = qk(target);
   if (newQk !== oldQk) {
@@ -3321,7 +3324,8 @@ function deleteQuestionFromEditor() {
 
 function deleteQuestionByN(n) {
   if (MK) return;
-  const q = byN(n);
+  const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
+  const q = rawQ || byN(n);
   if (q) deleteQuestionByQ(q);
 }
 
@@ -3837,7 +3841,7 @@ async function generateFreeformFlashcardsFromUI() {
 }
 
 async function addFlashcardForCurrent() {
-  const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : byN(Q[P]);
+  const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (Q && P < Q.length ? byN(Q[P]) : null);
   if (!rawQ) return;
   const btn = (window.event && window.event.target && window.event.target.tagName === 'BUTTON') ? window.event.target : null;
   const original = btn ? btn.innerHTML : '';
@@ -3960,14 +3964,18 @@ function startFlashcardReview() {
     ACTIVE_FC_SESSION_IDS = [];
     ACTIVE_FC_INDEX = 0;
     ACTIVE_FC_SHOW_BACK = false;
+    ACTIVE_FC_SHOW_BACK_MAP = {};
     ACTIVE_FC_RATED = new Set();
+    ACTIVE_FC_RATED_MAP = {};
     FC_SESSION_TOTAL = 0;
     return;
   }
   ACTIVE_FC_SESSION_IDS = due.map(c => c.id);
   ACTIVE_FC_INDEX = 0;
   ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_SHOW_BACK_MAP = {};
   ACTIVE_FC_RATED = new Set();
+  ACTIVE_FC_RATED_MAP = {};
   FC_SESSION_TOTAL = due.length;
   view = 'cards';
   renderFlashcardView();
@@ -4038,7 +4046,8 @@ function deleteFlashcard(id){
   const inReview = view === 'cards' && ACTIVE_FC_SESSION_IDS.includes(id);
   CARD_TOMBSTONES[id] = Date.now();
   CARDS.splice(idx,1);
-  ACTIVE_FC_RATED.delete(id);
+  try { ACTIVE_FC_RATED.delete(id); } catch(e){}
+  try { delete ACTIVE_FC_RATED_MAP[id]; delete ACTIVE_FC_SHOW_BACK_MAP[id]; } catch(e){}
   if(inReview){
     const pos = ACTIVE_FC_SESSION_IDS.indexOf(id);
     if(pos >= 0) ACTIVE_FC_SESSION_IDS.splice(pos,1);
@@ -4076,10 +4085,47 @@ function flashcardPlainText(c, field){
     .trim();
 }
 
+function viewLinkedFlashcardFromQuiz(id){
+  const c = (CARDS||[]).find(x=>x.id===id);
+  if(!c) { alert('Flashcard not found.'); return; }
+  const old = document.getElementById('fc-modal-overlay');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'fc-modal-overlay';
+  overlay.className = 'q-editor-overlay';
+  overlay.innerHTML = `
+    <div class="q-editor-card" role="dialog" aria-modal="true" aria-label="Flashcard">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
+        <b>📖 ${esc(c.concept || 'Flashcard')}</b>
+        <button class="sm" onclick="closeFlashcardModal()">✕ Close</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="sm"><b>Front</b></div>
+        <div style="margin-top:4px">${c.front || esc(flashcardPlainText(c,'front')).replace(/\n/g,'<br>')}</div>
+        <div class="sm" style="margin-top:10px"><b>Back</b></div>
+        <div style="margin-top:4px">${c.back || esc(flashcardPlainText(c,'back')).replace(/\n/g,'<br>')}</div>
+        ${c.trap ? `<div class="mu sm" style="margin-top:8px"><b>Common trap:</b> ${esc(c.trap)}</div>` : ''}
+        ${c.memoryHook ? `<div class="mu sm" style="margin-top:4px"><b>Memory hook:</b> ${esc(c.memoryHook)}</div>` : ''}
+      </div>
+      <div class="row" style="justify-content:flex-end;gap:6px;margin-top:12px">
+        <button class="sm" onclick="editFlashcard('${esc(c.id).replace(/'/g,"\\'")}');closeFlashcardModal();">Edit card</button>
+        <button class="sm p" onclick="closeFlashcardModal()">Close</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeFlashcardModal(); });
+  document.body.appendChild(overlay);
+}
+
+function closeFlashcardModal(){
+  const overlay = document.getElementById('fc-modal-overlay');
+  if (overlay) overlay.remove();
+}
+
 function editFlashcard(id){
   const c = (CARDS||[]).find(x=>x.id===id);
   if(!c) return;
-  window._fcEditReturn = view === 'cards' ? 'cards' : 'cardmgr';
+  window._fcEditReturn = view === 'cards' ? 'cards' : (view === 'q' ? 'cardmgr' : 'cardmgr');
   view = 'cardedit';
   $('#app').innerHTML = `
     <div class="top"><div class="row" style="justify-content:space-between">
@@ -4140,7 +4186,7 @@ function saveFlashcardEdits(id){
   const ret = window._fcEditReturn || 'cardmgr';
   view = ret;
   if(ret === 'cards' && ACTIVE_FC_SESSION_IDS.includes(id)){
-    ACTIVE_FC_SHOW_BACK = false;
+    ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[id];
     renderFlashcardView();
   } else {
     renderCardManagerView();
@@ -4168,6 +4214,18 @@ function renderFlashcardView() {
     ACTIVE_FC_INDEX = 0;
     FC_SESSION_TOTAL = dueInit.length;
     ACTIVE_FC_RATED = new Set();
+    ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+    ACTIVE_FC_RATED_MAP = ACTIVE_FC_RATED_MAP || {};
+  }
+  if (!ACTIVE_FC_SHOW_BACK_MAP) ACTIVE_FC_SHOW_BACK_MAP = {};
+  if (!ACTIVE_FC_RATED_MAP) ACTIVE_FC_RATED_MAP = {};
+  ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX]];
+    ACTIVE_FC_SESSION_IDS = dueInit.map(c=>c.id);
+  ACTIVE_FC_INDEX = 0;
+  FC_SESSION_TOTAL = dueInit.length;
+  ACTIVE_FC_RATED = new Set();
+  ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+  ACTIVE_FC_RATED_MAP = ACTIVE_FC_RATED_MAP || {};
   }
   if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) {
     finishFlashcardSession();
@@ -4190,6 +4248,8 @@ function renderFlashcardView() {
     sourceQuestion ? sourceQuestion.q : '',
     sourceQuestion ? [sourceQuestion.t, sourceQuestion.u] : []
   );
+  ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+  ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[curCard.id];
   clearMath($('#app'));
   $('#app').innerHTML = `
     <div class="top">
@@ -4204,7 +4264,7 @@ function renderFlashcardView() {
       <div class="fc-inner">
         <span class="fc-badge ${curCard.type === 'calc' ? 'c-sk' : (curCard.type === 'lure' ? 'c-no' : 'c-ok')}">
           ${esc(curCard.concept || curCard.type || 'Concept')} &middot; ${esc(curCard.subject)}${curCard.origin === 'ai' ? ' &middot; AI' : ''}
-          ${ACTIVE_FC_RATED.has(curCard.id) ? ' &middot; reviewed' : ''}
+          ${(ACTIVE_FC_RATED.has(curCard.id) || ACTIVE_FC_RATED_MAP[curCard.id]) ? ' &middot; reviewed' : ''}
         </span>
         <div style="font-size:16px;line-height:1.5">${curCard.front}</div>
         ${ACTIVE_FC_SHOW_BACK ? `
@@ -4252,17 +4312,24 @@ function renderFlashcardView() {
 }
 
 function flipCard() {
-  ACTIVE_FC_SHOW_BACK = true;
+  const cardId = Array.isArray(ACTIVE_FC_SESSION_IDS) && ACTIVE_FC_INDEX < ACTIVE_FC_SESSION_IDS.length ? ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX] : null;
+  ACTIVE_FC_SHOW_BACK = !ACTIVE_FC_SHOW_BACK;
+  if (cardId) {
+    ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+    ACTIVE_FC_SHOW_BACK_MAP[cardId] = ACTIVE_FC_SHOW_BACK;
+  }
   renderFlashcardView();
 }
 
 function finishFlashcardSession() {
-  const reviewed = ACTIVE_FC_RATED.size;
-  const total = Math.max(FC_SESSION_TOTAL, ACTIVE_FC_SESSION_IDS.length, reviewed);
+  const reviewed = ACTIVE_FC_RATED.size + (ACTIVE_FC_RATED_MAP ? Object.keys(ACTIVE_FC_RATED_MAP).length : 0);
+  const total = Math.max(FC_SESSION_TOTAL, Array.isArray(ACTIVE_FC_SESSION_IDS) ? ACTIVE_FC_SESSION_IDS.length : 0, reviewed);
   ACTIVE_FC_SESSION_IDS = [];
   ACTIVE_FC_INDEX = 0;
   ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_SHOW_BACK_MAP = {};
   ACTIVE_FC_RATED = new Set();
+  ACTIVE_FC_RATED_MAP = {};
   FC_SESSION_TOTAL = 0;
   const dueNow = CARDS.filter(c => !c.grad && (c.due || 0) <= today()).length;
   view = 'cards';
@@ -4283,7 +4350,8 @@ function finishFlashcardSession() {
 function fcPrevious() {
   if (ACTIVE_FC_INDEX <= 0) return;
   ACTIVE_FC_INDEX--;
-  ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+  ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX]];
   renderFlashcardView();
 }
 
@@ -4293,7 +4361,8 @@ function fcNext() {
     return;
   }
   ACTIVE_FC_INDEX++;
-  ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+  ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX]];
   renderFlashcardView();
 }
 
@@ -4305,6 +4374,8 @@ function rateCard(grade) {
     FC_SESSION_TOTAL = due.length;
     ACTIVE_FC_INDEX = 0;
     ACTIVE_FC_RATED = new Set();
+    ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+    ACTIVE_FC_RATED_MAP = ACTIVE_FC_RATED_MAP || {};
   }
   if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length){
     finishFlashcardSession();
@@ -4314,7 +4385,8 @@ function rateCard(grade) {
   let card = CARDS.find(c => c.id === cardId);
   if(!card){
     ACTIVE_FC_INDEX++;
-    ACTIVE_FC_SHOW_BACK = false;
+    ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+    ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX]];
     if (ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length) finishFlashcardSession();
     else renderFlashcardView();
     return;
@@ -4345,10 +4417,13 @@ function rateCard(grade) {
 
   card.lastReviewed = Date.now();
   card.updatedAt = card.lastReviewed;
-  ACTIVE_FC_RATED.add(card.id);
+  try { ACTIVE_FC_RATED.add(card.id); } catch(e){}
+  ACTIVE_FC_RATED_MAP = ACTIVE_FC_RATED_MAP || {};
+  ACTIVE_FC_RATED_MAP[card.id] = true;
   save();
   ACTIVE_FC_INDEX++;
-  ACTIVE_FC_SHOW_BACK = false;
+  ACTIVE_FC_SHOW_BACK_MAP = ACTIVE_FC_SHOW_BACK_MAP || {};
+  ACTIVE_FC_SHOW_BACK = !!ACTIVE_FC_SHOW_BACK_MAP[ACTIVE_FC_SESSION_IDS[ACTIVE_FC_INDEX]];
   if(ACTIVE_FC_INDEX >= ACTIVE_FC_SESSION_IDS.length){
     finishFlashcardSession();
     return;
@@ -4447,6 +4522,42 @@ function prepareQuestionForDisplay(rawQ) {
   const variant = (vRec && vRec._variant) ? vRec._variant : rawQ._variant;
   const useOrig = (vRec && vRec._useOriginal != null) ? vRec._useOriginal : rawQ._useOriginal;
   const activeSource = (variant && !useOrig) ? variant : rawQ;
+
+  const qType = (rawQ.qType || rawQ.type || activeSource.qType || activeSource.type || 'mcq').toString().toLowerCase();
+  if (qType === 'tf') {
+    const tfOpts = activeSource.tfOptions || activeSource.trueFalseOptions || ['True', 'False'];
+    const tfAns = activeSource.tfAnswer !== undefined ? activeSource.tfAnswer : activeSource.a;
+    return {
+      ...rawQ,
+      q: activeSource.q,
+      code: activeSource.code,
+      e: activeSource.e,
+      qType: 'tf',
+      expectedAnswer: activeSource.expectedAnswer || activeSource.answerText,
+      origQ: rawQ,
+      origO: tfOpts.slice(),
+      origA: tfAns,
+      displayOpts: tfOpts.slice(),
+      displayA: tfAns,
+      isShowingVariant: !!(variant && !useOrig)
+    };
+  }
+  if (qType === 'fr' || qType === 'free' || qType === 'free_response' || qType === 'written') {
+    return {
+      ...rawQ,
+      q: activeSource.q,
+      code: activeSource.code,
+      e: activeSource.e,
+      qType: 'fr',
+      expectedAnswer: activeSource.expectedAnswer || activeSource.answerText || activeSource.ans || activeSource.answer,
+      origQ: rawQ,
+      origO: [],
+      origA: 0,
+      displayOpts: [],
+      displayA: 0,
+      isShowingVariant: !!(variant && !useOrig)
+    };
+  }
 
   const origOpts = (activeSource.o || []).slice();
   const rawAnsIndex = activeSource.a !== undefined ? activeSource.a : 0;
@@ -4939,16 +5050,17 @@ function renderReadinessMeter() {
           else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
           else { dotClass = 'dot-amber'; statusText = `${Math.round(r.acc * 100)}% · Building`; }
         }
+        const tierLabel = (function(){ try { const tk = (typeof TIER_A_SUBJECTS !== 'undefined' && TIER_A_SUBJECTS.has && TIER_A_SUBJECTS.has(canonSubj(r.k))) ? 'Tier A · 85%' : 'Tier B · 75%'; return tk; } catch(e){ return (typeof subjectTarget==='function' && subjectTarget(r.k)>=0.8)?'Tier A · 85%':'Tier B · 75%'; } })();
         return `
           <div class="subject-card" onclick="startSubjectDrillFromBank('${esc(r.k)}')">
             <div class="row" style="justify-content:space-between;align-items:center">
               <b style="font-size:13px">${esc(r.k)}</b>
-              <span class="mu sm">↗</span>
+              <span class="mu sm">${tierLabel}</span>
             </div>
             <div class="row sm" style="align-items:center;font-size:12px;margin-top:2px">
               <span class="status-dot ${dotClass}"></span>
               <b>${statusText}</b>
-              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d</span>
+              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d · ${Math.round((typeof r.acc==='number'?r.acc:0)*100)}%</span>
             </div>
           </div>
         `;
@@ -5226,7 +5338,7 @@ function home(preserveScroll = false) {
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
           <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
-          <span class="chip ${weeklyMock.completed ? 'c-ok' : 'c-sk'}">📅 Weekly mock: <b>${weeklyMock.completed ? 'done' : 'due'}</b></span>
+          ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
         </div>
       </div>
@@ -5770,14 +5882,25 @@ function show() {
             `}
 
             ${(!MK && !hist.locked && !(isReview && recallFirst)) ? `
-              <div class="card" style="margin-top:10px;padding:10px 12px">
-                <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
-                  <input id="typed-answer" type="text" placeholder="Optional: type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();showTypedAnswerPanel();}">
-                  <button class="sm" onclick="showTypedAnswerPanel()">Check typed</button>
+              ${CURRENT_Q && CURRENT_Q.qType === 'fr' ? `
+                <div class="card" style="margin-top:10px;padding:10px 12px">
+                  <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+                    <input id="free-answer" type="text" placeholder="Type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();submitFreeResponse();}">
+                    <button class="sm p" onclick="submitFreeResponse()">Submit answer</button>
+                  </div>
+                  <div class="mu sm" style="margin-top:6px">After submission you’ll see the expected answer/explanation and confirm correct/wrong (Confidence 2, Unsure).</div>
+                  <div id="free-answer-panel"></div>
                 </div>
-                <div class="mu sm" style="margin-top:6px">Typed answers are self-graded as Confidence 2 (Unsure). MCQ buttons stay primary.</div>
-                <div id="typed-answer-panel"></div>
-              </div>
+              ` : `
+                <div class="card" style="margin-top:10px;padding:10px 12px">
+                  <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+                    <input id="typed-answer" type="text" placeholder="Optional: type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();showTypedAnswerPanel();}">
+                    <button class="sm" onclick="showTypedAnswerPanel()">Check typed</button>
+                  </div>
+                  <div class="mu sm" style="margin-top:6px">Typed answers are self-graded as Confidence 2 (Unsure). MCQ buttons stay primary.</div>
+                  <div id="typed-answer-panel"></div>
+                </div>
+              `}
             ` : ''}
             <div id="fb">${hist.locked ? (hist.feedbackHtml || '') : ''}</div>
           </div>
@@ -5855,6 +5978,35 @@ function renderOptionsHtml(q, hist) {
           : undefined)
   ) : undefined;
 
+  if (q && q.qType === 'fr') {
+    return '';
+  }
+  if (q && q.qType === 'tf') {
+    return q.displayOpts.map((o, i) => {
+      let cls = 'opt';
+      let disabled = false;
+      let stateIcon = '';
+      if (isMock) {
+        if (mockAnswer === i) cls += ' ans';
+        if (frozen) disabled = true;
+      } else if (hist && hist.locked) {
+        disabled = true;
+        if (i === q.displayA) {
+          cls += ' ok';
+          stateIcon = '<span class="opt-state-icon c-ok">✓ Correct</span>';
+        } else if (i === hist.chosenIdx) {
+          cls += ' no';
+          stateIcon = '<span class="opt-state-icon c-no">✗ Picked</span>';
+        }
+      }
+      return `
+        <button class="${cls}" id="opt-${i}" onclick="pick(${i})" ${disabled ? 'disabled' : ''}>
+          <span class="opt-text">${esc(o)}</span>
+          ${stateIcon}
+        </button>
+      `;
+    }).join('');
+  }
   return q.displayOpts.map((o, i) => {
     let cls = 'opt';
     let disabled = false;
@@ -5997,6 +6149,44 @@ function showTypedAnswerPanel() {
   `;
 }
 
+function submitFreeResponse() {
+  if (!CURRENT_Q || locked) return;
+  const input = $('#free-answer');
+  const text = input ? String(input.value || '').trim() : '';
+  if (!text) { alert('Type an answer first.'); return; }
+  window._freeAnswerText = text;
+  const panel = $('#free-answer-panel');
+  if (!panel) return;
+  const expected = CURRENT_Q.expectedAnswer || CURRENT_Q.origQ && (CURRENT_Q.origQ.expectedAnswer || CURRENT_Q.origQ.answerText || CURRENT_Q.origQ.ans);
+  panel.innerHTML = `
+    <div style="margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:8px">
+      <div class="sm"><b>Your answer:</b> ${esc(text)}</div>
+      ${expected ? `<div class="sm" style="margin-top:6px"><b>Expected answer:</b> ${esc(expected)}</div>` : `<div class="mu sm" style="margin-top:6px">No expected answer stored; compare carefully.</div>`}
+      ${CURRENT_Q.e && String(CURRENT_Q.e).trim() ? `<div class="mu sm" style="margin-top:6px"><b>Explanation:</b> ${esc(CURRENT_Q.e)}</div>` : ''}
+      <div class="mu sm" style="margin-top:6px">Confirm whether you were correct/wrong. This is recorded as Confidence 2 (Unsure).</div>
+      <div class="row" style="gap:6px;margin-top:8px">
+        <button class="sm p" onclick="freeResponseGrade(true)">I was correct</button>
+        <button class="sm" onclick="freeResponseGrade(false)">I was wrong</button>
+      </div>
+    </div>
+  `;
+}
+
+function freeResponseGrade(correct) {
+  if (!CURRENT_Q || locked) return;
+  const text = window._freeAnswerText || '';
+  window._freeAnswerText = '';
+  const wrongIndex = 0;
+  pick(correct ? 0 : 1, 2);
+  const fb = $('#fb');
+  const hist = sessionHistory[P];
+  if (text && fb) {
+    fb.insertAdjacentHTML('afterbegin', `<div class="mu sm" style="margin-bottom:6px"><b>Your free response:</b> ${esc(text)}</div>`);
+    if (hist) hist.feedbackHtml = fb.innerHTML;
+    save();
+  }
+}
+
 function typedAnswerGrade(correct) {
   if (!CURRENT_Q || locked) return;
   const text = window._typedAnswerText || '';
@@ -6018,6 +6208,9 @@ function pick(i, cfOverride) {
   if (recallWaiting) revealRecallOptions();
 
   const rawQ = CURRENT_Q.origQ || byN(Q[P]);
+  if (CURRENT_Q && CURRENT_Q.qType === 'fr' && !cfOverride) {
+    return;
+  }
 
   if (MK) {
     const origPickedIndex = CURRENT_Q.origO.indexOf(CURRENT_Q.displayOpts[i]);
@@ -6038,7 +6231,10 @@ function pick(i, cfOverride) {
 
   locked = true;
   const k = rawQ._k || rawQ.n;
-  const ok = (i === CURRENT_Q.displayA);
+  let ok = (i === CURRENT_Q.displayA);
+  if (CURRENT_Q && CURRENT_Q.qType === 'tf' && Array.isArray(CURRENT_Q.displayOpts)) {
+    ok = (i === CURRENT_Q.displayA);
+  }
   QRESULTS[P] = ok ? 'c' : 'w';
   const origPickedIndex = CURRENT_Q.origO.indexOf(CURRENT_Q.displayOpts[i]);
   const timeTakenMs = Math.max(500, Date.now() - (questionStartTime || Date.now()));
@@ -6167,11 +6363,18 @@ function pick(i, cfOverride) {
           ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-          <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
-        </div>
-        ${rescueLadderHtml}
-        ${resourceHtml}
-      </div>
+      <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
+      ${(() => {
+        const rawQ2 = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (typeof byN === 'function' && Q && P < Q.length ? byN(Q[P]) : null);
+        if (!rawQ2) return '';
+        const sqk = typeof qk === 'function' ? qk(rawQ2) : '';
+        const linked = (CARDS || []).find(c => !c.grad && (c.sourceQk === sqk || c.qk === sqk));
+        return linked ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>` : '';
+      })()}
+    </div>
+    ${rescueLadderHtml}
+    ${resourceHtml}
+  </div>
       <p class="row" style="margin-top:12px;gap:8px">
         <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
         <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
@@ -6248,6 +6451,13 @@ function dontKnow() {
       </div>
       <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
         <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
+        ${(() => {
+          const rawQ2 = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (typeof byN === 'function' && Q && P < Q.length ? byN(Q[P]) : null);
+          if (!rawQ2) return '';
+          const sqk = typeof qk === 'function' ? qk(rawQ2) : '';
+          const linked = (CARDS || []).find(c => !c.grad && (c.sourceQk === sqk || c.qk === sqk));
+          return linked ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>` : '';
+        })()}
       </div>
       ${resourceHtml}
     </div>
@@ -6712,7 +6922,7 @@ function done() {
     Object.keys(subjMap).forEach(s=>{
       if(subjMap[s].total>0 && subjMap[s].done===subjMap[s].total && !localStorage.getItem('bitmcq_l0done_'+s)){
         localStorage.setItem('bitmcq_l0done_'+s,'1');
-        setTimeout(()=>{ alert('🎉 All Level 0 Questions Mastered for ' + s + '!'); }, 500);
+        setTimeout(()=>{ try { if (typeof showToast === 'function') showToast('All Level 0 Questions Mastered for ' + s + '!'); else alert('All Level 0 Questions Mastered for ' + s + '!'); } catch(e){ alert('All Level 0 Questions Mastered for ' + s + '!'); } }, 500);
       }
     });
   } catch(e){}
@@ -6785,7 +6995,7 @@ function done() {
   });
 
   $('#app').innerHTML = `
-    <h1>Session Complete 🎉</h1>
+    <h1>Session Complete</h1>
     <div class="recap-card">
       <div class="row" style="justify-content:space-between;align-items:center">
         <div>
@@ -6928,11 +7138,12 @@ function localWeekKey(ts = Date.now()) {
 function weeklyMockStatus() {
   const currentWeek = localWeekKey();
   const lastWeek = WEEKLY_MOCK.lastCompletedWeek || '';
+  const started = WEEKLY_MOCK.startedWeek === currentWeek && !!WEEKLY_MOCK.startedAt;
   return {
     currentWeek,
     completed: lastWeek === currentWeek,
     due: lastWeek !== currentWeek,
-    started: WEEKLY_MOCK.startedWeek === currentWeek
+    started
   };
 }
 
@@ -7291,7 +7502,7 @@ function mockEnd() {
     <h1>Mock Exam Result ${isDiag ? '(Day-1 Diagnostic)' : ''}</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
-        Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%) 🎉</span>' : '<span class="c-no">Below 75% target</span>'}
+        Score: <b>${c}/${n} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%)</span>' : '<span class="c-no">Below 75% target</span>'}
       </p>
       ${pct >= PB_MOCK_SCORE && PB_MOCK_SCORE > 0 ? `<p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score!</p>` : ''}
       ${isDiag ? `<p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>` : ''}
@@ -7691,11 +7902,13 @@ function exportUI() {
         <option value="s">Skipped Only</option>
         <option value="ug">Unsure & Guessed (Confidence 1 & 2)</option>
         <option value="wsk">Mistakes + skipped</option>
+        <option value="weak">Weak Topics (across subjects)</option>
       </select>
       <select id="xf"><option value="md">Markdown (.md)</option><option value="txt">Plain Text (.txt)</option></select>
       <button class="p sm" onclick="exportLog(0)">⬇ Download</button>
       <button class="sm" onclick="exportLog(1)">Copy</button>
     </div>
+    <div class="mu sm" style="margin-top:4px">Exports are incremental since last successful export (per device). First export includes all history.</div>
     <div id="xm" class="mu" style="margin-top:4px"></div>
   `;
 }
@@ -7705,8 +7918,24 @@ function exportLog(copy) {
   const isMd = $('#xf').value === 'md';
   const m = $('#xm');
   const todayStr = localDateKey();
-  let text = `# Recall Error Log - ${todayStr}\n\n`;
+  let text = scope === 'weak' ? `# Weak Topics - ${todayStr}\n\n` : `# Recall Error Log - ${todayStr}\n\n`;
   const results = [];
+  let checkpoint = null;
+  try { checkpoint = JSON.parse(localStorage.getItem('bitmcq_export_ckpt_v1') || 'null'); } catch(e){ checkpoint = null; }
+  if (!checkpoint || typeof checkpoint !== 'object') checkpoint = { lastAt: 0, lastTs: 0 };
+  const cutoff = Math.max(Number(checkpoint.lastTs) || 0, Number(checkpoint.lastAt) || 0);
+
+  function inRange(ts){
+    if (scope === 'weak') return true;
+    if (!cutoff) return true;
+    const t = Number(ts) || 0;
+    return t > cutoff;
+  }
+
+  function recordTs(rec){
+    if (!rec) return 0;
+    return Number(rec.t) || Number(rec.ts) || Number(rec.at) || 0;
+  }
 
   function addResult(q, type, src, cf, identity) {
     if (!q) return;
@@ -7723,7 +7952,10 @@ function exportLog(copy) {
 
   (L || []).forEach(rec => {
     try {
-      if (localDateKey(rec.t || Date.now()) !== todayStr) return;
+      const ts = recordTs(rec);
+      if (scope !== 'weak') {
+        if (!inRange(ts) && cutoff) return;
+      }
       const q = findQuestionByRecord(rec);
       if (!q) return;
       const id = recordIdentity(rec) || questionUid(q) || qk(q);
@@ -7745,36 +7977,64 @@ function exportLog(copy) {
     return true;
   });
 
-  const wList = unique.filter(r => r.type === 'w');
-  const sList = unique.filter(r => r.type === 's');
-  const ugList = unique.filter(r => r.type === 'ug');
+  if (scope === 'weak') {
+    const bySubj = {};
+    unique.forEach(r => {
+      const q = r.q;
+      const s = q && q.s ? q.s : 'General';
+      bySubj[s] = bySubj[s] || { w: 0, s: 0, ug: 0, list: [] };
+      bySubj[s][r.type === 'w' ? 'w' : (r.type === 's' ? 's' : 'ug')]++;
+      if (bySubj[s].list.length < 10) bySubj[s].list.push(r);
+    });
+    const order = Object.keys(bySubj).sort((a,b)=>(bySubj[b].w+bySubj[b].s+bySubj[b].ug)-(bySubj[a].w+bySubj[a].s+bySubj[a].ug));
+    order.forEach(s => {
+      const x = bySubj[s];
+      text += `## ${s} — Misses: ${x.w}, Skipped: ${x.s}, Unsure/Guessed: ${x.ug}\n\n`;
+      x.list.forEach(r => {
+        const q = r.q;
+        const answer = q && Array.isArray(q.o) && q.a != null ? `${'ABCD'[q.a]}) ${q.o[q.a]}` : 'Unavailable';
+        text += `- Q${q.n != null ? q.n : '?'}: ${String(q.q||'').replace(/\n/g,' ')} | Correct: ${answer}\n`;
+      });
+      text += '\n';
+    });
+  } else {
+    const wList = unique.filter(r => r.type === 'w');
+    const sList = unique.filter(r => r.type === 's');
+    const ugList = unique.filter(r => r.type === 'ug');
 
-  function renderEntry(r, showConfidence) {
-    const q = r.q;
-    const answer = q && Array.isArray(q.o) && q.a != null ? `${'ABCD'[q.a]}) ${q.o[q.a]}` : 'Unavailable';
-    return `### ${q.n != null ? 'Q' + q.n : 'Question'} (${q.s || 'General'})\n${q.q || ''}\nCorrect: ${answer}\n` +
-      (showConfidence ? `Confidence: ${r.cf || '-'}\n` : '') +
-      (q.e ? `Reason: ${q.e}\n` : '') + '\n';
+    function renderEntry(r, showConfidence) {
+      const q = r.q;
+      const answer = q && Array.isArray(q.o) && q.a != null ? `${'ABCD'[q.a]}) ${q.o[q.a]}` : 'Unavailable';
+      return `### ${q.n != null ? 'Q' + q.n : 'Question'} (${q.s || 'General'})\n${q.q || ''}\nCorrect: ${answer}\n` +
+        (showConfidence ? `Confidence: ${r.cf || '-'}\n` : '') +
+        (q.e ? `Reason: ${q.e}\n` : '') + '\n';
+    }
+
+    if (scope === 'all' || scope === 'wsk' || scope === 'w') {
+      text += `## Mistakes (${wList.length})\n\n`;
+      wList.forEach(r => { text += renderEntry(r, true); });
+    }
+    if (scope === 'all' || scope === 'wsk' || scope === 's') {
+      text += `## Skipped (${sList.length})\n\n`;
+      sList.forEach(r => { text += renderEntry(r, false); });
+    }
+    if (scope === 'all' || scope === 'ug') {
+      text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
+      ugList.forEach(r => { text += renderEntry(r, true); });
+    }
   }
 
-  if (scope === 'all' || scope === 'wsk' || scope === 'w') {
-    text += `## Mistakes (${wList.length})\n\n`;
-    wList.forEach(r => { text += renderEntry(r, true); });
-  }
-  if (scope === 'all' || scope === 'wsk' || scope === 's') {
-    text += `## Skipped (${sList.length})\n\n`;
-    sList.forEach(r => { text += renderEntry(r, false); });
-  }
-  if (scope === 'all' || scope === 'ug') {
-    text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
-    ugList.forEach(r => { text += renderEntry(r, true); });
-  }
+  const nowTs = Date.now();
+  try {
+    localStorage.setItem('bitmcq_export_ckpt_v1', JSON.stringify({ lastAt: nowTs, lastTs: nowTs, scope: scope, at: new Date().toISOString() }));
+  } catch(e){}
 
   if (!copy) {
-    saveFile(`recall-error-log-${todayStr}.${isMd ? 'md' : 'txt'}`, text, isMd ? 'text/markdown' : 'text/plain');
-    if (m) m.textContent = 'Downloaded error log.';
+    const fname = scope === 'weak' ? `weak-topics-${todayStr}.${isMd ? 'md' : 'txt'}` : `recall-error-log-${todayStr}.${isMd ? 'md' : 'txt'}`;
+    saveFile(fname, text, isMd ? 'text/markdown' : 'text/plain');
+    if (m) m.textContent = scope === 'weak' ? 'Downloaded weak topics.' : 'Downloaded error log.';
   } else {
-    navigator.clipboard.writeText(text).then(() => { if (m) m.textContent = 'Copied to clipboard.'; });
+    navigator.clipboard.writeText(text).then(() => { if (m) m.textContent = scope === 'weak' ? 'Copied weak topics to clipboard.' : 'Copied to clipboard.'; });
   }
 }
 
@@ -8158,9 +8418,9 @@ function fixMockOptionScrambleBug() {
     <h1>Mock Exam Result (Day-1 Diagnostic · Repaired)</h1>
     <div class="card">
       <p style="font-size:24px;margin:0 0 10px">
-        Score: <b>${correctCount}/${total} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%) 🎉</span>' : '<span class="c-no">Below 75% target</span>'}
+        Score: <b>${correctCount}/${total} (${pct}%)</b> — ${pct >= 75 ? '<span class="c-ok">Target Met (≥75%)</span>' : '<span class="c-no">Below 75% target</span>'}
       </p>
-      <p class="c-ok" style="font-weight:700">🏆 New Personal Best Mock Score: ${pct}%!</p>
+      <p class="c-ok" style="font-weight:700">New Personal Best Mock Score: ${pct}%</p>
       <p class="c-ok">✓ Milestone M1 Complete: Day-1 Diagnostic baseline recorded.</p>
       <table class="tbl">
         <tr><th>Subject</th><th>Score</th><th>Accuracy</th></tr>
