@@ -949,6 +949,7 @@ function recordApiCall() {
 
 // Persist the complete app state locally, then notify cloud sync; keep serialization aligned with load() and AppState.
 function save() {
+  let saved = false;
   try {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
@@ -963,10 +964,12 @@ function save() {
     localStorage.setItem('bitmcq_quiet', QUIET_MODE ? 'true' : 'false');
     localStorage.setItem('bitmcq_session_hist', JSON.stringify(sessionHistory || []));
     if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
+    saved = true;
   } catch (e) {
     console.error('Save failed:', e);
   }
   try { if (window.CloudSync) window.CloudSync.onLocalSave(); } catch (e) {}
+  return saved;
 }
 
 function cardStamp(c) {
@@ -7647,14 +7650,27 @@ function doLoad() {
       const imported = importBank(x);
       const id = imported.id;
       loadMode = 0; impMode = 0;
-      if (!D) loadSet(id, 0); else { save(); home(); }
+      let saved;
+      if (!D) saved = loadSet(id, 0);
+      else { saved = save(); home(); }
+      const message = saved
+        ? `Question bank "${imported.name}" imported: ${imported.q.length} questions in ${imported.sets.length} sets.`
+        : `Question bank "${imported.name}" imported for this session, but couldn't be saved locally. Check browser storage and back up your progress.`;
+      showToast(message, saved ? 'success' : 'warn');
       return;
     }
     const nd = parse(t);
     if (D && Object.keys(R).length) { A.push(compact()); S = A.length + 1; }
     else S = A.length + 1;
     D = nd; R = {}; W = {}; Q = []; QRESULTS = []; P = 0; SETBANK = null; SETI = -1; loadMode = 0;
-    save(); home();
+    const saved = save();
+    home();
+    showToast(
+      saved
+        ? `${nd.length} questions loaded. Ready to practice.`
+        : `${nd.length} questions loaded for this session, but couldn't be saved locally. Check browser storage and back up your progress.`,
+      saved ? 'success' : 'warn'
+    );
   } catch (e) {
     $('#err').textContent = e.message;
   }
@@ -7775,9 +7791,10 @@ function loadSet(bankId, k, startFresh = false) {
     });
   R = {}; W = {}; Q = []; QRESULTS = []; P = 0; loadMode = 0; impMode = 0;
   syncFlashcardSourceLinks();
-  save();
+  const saved = save();
   if (startFresh) start(D.map(q => q.n));
   else home();
+  return saved;
 }
 
 function isArchivedSetComplete(attempt) {

@@ -25,6 +25,8 @@
 **Profile:** BSc CSIT graduate, all subjects studied once, revision started. Light plan: about 2 h a day, MCQ-focused. Method: **attempt → check → patch → log → re-test.** Never re-learn from zero.
 **Fixed:** exam is exactly 2 hours (120 min), about 2 months away. **Assume (verify):** 100 Qs, 4 options, exact exam date (so keep a buffer), negative marking unknown.
 
+**Source caution:** Some supplementary practice questions come from a standard model-question set for a different master's program in the same university department. They can help practise overlapping fundamentals, but they are **not MIT past questions or proof of MIT's syllabus, difficulty, question mix, or subject weighting**. Use MIT-specific official notices, syllabus, and past papers to set scope; treat overlap with the sibling-program set as practice only.
+
 ---
 
 ## 1. Scope and marks
