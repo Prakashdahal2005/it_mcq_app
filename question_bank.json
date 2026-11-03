@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total_questions": 1639,
+  "total_questions": 1727,
   "subjects": 19,
   "schema": "id, question (markdown; KaTeX $..$ for maths), options A-D, answer, level 0-3, type, unit/unit_name/unit_conf, regeneratable, shuffle_safe, giveaway_risk, explanation (null = fill with Gemini), source"
  },
@@ -8,7 +8,7 @@
   {
    "subject": "Introduction to IT",
    "subject_code": "BIT101",
-   "question_count": 85,
+   "question_count": 90,
    "questions": [
     {
      "id": 1,
@@ -1879,13 +1879,113 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S021",
+     "question": "Which order lists memory from fastest to slowest?",
+     "options": {
+      "A": "Registers, RAM, cache, hard disk",
+      "B": "Registers, cache, RAM, hard disk",
+      "C": "Cache, registers, RAM, hard disk",
+      "D": "Registers, cache, hard disk, RAM"
+     },
+     "answer": "B",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT101",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "memory hierarchy",
+     "explanation": "Hierarchy: registers → cache → RAM → disk. Each distractor swaps one adjacent pair.",
+     "source": "sibling"
+    },
+    {
+     "id": "S022",
+     "question": "Which malware spreads across a network on its own, without attaching to a host file?",
+     "options": {
+      "A": "Trojan horse",
+      "B": "Virus",
+      "C": "Worm",
+      "D": "Spyware"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT101",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "virus ≠ worm ≠ Trojan",
+     "explanation": "Virus needs a host file; Trojan is disguised and does not self-replicate; spyware only collects data.",
+     "source": "sibling"
+    },
+    {
+     "id": "S023",
+     "question": "Which tool monitors traffic for suspicious patterns and only raises alerts instead of blocking by rule?",
+     "options": {
+      "A": "DHCP server",
+      "B": "Intrusion detection system",
+      "C": "Packet-filtering firewall",
+      "D": "Domain name server"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT101",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "firewall ≠ IDS",
+     "explanation": "Firewall filters by rule; IDS watches and alerts.",
+     "source": "sibling"
+    },
+    {
+     "id": "S024",
+     "question": "Which protocol automatically assigns IP addresses to hosts joining a network?",
+     "options": {
+      "A": "DNS",
+      "B": "SMTP",
+      "C": "DHCP",
+      "D": "FTP"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT101",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "network protocols",
+     "explanation": "DNS maps names to IPs; FTP transfers files; SMTP sends mail.",
+     "source": "sibling"
+    },
+    {
+     "id": "S025",
+     "question": "Which translator converts assembly language into machine code?",
+     "options": {
+      "A": "Compiler",
+      "B": "Linker",
+      "C": "Interpreter",
+      "D": "Assembler"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT101",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "assembler ≠ compiler",
+     "explanation": "Compiler = high-level language; interpreter runs line by line; linker joins object files.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "C Programming",
    "subject_code": "BIT102",
-   "question_count": 72,
+   "question_count": 74,
    "questions": [
     {
      "id": 1,
@@ -3470,13 +3570,53 @@
      "unit_conf": "high",
      "explanation": "\"a\" appends and creates the file if missing. \"w\" and \"w+\" truncate an existing file; \"r+\" needs the file to exist.",
      "source": "added"
+    },
+    {
+     "id": "S026",
+     "question": "What is printed?\n```c\nint a = 7, b = 2;\nprintf(\"%d\", a / b + a % b * 2);\n```",
+     "options": {
+      "A": "5",
+      "B": "6",
+      "C": "8",
+      "D": "5.5"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT102",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "precedence, integer division",
+     "explanation": "3 + (1·2) = 5. Slips: 6 = 3 + 7%(2·2); 8 = (3 + 1)·2; 5.5 = real division.",
+     "source": "sibling"
+    },
+    {
+     "id": "S027",
+     "question": "int arr[5] starts at address 1000 and sizeof(int) is 4. The value of &arr[3] is",
+     "options": {
+      "A": "1012",
+      "B": "1003",
+      "C": "1024",
+      "D": "1006"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT102",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "pointer arithmetic",
+     "explanation": "1000 + 3·4. Slips: 1003 ignored the scaling; 1006 used 2-byte int; 1024 used 8 bytes.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Digital Logic",
    "subject_code": "BIT103",
-   "question_count": 56,
+   "question_count": 61,
    "questions": [
     {
      "id": 1,
@@ -4709,13 +4849,113 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S031",
+     "question": "Minimum number of flip-flops for a mod-12 counter",
+     "options": {
+      "A": "3",
+      "B": "12",
+      "C": "4",
+      "D": "6"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT103",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DL-01",
+     "explanation": "⌈log₂12⌉ = 4. Slips: ⌊log₂12⌋ = 3; N; N/2.",
+     "source": "sibling"
+    },
+    {
+     "id": "S032",
+     "question": "The range of 8-bit two's complement integers is",
+     "options": {
+      "A": "−127 to +127",
+      "B": "−128 to +128",
+      "C": "0 to 255",
+      "D": "−128 to +127"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT103",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DL-02",
+     "explanation": "−2ⁿ⁻¹ … 2ⁿ⁻¹ − 1. Slips: 1's complement / sign-magnitude; unsigned; off-by-one top.",
+     "source": "sibling"
+    },
+    {
+     "id": "S033",
+     "question": "−20 in 8-bit two's complement is",
+     "options": {
+      "A": "00010100",
+      "B": "11101011",
+      "C": "10010100",
+      "D": "11101100"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT103",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "two's complement",
+     "explanation": "20 = 00010100, invert = 11101011, +1 = 11101100. Slips: forgot +1; sign-magnitude; +20.",
+     "source": "sibling"
+    },
+    {
+     "id": "S034",
+     "question": "A JK flip-flop with J = 1 and K = 1 receives a clock edge. It",
+     "options": {
+      "A": "toggles its output",
+      "B": "resets its output to 0",
+      "C": "holds its previous output",
+      "D": "goes to an invalid state"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT103",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "JK flip-flop",
+     "explanation": "JK = 11 toggles. 'Invalid' is the SR = 11 sibling; J = K = 0 holds.",
+     "source": "sibling"
+    },
+    {
+     "id": "S035",
+     "question": "A 32:1 multiplexer needs how many select lines?",
+     "options": {
+      "A": "16",
+      "B": "5",
+      "C": "4",
+      "D": "32"
+     },
+     "answer": "B",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT103",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "multiplexer",
+     "explanation": "2ⁿ inputs need n selects: 2⁵ = 32.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Microprocessor and Computer Architecture",
    "subject_code": "BIT151",
-   "question_count": 87,
+   "question_count": 92,
    "questions": [
     {
      "id": 2,
@@ -6630,13 +6870,113 @@
      "unit_conf": "high",
      "explanation": "+11 does not fit in 4-bit signed (range −8…+7). Two positives gave a negative sign bit, which is signed overflow.",
      "source": "added"
+    },
+    {
+     "id": "S036",
+     "question": "A 5-stage pipeline executes 12 instructions with no stalls. Total clock cycles =",
+     "options": {
+      "A": "8",
+      "B": "17",
+      "C": "16",
+      "D": "60"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT151",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "MP-01",
+     "explanation": "k + n − 1 = 16. Slips: k × n; k + n; n − k + 1.",
+     "source": "sibling"
+    },
+    {
+     "id": "S037",
+     "question": "The 8085 has a 16-bit address bus, so it can address at most",
+     "options": {
+      "A": "16 KB of memory",
+      "B": "256 bytes of memory",
+      "C": "64 KB of memory",
+      "D": "1 MB of memory"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT151",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "8085 memory",
+     "explanation": "2¹⁶ = 64 KB. 1 MB is the 8086 sibling; 256 B would be an 8-bit address.",
+     "source": "sibling"
+    },
+    {
+     "id": "S038",
+     "question": "Which is NOT a flag in the 8085 flag register?",
+     "options": {
+      "A": "Auxiliary carry",
+      "B": "Sign",
+      "C": "Parity",
+      "D": "Overflow"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT151",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "8085 flags",
+     "explanation": "8085 flags: S, Z, AC, P, CY. Overflow belongs to later processors.",
+     "source": "sibling"
+    },
+    {
+     "id": "S039",
+     "question": "Which 8085 interrupt has the highest priority?",
+     "options": {
+      "A": "TRAP",
+      "B": "RST 7.5",
+      "C": "RST 5.5",
+      "D": "INTR"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT151",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "8085 interrupts",
+     "explanation": "Order: TRAP > 7.5 > 6.5 > 5.5 > INTR.",
+     "source": "sibling"
+    },
+    {
+     "id": "S040",
+     "question": "Which feature is characteristic of a RISC processor?",
+     "options": {
+      "A": "Many variable-length instructions and addressing modes",
+      "B": "A small register set with memory-to-memory operations",
+      "C": "Complex instructions executed through microcode",
+      "D": "Fixed-length instructions with load/store memory access"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT151",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "RISC ≠ CISC",
+     "explanation": "The distractors are classic CISC traits.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Object Oriented Programming, C++",
    "subject_code": "BIT153",
-   "question_count": 72,
+   "question_count": 76,
    "questions": [
     {
      "id": 1,
@@ -8221,13 +8561,93 @@
      "unit_conf": "high",
      "explanation": "mx(3,7) instantiates T = int and returns 7; mx(2.5,1.5) instantiates T = double and returns 2.5. Printed back to back: 72.5.",
      "source": "added"
+    },
+    {
+     "id": "S041",
+     "question": "Class B is derived from class A. When a B object is created and later destroyed, the calls occur in the order",
+     "options": {
+      "A": "A(), B(), ~A(), ~B()",
+      "B": "B(), A(), ~B(), ~A()",
+      "C": "A(), B(), ~B(), ~A()",
+      "D": "B(), A(), ~A(), ~B()"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT153",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "ctor / dtor order",
+     "explanation": "Constructors base → derived; destructors in reverse.",
+     "source": "sibling"
+    },
+    {
+     "id": "S042",
+     "question": "In C++, members of a struct are by default",
+     "options": {
+      "A": "private",
+      "B": "protected",
+      "C": "public",
+      "D": "static"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT153",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "struct ≠ class",
+     "explanation": "struct = public by default; class = private by default.",
+     "source": "sibling"
+    },
+    {
+     "id": "S043",
+     "question": "Function overriding differs from overloading because overriding",
+     "options": {
+      "A": "is resolved at compile time from the argument types",
+      "B": "redefines a virtual base-class function in a derived class",
+      "C": "renames a base-class function inside the derived class",
+      "D": "gives one name several parameter lists inside the same class"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT153",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "overriding ≠ overloading",
+     "explanation": "The first distractor and the second describe overloading.",
+     "source": "sibling"
+    },
+    {
+     "id": "S045",
+     "question": "Declaring a base-class destructor virtual ensures that",
+     "options": {
+      "A": "a derived object deleted through a base pointer is destroyed fully",
+      "B": "the destructor can be overloaded with other parameters",
+      "C": "only one object of the base class can ever be created",
+      "D": "the compiler skips member cleanup for derived classes"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT153",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "virtual destructor",
+     "explanation": "Without virtual, only the base destructor runs.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Data Structures and Algorithms",
    "subject_code": "BIT201",
-   "question_count": 90,
+   "question_count": 95,
    "questions": [
     {
      "id": 1,
@@ -10208,13 +10628,113 @@
      "unit_conf": "high",
      "explanation": "DFS goes deep first: A, B, D, F, then back to C, then E: A B D F C E. A B C D E F is the BFS order.",
      "source": "added"
+    },
+    {
+     "id": "S046",
+     "question": "Bubble sort on 4, 3, 2, 5, 1 performs how many swaps?",
+     "options": {
+      "A": "6",
+      "B": "4",
+      "C": "7",
+      "D": "10"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT201",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DSA-01",
+     "explanation": "Swaps = inversions: (4,3)(4,2)(4,1)(3,2)(3,1)(2,1)(5,1) = 7. Slips: 10 = n(n−1)/2 comparisons; 4 = passes.",
+     "source": "sibling"
+    },
+    {
+     "id": "S047",
+     "question": "The postfix form of A * (B + C) − D / E is",
+     "options": {
+      "A": "AB*C+DE/−",
+      "B": "ABC+*−DE/",
+      "C": "ABC+*DE/−",
+      "D": "ABC*+DE/−"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT201",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DSA-02",
+     "explanation": "Brackets first, then * and / before −. The distractors ignore brackets or precedence.",
+     "source": "sibling"
+    },
+    {
+     "id": "S048",
+     "question": "Keys 40, 20, 60, 10, 30, 50 are inserted into an empty BST in that order. Its pre-order traversal is",
+     "options": {
+      "A": "10 20 30 40 50 60",
+      "B": "40 20 10 30 60 50",
+      "C": "40 20 60 10 30 50",
+      "D": "10 30 20 50 60 40"
+     },
+     "answer": "B",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT201",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "tree traversal",
+     "explanation": "Distractors are in-order, post-order and level-order.",
+     "source": "sibling"
+    },
+    {
+     "id": "S049",
+     "question": "Which algorithm finds shortest paths from one source to all vertices of a weighted graph?",
+     "options": {
+      "A": "Prim's algorithm",
+      "B": "Kruskal's algorithm",
+      "C": "Topological sort",
+      "D": "Dijkstra's algorithm"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT201",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "MST ≠ shortest path",
+     "explanation": "Prim and Kruskal build minimum spanning trees.",
+     "source": "sibling"
+    },
+    {
+     "id": "S050",
+     "question": "The worst-case time complexity of quicksort is",
+     "options": {
+      "A": "O(n²)",
+      "B": "O(log n)",
+      "C": "O(n)",
+      "D": "O(n log n)"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT201",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "sort complexity",
+     "explanation": "O(n log n) is the average case (and merge sort's always).",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Database Management System",
    "subject_code": "BIT202",
-   "question_count": 91,
+   "question_count": 96,
    "questions": [
     {
      "id": 1,
@@ -12217,13 +12737,113 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S051",
+     "question": "Which is the logical order of evaluation of these SQL clauses?",
+     "options": {
+      "A": "FROM, WHERE, GROUP BY, HAVING, SELECT",
+      "B": "SELECT, FROM, WHERE, GROUP BY, HAVING",
+      "C": "FROM, GROUP BY, WHERE, HAVING, SELECT",
+      "D": "FROM, WHERE, SELECT, GROUP BY, HAVING"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT202",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "execution order",
+     "explanation": "Few Warriors Get Hurt Seriously Often.",
+     "source": "sibling"
+    },
+    {
+     "id": "S052",
+     "question": "R(StudentID, CourseID, StudentName) has key (StudentID, CourseID) and StudentID → StudentName. The lowest normal form that R violates is",
+     "options": {
+      "A": "3NF",
+      "B": "1NF",
+      "C": "2NF",
+      "D": "BCNF"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT202",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DBMS-01",
+     "explanation": "StudentName depends on part of the key: partial dependency = 2NF violation.",
+     "source": "sibling"
+    },
+    {
+     "id": "S053",
+     "question": "Which ACID property guarantees that committed changes survive a system crash?",
+     "options": {
+      "A": "Durability",
+      "B": "Isolation",
+      "C": "Atomicity",
+      "D": "Consistency"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT202",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "ACID",
+     "explanation": "Atomicity = all or nothing; consistency = valid state; isolation = no interference.",
+     "source": "sibling"
+    },
+    {
+     "id": "S054",
+     "question": "GRANT and REVOKE belong to which SQL sublanguage?",
+     "options": {
+      "A": "DCL",
+      "B": "TCL",
+      "C": "DML",
+      "D": "DDL"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT202",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DDL / DML / DCL / TCL",
+     "explanation": "DCL controls access; TCL is COMMIT / ROLLBACK.",
+     "source": "sibling"
+    },
+    {
+     "id": "S055",
+     "question": "Combining entity sets that share common features into a higher-level entity set is called",
+     "options": {
+      "A": "aggregation",
+      "B": "generalization",
+      "C": "normalization",
+      "D": "specialization"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT202",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "ER extensions",
+     "explanation": "Generalization is bottom-up; specialization is top-down.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Operating Systems",
    "subject_code": "BIT204",
-   "question_count": 69,
+   "question_count": 72,
    "questions": [
     {
      "id": 1,
@@ -13742,13 +14362,73 @@
      "unit_conf": "high",
      "explanation": "The four Coffman conditions are mutual exclusion, hold and wait, NO pre-emption and circular wait. If resources could be pre-empted, deadlock could be broken.",
      "source": "added"
+    },
+    {
+     "id": "S056",
+     "question": "A system has a 256 KB virtual address space and 2 KB pages. How many bits form the page number?",
+     "options": {
+      "A": "11",
+      "B": "8",
+      "C": "18",
+      "D": "7"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT204",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "OS-01",
+     "explanation": "256 KB ÷ 2 KB = 128 pages = 2⁷. Slips: 11 = offset bits; 18 = total address bits; 8 = log₂256.",
+     "source": "sibling"
+    },
+    {
+     "id": "S057",
+     "question": "P1, P2, P3 arrive together with CPU bursts 6, 3 and 3 ms. The average waiting time under SJF is",
+     "options": {
+      "A": "9 ms",
+      "B": "3 ms",
+      "C": "5 ms",
+      "D": "7 ms"
+     },
+     "answer": "B",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT204",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "OS-02",
+     "explanation": "Order P2, P3, P1: waits 0, 3, 6 → 9/3 = 3. Slips: 5 = FCFS; 7 = turnaround time; 9 = total, not average.",
+     "source": "sibling"
+    },
+    {
+     "id": "S060",
+     "question": "FIFO page replacement uses 3 frames for the reference string 2, 3, 2, 1, 5, 2, 4. The number of page faults is",
+     "options": {
+      "A": "4",
+      "B": "7",
+      "C": "5",
+      "D": "6"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT204",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "page replacement",
+     "explanation": "Faults: 2, 3, 1, 5, 2, 4 (only the second 2 hits). 5 is the LRU result; 7 counts every reference.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Web Technology",
    "subject_code": "BIT251",
-   "question_count": 115,
+   "question_count": 120,
    "questions": [
     {
      "id": 1,
@@ -16279,13 +16959,113 @@
      "unit_conf": "medium",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S066",
+     "question": "In the CSS box model, the layers from the content outward are",
+     "options": {
+      "A": "content, margin, border, padding",
+      "B": "content, padding, border, margin",
+      "C": "padding, content, border, margin",
+      "D": "content, border, padding, margin"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT251",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "box model",
+     "explanation": "Content, padding, border, margin.",
+     "source": "sibling"
+    },
+    {
+     "id": "S067",
+     "question": "Which statement separates sessions from cookies?",
+     "options": {
+      "A": "Session data stays on the server; cookies are stored in the browser",
+      "B": "Both are stored only on the server and never reach the browser",
+      "C": "Cookie data stays on the server; sessions are stored in the browser",
+      "D": "Both are stored only in the browser and vanish on page reload"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT251",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "cookies ≠ sessions",
+     "explanation": "The first distractor swaps the definitions.",
+     "source": "sibling"
+    },
+    {
+     "id": "S068",
+     "question": "Which is a valid PHP variable name?",
+     "options": {
+      "A": "$2user",
+      "B": "user_name",
+      "C": "$user_name",
+      "D": "$user-name"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT251",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "PHP variables",
+     "explanation": "Must start with $, then a letter or underscore; no hyphens.",
+     "source": "sibling"
+    },
+    {
+     "id": "S069",
+     "question": "Which is a semantic element introduced in HTML5?",
+     "options": {
+      "A": "<span>",
+      "B": "<article>",
+      "C": "<div>",
+      "D": "<center>"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT251",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "HTML5 semantic tags",
+     "explanation": "div and span are generic containers; center is old presentational markup.",
+     "source": "sibling"
+    },
+    {
+     "id": "S070",
+     "question": "Which JavaScript method shows an OK/Cancel dialog and returns true or false?",
+     "options": {
+      "A": "alert()",
+      "B": "confirm()",
+      "C": "write()",
+      "D": "prompt()"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT251",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "JS dialogs",
+     "explanation": "alert only informs; prompt returns text.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Systems Analysis and Design",
    "subject_code": "BIT253",
-   "question_count": 85,
+   "question_count": 90,
    "questions": [
     {
      "id": 1,
@@ -18156,13 +18936,113 @@
      "unit_conf": "medium",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S071",
+     "question": "The development company's own staff test the finished product at the developer's site. This is",
+     "options": {
+      "A": "alpha testing",
+      "B": "acceptance testing",
+      "C": "unit testing",
+      "D": "beta testing"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT253",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "alpha ≠ beta ≠ acceptance",
+     "explanation": "Beta = real users at their site; acceptance = client sign-off.",
+     "source": "sibling"
+    },
+    {
+     "id": "S072",
+     "question": "Which SDLC model suits unclear requirements when users need an early working sample?",
+     "options": {
+      "A": "Waterfall",
+      "B": "RAD",
+      "C": "Prototyping",
+      "D": "Spiral"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT253",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "SDLC models",
+     "explanation": "Spiral = risk, RAD = speed, waterfall = fixed requirements.",
+     "source": "sibling"
+    },
+    {
+     "id": "S073",
+     "question": "Which tool best records rules that combine several conditions with their actions?",
+     "options": {
+      "A": "Data flow diagram",
+      "B": "Decision table",
+      "C": "Entity relationship diagram",
+      "D": "Use-case diagram"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT253",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "process vs logic tools",
+     "explanation": "DFD = process, ERD = data, decision table = logic.",
+     "source": "sibling"
+    },
+    {
+     "id": "S074",
+     "question": "Which installation strategy runs old and new systems side by side until the new one is trusted?",
+     "options": {
+      "A": "Parallel installation",
+      "B": "Phased installation",
+      "C": "Pilot installation",
+      "D": "Direct installation"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT253",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "installation",
+     "explanation": "Direct = cut-over; phased = module by module; pilot = one site first.",
+     "source": "sibling"
+    },
+    {
+     "id": "S075",
+     "question": "A study asking whether a project's expected benefits outweigh its costs is a(n)",
+     "options": {
+      "A": "technical feasibility study",
+      "B": "legal feasibility study",
+      "C": "economic feasibility study",
+      "D": "operational feasibility study"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT253",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "feasibility",
+     "explanation": "Technical = can we build it; operational = will it be used.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Network and Data Communications",
    "subject_code": "BIT254",
-   "question_count": 82,
+   "question_count": 87,
    "questions": [
     {
      "id": 1,
@@ -19967,13 +20847,113 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S061",
+     "question": "The IPv4 address 139.5.2.1 belongs to which class?",
+     "options": {
+      "A": "Class B",
+      "B": "Class A",
+      "C": "Class C",
+      "D": "Class D"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT254",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "CN-01",
+     "explanation": "B = 128–191.",
+     "source": "sibling"
+    },
+    {
+     "id": "S062",
+     "question": "A network switch operates mainly at the",
+     "options": {
+      "A": "physical layer",
+      "B": "network layer",
+      "C": "data link layer",
+      "D": "transport layer"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT254",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "devices by layer",
+     "explanation": "Hub = layer 1, switch = layer 2, router = layer 3.",
+     "source": "sibling"
+    },
+    {
+     "id": "S063",
+     "question": "Which protocol sends e-mail from a client to a mail server?",
+     "options": {
+      "A": "POP3",
+      "B": "FTP",
+      "C": "SMTP",
+      "D": "IMAP"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT254",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "SMTP ≠ POP/IMAP",
+     "explanation": "POP3 and IMAP retrieve mail.",
+     "source": "sibling"
+    },
+    {
+     "id": "S064",
+     "question": "OSPF is",
+     "options": {
+      "A": "a link-state protocol that computes shortest paths",
+      "B": "a static protocol configured manually on routers",
+      "C": "a transport protocol that retransmits lost segments",
+      "D": "a distance-vector protocol that counts hops only"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT254",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "RIP ≠ OSPF",
+     "explanation": "RIP is the distance-vector sibling.",
+     "source": "sibling"
+    },
+    {
+     "id": "S065",
+     "question": "How many usable host addresses does a subnet with mask 255.255.255.224 have?",
+     "options": {
+      "A": "31",
+      "B": "62",
+      "C": "30",
+      "D": "32"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT254",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "subnetting",
+     "explanation": "5 host bits: 2⁵ − 2 = 30. Slips: 32 forgot reserved addresses; 31; 62 = /26.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Software Engineering",
    "subject_code": "BIT302",
-   "question_count": 80,
+   "question_count": 84,
    "questions": [
     {
      "id": 1,
@@ -21734,13 +22714,93 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S091",
+     "question": "Which question does validation answer?",
+     "options": {
+      "A": "Are we building the product right?",
+      "B": "Are we meeting the schedule?",
+      "C": "Are we building the right product?",
+      "D": "Are we following the coding standard?"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT302",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "verification ≠ validation",
+     "explanation": "The first distractor is verification.",
+     "source": "sibling"
+    },
+    {
+     "id": "S092",
+     "question": "Which is a non-functional requirement?",
+     "options": {
+      "A": "Administrators can add and remove accounts",
+      "B": "Users can reset their password by e-mail",
+      "C": "The system generates a monthly sales report",
+      "D": "Queries must return results within 2 seconds"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT302",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "functional ≠ non-functional",
+     "explanation": "Performance is a quality attribute; the others are behaviours.",
+     "source": "sibling"
+    },
+    {
+     "id": "S093",
+     "question": "In basic COCOMO, a small team building a familiar, loosely constrained application falls in which mode?",
+     "options": {
+      "A": "evolutionary",
+      "B": "embedded",
+      "C": "semi-detached",
+      "D": "organic"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT302",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "COCOMO modes",
+     "explanation": "Modes: organic, semi-detached, embedded.",
+     "source": "sibling"
+    },
+    {
+     "id": "S094",
+     "question": "Analysing existing software to recover its design without changing it is",
+     "options": {
+      "A": "re-engineering",
+      "B": "reverse engineering",
+      "C": "regression testing",
+      "D": "forward engineering"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT302",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "reverse ≠ re-engineering",
+     "explanation": "Re-engineering also restructures or rebuilds.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Management Information System",
    "subject_code": "BIT353",
-   "question_count": 105,
+   "question_count": 109,
    "questions": [
     {
      "id": 2,
@@ -24051,13 +25111,93 @@
      "unit_conf": "low",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S096",
+     "question": "Which system supports senior managers with strategic, unstructured decisions using external data?",
+     "options": {
+      "A": "Management information system",
+      "B": "Transaction processing system",
+      "C": "Decision support system",
+      "D": "Executive support system"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT353",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "TPS / MIS / DSS / ESS",
+     "explanation": "ESS = senior level.",
+     "source": "sibling"
+    },
+    {
+     "id": "S097",
+     "question": "Which system helps middle managers with non-routine decisions through what-if analysis?",
+     "options": {
+      "A": "Decision support system",
+      "B": "Transaction processing system",
+      "C": "Executive support system",
+      "D": "Management information system"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT353",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DSS",
+     "explanation": "MIS = routine summary reports.",
+     "source": "sibling"
+    },
+    {
+     "id": "S098",
+     "question": "Which is NOT one of Porter's five competitive forces?",
+     "options": {
+      "A": "Threat of substitute products",
+      "B": "Bargaining power of buyers",
+      "C": "Rivalry among existing competitors",
+      "D": "Government regulation"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT353",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "Porter's five forces",
+     "explanation": "Five forces: new entrants, substitutes, buyers, suppliers, rivalry.",
+     "source": "sibling"
+    },
+    {
+     "id": "S099",
+     "question": "Which system coordinates the flow of materials and information among suppliers, manufacturers and distributors?",
+     "options": {
+      "A": "Knowledge management system",
+      "B": "Supply chain management",
+      "C": "Customer relationship management",
+      "D": "Enterprise resource planning"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT353",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "ERP / SCM / CRM",
+     "explanation": "CRM = customers; ERP = internal integration.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "E-Commerce",
    "subject_code": "BIT403",
-   "question_count": 105,
+   "question_count": 109,
    "questions": [
     {
      "id": 1,
@@ -26368,13 +27508,93 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S076",
+     "question": "Which attack silently redirects users from a genuine website to a fake one, often by tampering with DNS?",
+     "options": {
+      "A": "Phishing",
+      "B": "Pharming",
+      "C": "Sniffing",
+      "D": "Spoofing"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT403",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "phishing ≠ pharming",
+     "explanation": "Phishing uses deceptive messages to lure users.",
+     "source": "sibling"
+    },
+    {
+     "id": "S077",
+     "question": "An online auction where individuals sell to other individuals is which e-commerce type?",
+     "options": {
+      "A": "C2B",
+      "B": "C2C",
+      "C": "B2C",
+      "D": "B2B"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT403",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "B2C / B2B / C2C / C2B",
+     "explanation": "Consumer-to-consumer.",
+     "source": "sibling"
+    },
+    {
+     "id": "S078",
+     "question": "A DDoS attack differs from a DoS attack because",
+     "options": {
+      "A": "the flood comes from many compromised computers at once",
+      "B": "the flood comes from a single attacking machine on one network",
+      "C": "it encrypts stored files and demands a payment",
+      "D": "it steals passwords instead of flooding the target servers"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT403",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DoS ≠ DDoS",
+     "explanation": "Distributed = many sources.",
+     "source": "sibling"
+    },
+    {
+     "id": "S079",
+     "question": "Ensuring that a message was not altered in transit is the security dimension of",
+     "options": {
+      "A": "authenticity",
+      "B": "nonrepudiation",
+      "C": "integrity",
+      "D": "confidentiality"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT403",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "security dimensions",
+     "explanation": "Confidentiality = secrecy; authenticity = identity; nonrepudiation = cannot deny.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Computer Graphics",
    "subject_code": "BIT304",
-   "question_count": 50,
+   "question_count": 55,
    "questions": [
     {
      "id": 1,
@@ -27475,13 +28695,113 @@
      "unit_conf": "medium",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S081",
+     "question": "Compared with DDA, Bresenham's line algorithm is faster mainly because it",
+     "options": {
+      "A": "uses only integer addition and comparison",
+      "B": "plots several pixels at once in parallel",
+      "C": "rounds a floating-point y at every step",
+      "D": "multiplies by the slope for every pixel"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT304",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "DDA ≠ Bresenham",
+     "explanation": "The first two distractors describe DDA.",
+     "source": "sibling"
+    },
+    {
+     "id": "S082",
+     "question": "For a line from (0, 0) to (8, 3), the initial decision parameter p₀ = 2Δy − Δx is",
+     "options": {
+      "A": "14",
+      "B": "−2",
+      "C": "−5",
+      "D": "13"
+     },
+     "answer": "B",
+     "level": 2,
+     "type": "recall",
+     "tag": "L2 - BIT304",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "Bresenham p₀",
+     "explanation": "2·3 − 8 = −2. Slips: 13 = 2Δx − Δy; −5 forgot the 2; 14 = 2Δy + Δx.",
+     "source": "sibling"
+    },
+    {
+     "id": "S083",
+     "question": "Which hidden-surface method sorts polygons by depth and draws them farthest first?",
+     "options": {
+      "A": "Back-face culling",
+      "B": "Z-buffer algorithm",
+      "C": "Scan-line fill",
+      "D": "Painter's algorithm"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT304",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "painter's ≠ Z-buffer",
+     "explanation": "Painter's = object space; Z-buffer = image space, no sorting.",
+     "source": "sibling"
+    },
+    {
+     "id": "S084",
+     "question": "Which shading model interpolates intensities computed at a polygon's vertices across its surface?",
+     "options": {
+      "A": "Phong shading",
+      "B": "Ray tracing",
+      "C": "Flat shading",
+      "D": "Gouraud shading"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT304",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "shading",
+     "explanation": "Flat = one colour per polygon; Phong interpolates normals.",
+     "source": "sibling"
+    },
+    {
+     "id": "S085",
+     "question": "A point (2, 3) is translated by (4, −1) and then scaled by 2 about the origin. The result is",
+     "options": {
+      "A": "(12, 4)",
+      "B": "(6, 2)",
+      "C": "(8, 5)",
+      "D": "(4, 6)"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT304",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "transformations",
+     "explanation": "(6, 2) → (12, 4). Slips: scale first then translate; translation only; scaling only.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Artificial Intelligence",
    "subject_code": "BIT252",
-   "question_count": 95,
+   "question_count": 100,
    "questions": [
     {
      "id": 2,
@@ -29572,13 +30892,113 @@
      "unit_conf": "medium",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S086",
+     "question": "Open nodes have (g, h): A (4, 7), B (6, 3), C (2, 10), D (9, 1). A* expands",
+     "options": {
+      "A": "C",
+      "B": "B",
+      "C": "A",
+      "D": "D"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT252",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "AI-01",
+     "explanation": "f = g + h: A 11, B 9, C 12, D 10 → B. Greedy would pick D (lowest h); g alone picks C.",
+     "source": "sibling"
+    },
+    {
+     "id": "S087",
+     "question": "In alpha-beta pruning, alpha is",
+     "options": {
+      "A": "the depth at which pruning stops the search",
+      "B": "the best value found so far for MIN along the path",
+      "C": "the average value of all leaves seen so far",
+      "D": "the best value found so far for MAX along the path"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT252",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "alpha-beta",
+     "explanation": "The first distractor is beta.",
+     "source": "sibling"
+    },
+    {
+     "id": "S088",
+     "question": "A thermostat that reacts only to the current temperature reading is a",
+     "options": {
+      "A": "goal-based agent",
+      "B": "simple reflex agent",
+      "C": "utility-based agent",
+      "D": "model-based agent"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT252",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "agent types",
+     "explanation": "No internal state, goal or utility.",
+     "source": "sibling"
+    },
+    {
+     "id": "S089",
+     "question": "A program learns to play a game by receiving rewards and penalties. This is",
+     "options": {
+      "A": "supervised learning",
+      "B": "unsupervised learning",
+      "C": "deductive reasoning",
+      "D": "reinforcement learning"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - BIT252",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "learning types",
+     "explanation": "Supervised needs labelled examples; unsupervised finds structure.",
+     "source": "sibling"
+    },
+    {
+     "id": "S090",
+     "question": "Which uninformed search expands the shallowest unexpanded node first, using a FIFO queue?",
+     "options": {
+      "A": "Breadth-first search",
+      "B": "Greedy best-first search",
+      "C": "Iterative deepening search",
+      "D": "Depth-first search"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - BIT252",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "uninformed search",
+     "explanation": "DFS uses a stack; greedy is informed (f = h).",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Basic Mathematics: Calculus & Functions",
    "subject_code": "MTH104",
-   "question_count": 135,
+   "question_count": 143,
    "questions": [
     {
      "id": 1,
@@ -32549,13 +33969,173 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S001",
+     "question": "lim (x→3) (x⁴ − 81)/(x − 3) =",
+     "options": {
+      "A": "108",
+      "B": "81",
+      "C": "27",
+      "D": "324"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "CAL-01",
+     "explanation": "Derivative of x⁴ at 3 = 4·3³. Slips: 27 forgot k; 324 power not reduced; 81 = 3⁴.",
+     "source": "sibling"
+    },
+    {
+     "id": "S002",
+     "question": "If y = (x² + 1)³, then dy/dx at x = 1 is",
+     "options": {
+      "A": "8",
+      "B": "12",
+      "C": "24",
+      "D": "48"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "chain rule",
+     "explanation": "3(x²+1)²·2x = 3·4·2. Slips: 12 forgot inner derivative; 48 wrong power left; 8 = value of y.",
+     "source": "sibling"
+    },
+    {
+     "id": "S004",
+     "question": "∫₀¹ x·e^(x²) dx =",
+     "options": {
+      "A": "(e − 1)/2",
+      "B": "e/2",
+      "C": "e − 1",
+      "D": "(e + 1)/2"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "substitution",
+     "explanation": "u = x², ½∫₀¹ eᵘ du. Slips: e − 1 forgot ½; (e + 1)/2 sign slip; e/2 dropped the lower limit.",
+     "source": "sibling"
+    },
+    {
+     "id": "S005",
+     "question": "The integral ∫₋₁¹ dx/x² is",
+     "options": {
+      "A": "2",
+      "B": "−2",
+      "C": "divergent",
+      "D": "0"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "improper integral",
+     "explanation": "Discontinuity at 0 inside the interval, so it diverges. Slips: −2 from blindly using −1/x; 2 and 0 from symmetry thinking.",
+     "source": "sibling"
+    },
+    {
+     "id": "S006",
+     "question": "If f(x, y) = x·eʸ + y², then ∂f/∂y at (1, 1) is",
+     "options": {
+      "A": "2e",
+      "B": "e + 1",
+      "C": "e",
+      "D": "e + 2"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "partial derivative",
+     "explanation": "∂f/∂y = x·eʸ + 2y. Slips: e = ∂f/∂x; 2e doubled the exponential; e + 1 differentiated y² as y.",
+     "source": "sibling"
+    },
+    {
+     "id": "S007",
+     "question": "The solution of y′ + 3y = 0 with y(0) = 2 is",
+     "options": {
+      "A": "y = 2e^(3x)",
+      "B": "y = 2e^(−3x)",
+      "C": "y = e^(−3x) + 1",
+      "D": "y = 3e^(−2x)"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "y′ + ky = 0",
+     "explanation": "y = Ce^(−kx), C = y(0) = 2. Slips: sign of the exponent; swapped constants; added instead of multiplying.",
+     "source": "sibling"
+    },
+    {
+     "id": "S008",
+     "question": "The plane through (1, 2, 3) with normal vector (2, −1, 4) is",
+     "options": {
+      "A": "2x − y + 4z = −12",
+      "B": "2x − y + 4z = 12",
+      "C": "2x − y + 4z = 16",
+      "D": "x + 2y + 3z = 14"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "plane equation",
+     "explanation": "a(x−x₀)+b(y−y₀)+c(z−z₀)=0 → 2x − y + 4z = 2 − 2 + 12. Slips: used the point as the normal; sign of the constant; sign slip on −y·2.",
+     "source": "sibling"
+    },
+    {
+     "id": "S009",
+     "question": "f(x) = x³ − 6x² + 9x is decreasing on",
+     "options": {
+      "A": "(1, 3)",
+      "B": "(0, 3)",
+      "C": "(−∞, 3)",
+      "D": "(−∞, 1) ∪ (3, ∞)"
+     },
+     "answer": "A",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH104",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "increasing / decreasing",
+     "explanation": "f′ = 3(x−1)(x−3) < 0 on (1, 3). The second option is where f increases.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Linear Algebra and Abstract Algebra",
    "subject_code": "MTH168",
-   "question_count": 90,
+   "question_count": 95,
    "questions": [
     {
      "id": 1,
@@ -34536,13 +36116,113 @@
      "unit_conf": "medium",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S010",
+     "question": "The inverse of A = [2 1; 5 4] (rows separated by semicolons) is",
+     "options": {
+      "A": "(1/3)[4 1; 5 2]",
+      "B": "(1/3)[2 −1; −5 4]",
+      "C": "[4 −1; −5 2]",
+      "D": "(1/3)[4 −1; −5 2]"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH168",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "LA-01",
+     "explanation": "det = 8 − 5 = 3; swap a and d, negate b and c. Slips: forgot ÷det; forgot to negate b, c; swapped signs without swapping a and d.",
+     "source": "sibling"
+    },
+    {
+     "id": "S011",
+     "question": "x + 2y = 3 and 2x + 4y = k have infinitely many solutions when k =",
+     "options": {
+      "A": "12",
+      "B": "0",
+      "C": "3",
+      "D": "6"
+     },
+     "answer": "D",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH168",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "consistency",
+     "explanation": "The second equation must be 2 × the first, so k = 6. Any other k gives 0 = nonzero (no solution).",
+     "source": "sibling"
+    },
+    {
+     "id": "S012",
+     "question": "det [1 2 0; 3 −1 4; 0 5 2] =",
+     "options": {
+      "A": "−10",
+      "B": "−34",
+      "C": "10",
+      "D": "34"
+     },
+     "answer": "B",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - MTH168",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "determinant",
+     "explanation": "1(−2−20) − 2(6−0) + 0 = −22 − 12. Slips: −10 dropped the alternating sign; 10 and 34 sign errors.",
+     "source": "sibling"
+    },
+    {
+     "id": "S014",
+     "question": "By Cramer's rule, x in 2x + y = 5, x + 3y = 5 is",
+     "options": {
+      "A": "10",
+      "B": "4",
+      "C": "1",
+      "D": "2"
+     },
+     "answer": "D",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - MTH168",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "Cramer's rule",
+     "explanation": "det = 5, Dₓ = 15 − 5 = 10, x = 10/5. Slips: 1 = y; 10 forgot ÷det; 4 swapped the numerator.",
+     "source": "sibling"
+    },
+    {
+     "id": "S015",
+     "question": "For what k are u = (2, k, 1) and v = (3, −2, −4) orthogonal?",
+     "options": {
+      "A": "−1",
+      "B": "2",
+      "C": "1",
+      "D": "3"
+     },
+     "answer": "C",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - MTH168",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "orthogonality",
+     "explanation": "u·v = 6 − 2k − 4 = 2 − 2k = 0. Slips: −1 sign error; 3 dropped the third term; 2 arithmetic slip.",
+     "source": "sibling"
     }
    ]
   },
   {
    "subject": "Basic Statistics",
    "subject_code": "STA154",
-   "question_count": 75,
+   "question_count": 79,
    "questions": [
     {
      "id": 1,
@@ -36193,6 +37873,86 @@
      "unit_conf": "high",
      "explanation": null,
      "source": "original"
+    },
+    {
+     "id": "S016",
+     "question": "Data x has mean 10 and variance 4. For y = 3x + 2, the mean and variance of y are",
+     "options": {
+      "A": "32 and 38",
+      "B": "30 and 36",
+      "C": "32 and 36",
+      "D": "32 and 12"
+     },
+     "answer": "C",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - STA154",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "STAT-01",
+     "explanation": "Mean 3m + 2 = 32; variance a²v = 36. Slips: a·v; a²v + b; forgot the shift in the mean.",
+     "source": "sibling"
+    },
+    {
+     "id": "S018",
+     "question": "A fair coin is tossed 5 times. The probability of exactly 2 heads is",
+     "options": {
+      "A": "2/5",
+      "B": "5/16",
+      "C": "1/32",
+      "D": "1/4"
+     },
+     "answer": "B",
+     "level": 0,
+     "type": "recall",
+     "tag": "L0 - STA154",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "binomial",
+     "explanation": "C(5,2)/2⁵ = 10/32. Slips: 1/32 forgot C(5,2); 2/5 relative frequency; 1/4 = (1/2)².",
+     "source": "sibling"
+    },
+    {
+     "id": "S019",
+     "question": "A correlation coefficient r = −0.8 between two variables indicates",
+     "options": {
+      "A": "a strong negative linear relationship",
+      "B": "a strong positive linear relationship",
+      "C": "that one variable causes the other to fall",
+      "D": "a weak negative linear relationship"
+     },
+     "answer": "A",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - STA154",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "correlation",
+     "explanation": "Sign = direction, |r| = strength; correlation ≠ causation.",
+     "source": "sibling"
+    },
+    {
+     "id": "S020",
+     "question": "Temperature measured in °C is on which scale?",
+     "options": {
+      "A": "Nominal",
+      "B": "Interval",
+      "C": "Ratio",
+      "D": "Ordinal"
+     },
+     "answer": "B",
+     "level": 1,
+     "type": "recall",
+     "tag": "L1 - STA154",
+     "regeneratable": false,
+     "shuffle_safe": true,
+     "giveaway_risk": false,
+     "unit_name": "scales of measurement",
+     "explanation": "Equal intervals but no true zero. Ratio is the trap: 0 °C is not 'no temperature'.",
+     "source": "sibling"
     }
    ]
   }
