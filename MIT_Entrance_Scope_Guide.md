@@ -33,12 +33,12 @@
 
 - **Q21–100 = 16 computing subjects x 5 Qs.** Every subject is worth 5 marks whatever its syllabus size, so study by **marks per hour**.
 - **Q1–20 = Math/Stats:** Calculus 9, Linear Algebra 6, Statistics 5. Math/Stats is ranked by marks per hour like every other block. The one real difference: it is a skill (small calculations by hand), not recall, so it is practised rather than memorised.
-- **75/100 target:** the tier aims below add up to about 79 (computing ≈ 65 of 80, Math ≈ 14 of 20), a small buffer. Math has no special target: if any block lags, the others cover it (e.g. Math = 10 means computing must give 65/80).
+- **75/100 target:** these per-subject targets add up to about 79 (computing ≈ 65 of 80, Math ≈ 14 of 20), a small buffer. Math has no special target: if any block lags, the others cover it (e.g. Math = 10 means computing must give 65/80).
 
 | Tier | Subjects | Aim |
 |---|---|---|
-| **A** (cheap recall) | IIT, DL, EC, MIS, CG, AI, SAD, SE, Web | 4.5/5 |
-| **B** (trace, calc, wide) | C, OOP, DSA, DBMS, CN, MP, OS, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | about 70% of each subject's marks (3.5/5 for the computing ones) |
+| **A** (higher-yield, approachable under the exam scope) | IIT, DL, EC, MIS, CG, AI, SAD, SE, Web, MP | 85% (4.25/5) |
+| **B** (broader, or more trace/calculation-heavy) | C, OOP, DSA, DBMS, CN, OS, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | 75% (3.75/5 for the computing subjects) |
 
 ## 2. What the paper really is
 
@@ -65,6 +65,7 @@ Format: **know cold** | *trap* | skip deep until the core is fluent.
 - **EC:** 7 unique features; B2C/B2B/C2C/C2B; 6 security dimensions; **phishing≠pharming≠spoofing**; DoS≠DDoS; SSL/TLS, PKI, VPN; auctions; EDI; Nepal ETA. | *trap:* dimension vs attack names | skip SET steps, social-media tools.
 - **CG:** DDA (float) ≠ Bresenham (integer); translation/scaling/rotation matrices; Cohen-Sutherland≠Liang-Barsky; Z-buffer (image space)≠painter's (object space); flat≠Gouraud≠Phong; Bezier≠B-spline; RGB (additive)≠CMY (subtractive)≠HSV. | *trap:* translation/transformation wording | skip derivations, OpenGL, VR.
 - **AI:** PEAS, 5 agent types; BFS/DFS/IDS; **greedy f=h ≠ A\* f=g+h**; minimax, alpha-beta (alpha = best for MAX); CNF; forward≠backward chaining; Bayes; supervised/unsupervised/RL; ANN training updates weights. | *trap:* which f for which search | skip Dempster-Shafer, scripts, NLP detail.
+- **MP (8085 & computer architecture):** 8085 = 8-bit data, 16-bit address (64 KB), 40 pins; address bus one-way, data bus two-way; flags S Z AC P CY; interrupts TRAP > 7.5 > 6.5 > 5.5 > INTR; fetch→decode→execute; RISC≠CISC; Booth = multiplication; pipelining = overlap. | *trap:* bus direction, flag/interrupt details, and one-step pipeline arithmetic | skip assembly programs and microprogramming.
 
 ### Tier B
 - **C:** precedence; pre vs post `++`; integer division; `=` vs `==`; switch fall-through; macro without parentheses; pointer arithmetic scales by type size; `strlen`≠`sizeof`; fopen modes; struct≠union; array size n+1 for a string of n. | *trap:* trace on paper; "compile error" is often an option | skip file handling, preprocessor.
@@ -73,7 +74,6 @@ Format: **know cold** | *trap* | skip deep until the core is fluent.
 - **DBMS:** **FROM→WHERE→GROUP BY→HAVING→SELECT→ORDER BY**; 1NF atomic, 2NF no partial, 3NF no transitive, BCNF every determinant a candidate key; specialization≠generalization≠aggregation; ACID; deferred (NO-UNDO/REDO)≠immediate (UNDO/REDO)≠shadow paging; DDL/DML/DCL/TCL. | *trap:* ALTER vs DROP vs UPDATE | skip NoSQL detail, MVD derivations.
 - **OS:** process≠thread; FCFS/SJF/SRTF/RR/priority; busy-waiting (lock, strict alternation, Peterson) ≠ blocking (sleep/wakeup, semaphore, monitor); **4 deadlock conditions** (mutual exclusion, hold & wait, no preemption, circular wait); Ostrich = ignore, not recovery; internal≠external fragmentation; FIFO/LRU/optimal. | *trap:* ignore extra numbers in the stem | skip file-system implementation, I/O layers.
 - **CN:** layers and devices (hub 1, switch 2, router 3); TCP≠UDP; IPv4 32-bit classful ≠ IPv6 128-bit classless; ARP≠RARP; SMTP (send) ≠ POP/IMAP (receive); stop-and-wait / Go-Back-N / selective repeat; TDM≠FDM≠WDM; RIP (distance-vector)≠OSPF (link-state); fibre immune to EMI. | *trap:* TCP header is 20–60 B | skip CRC/Hamming, routing walkthroughs.
-- **MP:** 8085 = 8-bit data, 16-bit address (64 KB), 40 pins; address bus one-way, data bus two-way; flags S Z AC P CY; interrupts TRAP > 7.5 > 6.5 > 5.5 > INTR; fetch→decode→execute; RISC≠CISC; Booth = multiplication; pipelining = overlap. | skip assembly programs, microprogramming.
 - **Calculus (9):** derivative rules (chain, implicit); limit as a derivative (xᵏ−2ᵏ)/(x−2) = k·2ᵏ⁻¹; extremes = critical points **plus endpoints**; f'>0 increasing; ∫ and substitution; improper integral with a discontinuity inside diverges (∫dx/(x−a)); y'+ky=0 → Ce⁻ᵏˣ; partial derivative; plane a(x−x₀)+b(y−y₀)+c(z−z₀)=0. | *trap:* skipped endpoints, hidden discontinuity | skip volumes, arc length, Newton/Euler, Lagrange. **Promote first:** series tests, related rates.
 - **Linear Algebra (6):** reduce to 0 = nonzero → no solution; det 0 → singular/dependent; 2×2 inverse = (1/det)[[d,−b],[−c,a]]; symmetric A=Aᵀ; |a+b| ≤ |a|+|b|; group = closure, associativity, identity, inverse. | *trap:* forgetting ÷det, two true options | skip Gram-Schmidt, SVD, rings. **Promote first:** 2×2 eigenvalues, Cramer.
 - **Statistics (5):** nominal < ordinal < interval < ratio; shift by c: mean ±c, variance unchanged; scale by c: mean×c, variance×c²; constants → variance 0; total probability ΣP(A|Bᵢ)P(Bᵢ), Bayes; r sign = direction, |r| = strength, correlation ≠ causation. | skip CI, sampling distributions. **Promote first:** binomial, normal.
