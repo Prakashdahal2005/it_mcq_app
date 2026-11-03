@@ -801,6 +801,20 @@ window.MathJax = {
   startup: { typeset: false }
 };
 
+/*
+ * AGENT NAVIGATION
+ * State/persistence: Core State; save(), load(), AppState.
+ * Question identity/edit/delete: questionUid(), updateQuestionCopies(),
+ *   applyQuestionOverridesEverywhere(), editor and deletion helpers.
+ * Scheduling/readiness: Spaced Repetition; sr(), buildTodaySession(),
+ *   readinessStats(), milestoneSubjectSignals().
+ * Flashcards: PHASE 5; card generation/linking, manager, review, and ratings.
+ * Question UI/grading: Question Screen & Presentation; show(), pick(),
+ *   typed/free-response handlers, done().
+ * Mocks: weeklyMockStatus(), mock(), mockEnd(), and persisted mock state.
+ * Import/export/settings: Import & Bank Handling, Backup & Persistence, Settings.
+ * Persistent or synced behavior may also need corresponding cloud-sync.js changes.
+ */
 const $ = s => document.querySelector(s);
 const KEY = 'bitmcq1';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -853,6 +867,7 @@ try {
 }
 
 // Core State
+// Keep persisted fields aligned across save(), load(), AppState, backup, and cloud-sync normalization.
 let D = null, R = {}, W = {}, Q = [], QRESULTS = [], P = 0, S = 1, A = [], loadMode = 0, FOC = [], L = [], V = {}, ET = -1, REC = null, RA = new Set(), MK = null, TI = 0, REV = null, locked = false, view = 'home', tab = 'w', BANKS = [], SETBANK = null, SETI = -1, impMode = 0, AUTO_ADVANCE_TIMER = null;
 let MOCK_D = [];
 let WEEKLY_MOCK = {};
@@ -932,6 +947,7 @@ function recordApiCall() {
   localStorage.setItem(dayKey, String(cur + 1));
 }
 
+// Persist the complete app state locally, then notify cloud sync; keep serialization aligned with load() and AppState.
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
@@ -986,6 +1002,7 @@ function restoreBanks(s) {
   if (BANKS.length) A = A.map(a => a.bi != null && a.bankId == null ? { ...a, bankId: BANKS[0].id } : a);
 }
 
+// Restore current and legacy local state, then apply question tombstones and overrides across active copies.
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -1894,6 +1911,7 @@ function setQuestionLevel(n, newLvl) {
   show();
 }
 
+// Stable identity is shared across active, bank, drill, mock, history, and sync copies; do not substitute q.n.
 function questionUid(q) {
   if (!q || typeof q !== 'object') return '';
   if (q._sid) return String(q._sid);
@@ -1929,6 +1947,7 @@ function applyQuestionOverride(q) {
   return q;
 }
 
+// Apply edits to every in-memory copy of one stable question identity so views cannot drift apart.
 function updateQuestionCopies(uid, patch) {
   if (!uid) return;
   const apply = q => {
@@ -2025,6 +2044,7 @@ function pruneSessionQuestions() {
   }
 }
 
+// Resolve card-to-question links across question pools; preserve cards whose source question was deleted.
 function syncFlashcardSourceLinks() {
   if (!Array.isArray(CARDS) || !CARDS.length) return;
   const pool = [
@@ -2058,6 +2078,7 @@ function syncFlashcardSourceLinks() {
   });
 }
 
+// Enforce saved question edits/deletions when banks or synced state are loaded.
 function applyQuestionOverridesEverywhere() {
   const prepare = arr => {
     if (!Array.isArray(arr)) return;
@@ -2400,6 +2421,7 @@ function isLockedIn(q) {
   return false;
 }
 
+// Record review history and schedule the next due day; a correct low-confidence guess intentionally counts as a miss.
 function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
   const k = qk(q);
   const v = V[k] || (V[k] = { history: [], missCount: 0 });
@@ -3136,6 +3158,7 @@ function deleteQuestionByUid(uid) {
   if (q) deleteQuestionByQ(q);
 }
 
+// Edit by stable identity; saveQuestionEditor persists an override for every copy of this question.
 function openQuestionEditorForQuestion(q) {
   if (!q || MK) return;
   ensureQuestionUid(q);
@@ -3329,6 +3352,7 @@ function deleteQuestionByN(n) {
   if (q) deleteQuestionByQ(q);
 }
 
+// Tombstone deletion so reloads and cloud merges cannot restore the question; linked flashcards remain independent.
 function deleteQuestionByQ(q) {
   if (!q || MK) return;
   if (!confirm('Delete this MCQ? Linked flashcards will be kept and will show as missing their source. This cannot be undone from history.')) return;
@@ -3476,6 +3500,7 @@ function saveMnemonicForCurrent() {
 // ============================================================================
 // PHASE 5: Curated Resource Library & Flashcard Spaced Repetition System
 // ============================================================================
+// Card source identity and deletion tombstones are persisted separately from question-bank membership.
 const RESOURCE_LIBRARY = [
   { id: 'neso-dl', title: 'Digital Logic & Counters', provider: 'Neso Academy', subject: 'Digital Logic', url: 'https://www.youtube.com/playlist?list=PLBlnK6fEyqRjMH3mWf6kwqiTbT798eAOm', desc: 'Bite-sized visual lectures on Mod-N counters and K-maps.' },
   { id: 'neso-coa', title: 'Pipelining & Cache Mapping', provider: 'Neso Academy', subject: 'Computer Organization and Architecture', url: 'https://www.youtube.com/playlist?list=PLBlnK6fEyqRgLLlzdgiTUKULKJPYc0A4q', desc: 'Step-by-step pipeline cycle calculations and memory hierarchy.' },
@@ -3584,6 +3609,7 @@ function isConceptCardCopyOfQuestion(front, rawQ) {
   return false;
 }
 
+// Offline-safe concept-card content; keep it concept-focused rather than copying the source MCQ/options.
 function conceptCardFallback(rawQ) {
   const subject = canonSubj(rawQ.s);
   const rawUnit = String(rawQ.unit_name || rawQ.unit || rawQ.t || '').trim();
@@ -3601,6 +3627,7 @@ function conceptCardFallback(rawQ) {
   };
 }
 
+// Prefer Gemini when configured, but use the local fallback when AI is unavailable or not configured.
 async function generateConceptCardData(rawQ) {
   const fallback = conceptCardFallback(rawQ);
   if (!GEM_KEY || getDailyApiCount() >= DAILY_API_LIMIT) return fallback;
@@ -3658,6 +3685,7 @@ function conceptCardHtml(data) {
   return { front, back };
 }
 
+// Add or replace a concept card while retaining its source link and, when applicable, review state.
 function saveConceptCard(rawQ, data, opts = {}) {
   if (!rawQ || !data) return { card: null };
   const todayDate = localDateKey();
@@ -3725,6 +3753,7 @@ function saveConceptCard(rawQ, data, opts = {}) {
   return { card, updated: !!existing };
 }
 
+// Resolve linked source questions without assuming they remain in the currently selected bank.
 function findSourceQuestionForCard(card) {
   if (!card) return null;
   const keys = [card.sourceQk, card.qk].filter(Boolean);
@@ -3956,6 +3985,7 @@ function createCardForMissed(rawQ, chosenOptIndex = -1) {
   return result && result.card && !result.duplicate ? result.card : null;
 }
 
+// Snapshot due card IDs for this session so navigation remains stable as cards are rated or edited.
 function startFlashcardReview() {
   const todayTs = today();
   const due = CARDS.filter(c => !c.grad && (c.due || 0) <= todayTs);
@@ -3981,6 +4011,7 @@ function startFlashcardReview() {
   renderFlashcardView();
 }
 
+// Management view for searching, editing, deleting, and generating cards.
 function renderCardManagerView(){
   view = 'cardmgr';
   const subjects = Array.from(new Set((CARDS||[]).map(c=>c.subject).filter(Boolean)));
@@ -4039,6 +4070,7 @@ function renderCardManagerView(){
   `;
 }
 
+// Record a card tombstone before removal so sync cannot resurrect it on another device.
 function deleteFlashcard(id){
   const idx = (CARDS||[]).findIndex(c=>c.id===id);
   if(idx<0) return;
@@ -4193,6 +4225,7 @@ function saveFlashcardEdits(id){
   }
 }
 
+// Render the current session card; reveal and rating state must remain coherent across navigation.
 function renderFlashcardView() {
   const todayTs = today();
   if(!Array.isArray(ACTIVE_FC_SESSION_IDS) || !ACTIVE_FC_SESSION_IDS.length){
@@ -4366,6 +4399,7 @@ function fcNext() {
   renderFlashcardView();
 }
 
+// Update the card's spaced-repetition schedule, persist its rating, and advance the active session.
 function rateCard(grade) {
   const todayTs = today();
   if(!Array.isArray(ACTIVE_FC_SESSION_IDS) || !ACTIVE_FC_SESSION_IDS.length){
@@ -4517,6 +4551,7 @@ function toggleCurrentQuick(){
 }
 
 // Option Shuffling with Anchored/Pinned Options & Shuffle-Safe Enforcement
+// Normalize MCQ/TF/free-response data and map displayed options back to source answers when choices apply.
 function prepareQuestionForDisplay(rawQ) {
   const vRec = V[qk(rawQ)];
   const variant = (vRec && vRec._variant) ? vRec._variant : rawQ._variant;
@@ -4619,6 +4654,7 @@ function prepareQuestionForDisplay(rawQ) {
 }
 
 // Probabilistic Spaced Session Construction (FSRS-scheduled, unbroken subject runs, easy L0 first item)
+// Compose an interleaved set from due, weak, fresh, and filler items without duplicating questions.
 function buildTodaySession(minutes = 15, quickOnly = false) {
   if (!D || !D.length) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
@@ -4824,6 +4860,7 @@ function rawAccuracy(records) {
   return ok / records.length;
 }
 
+// Estimate readiness from first practice attempts; mock results and repeated attempts are handled separately.
 function readinessStats() {
   const first = firstPracticeAttempts();
   const bySubject = {};
@@ -5688,6 +5725,7 @@ function navForward() {
 }
 
 // Question Screen & Presentation
+// Render the current question and restore per-position answer/history; keep mock and practice paths distinct.
 function show() {
   view = 'q';
   cancelAutoAdvance();
@@ -6082,6 +6120,7 @@ function confirmExit() {
 
 let questionStartTime = Date.now();
 
+// Revise confidence after grading and reschedule the same attempt; keep feedback and session history aligned.
 function updateConfidence(cf) {
   try { cancelAutoAdvance(); } catch(e){}
   if (!REC || !CURRENT_Q) return;
@@ -6129,6 +6168,7 @@ function evalCalc() {
   }
 }
 
+// Legacy optional typed-answer helper for MCQ practice; this is distinct from a free-response question.
 function showTypedAnswerPanel() {
   if (!CURRENT_Q || locked) return;
   const input = $('#typed-answer');
@@ -6149,6 +6189,7 @@ function showTypedAnswerPanel() {
   `;
 }
 
+// Capture a free-response submission and present expected-answer review before recording a grade.
 function submitFreeResponse() {
   if (!CURRENT_Q || locked) return;
   const input = $('#free-answer');
@@ -6172,6 +6213,7 @@ function submitFreeResponse() {
   `;
 }
 
+// Record a self-assessed free-response result through the shared practice grading path.
 function freeResponseGrade(correct) {
   if (!CURRENT_Q || locked) return;
   const text = window._freeAnswerText || '';
@@ -6202,6 +6244,7 @@ function typedAnswerGrade(correct) {
   }
 }
 
+// Shared answer path for practice and mocks; updates attempt history, scheduling, feedback, and linked-card UI.
 function pick(i, cfOverride) {
   if (locked) return;
   if (MK && MK.expired) return;
@@ -6890,6 +6933,7 @@ function backToLastQuestion() {
 }
 
 // Session Complete Screen
+// Finish a practice session and summarize progress; timed-mock submission/results use mockEnd().
 function done() {
   view = 'done';
   cancelRecallTimer();
@@ -7135,6 +7179,7 @@ function localWeekKey(ts = Date.now()) {
   return String(dayIdx - offset);
 }
 
+// Derive whether the current local week has a completed or resumable mock from WEEKLY_MOCK.
 function weeklyMockStatus() {
   const currentWeek = localWeekKey();
   const lastWeek = WEEKLY_MOCK.lastCompletedWeek || '';
@@ -7247,6 +7292,7 @@ function buildMockSnapshots(half) {
   return { snapshots, source: source.source };
 }
 
+// Build and start a timed mock from the exam blueprint with separate mock-session grading and persistence.
 function mock(count = 100, isDiagnostic = false) {
   const half = count === 50;
   const built = buildMockSnapshots(half);
@@ -7447,6 +7493,7 @@ function confirmSubmitMock() {
   mockEnd();
 }
 
+// Submit a timed mock, record mock-only results, and update the weekly completion marker.
 function mockEnd() {
   clearInterval(TI);
   if (!MK) return;
@@ -7586,6 +7633,7 @@ document.addEventListener('keydown', e => {
 });
 
 // Import & Bank Handling
+// Import and restore paths normalize/merge existing state; avoid replacing user history when changing bank data.
 function tpl() { $('#t').value = TPL; }
 
 function doLoad() {
@@ -7840,6 +7888,7 @@ function revCard() {
 }
 
 // Backup & Persistence
+// Backups are full-state recovery artifacts; study-report exports below must not mutate study history.
 function saveFile(name, text, mime) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: mime || 'text/plain' }));
@@ -7913,6 +7962,7 @@ function exportUI() {
   `;
 }
 
+// Build error-log or weak-topic reports from attempt history; export checkpoints are device-local metadata.
 function exportLog(copy) {
   const scope = $('#xs').value;
   const isMd = $('#xf').value === 'md';
