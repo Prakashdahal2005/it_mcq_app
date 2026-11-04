@@ -902,6 +902,15 @@ let DIAGNOSTIC_DONE = false;
 let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
 let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
 let COLD_QS = {}; // n -> { cold: boolean, t: timestamp } or boolean
+let CODE_TRACE = { lastAt: 0, lastDate: '', snoozedUntil: 0 };
+function normalizeCodeTrace(v) {
+  const s = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  return {
+    lastAt: Number(s.lastAt) || 0,
+    lastDate: typeof s.lastDate === 'string' ? s.lastDate : '',
+    snoozedUntil: Number(s.snoozedUntil) || 0
+  };
+}
 function isColdQuestion(q) {
   if (!q) return false;
   const v = COLD_QS[q.n];
@@ -934,7 +943,8 @@ let variantRefreshSkipped = 0;
 let variantRefreshSessionCount = 0;
 let variantRefreshTouched = new Set();
 let variantRefreshCurrentKey = '';
-const VARIANT_REFRESH_SESSION_CAP = 20;
+let SESSION_KIND = 'practice';
+const VARIANT_REFRESH_SESSION_CAP = 5;
 
 function getDailyApiCount() {
   const dayKey = 'bitmcq_api_calls_' + localDateKey();
@@ -954,7 +964,8 @@ function save() {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
       D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
-      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK
+      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK,
+      CODE_TRACE: normalizeCodeTrace(CODE_TRACE)
     }));
     localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
     localStorage.setItem('bitmcq_rmarks', JSON.stringify(RESOURCE_MARKS));
@@ -1040,6 +1051,7 @@ function load() {
       PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
       WEEKLY_MOCK = (s.WEEKLY_MOCK && typeof s.WEEKLY_MOCK === 'object') ? s.WEEKLY_MOCK : {};
       COLD_QS = (s.COLD_QS && typeof s.COLD_QS === 'object') ? s.COLD_QS : {};
+      CODE_TRACE = normalizeCodeTrace(s.CODE_TRACE);
       if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
       try {
         sessionHistory = JSON.parse(localStorage.getItem('bitmcq_session_hist') || '[]');
@@ -1849,6 +1861,44 @@ function looksLikeCode(s) {
   return false;
 }
 
+const CODE_TRACE_MIN_LINES = 5;
+const CODE_TRACE_MIN_CHARS = 180;
+function codeBlockText(q) {
+  if (!q) return '';
+  let code = q.code ? (Array.isArray(q.code) ? q.code.join('\n') : String(q.code)) : '';
+  const stem = String(q.q || '');
+  const fence = '```';
+  let from = 0;
+  while (from < stem.length) {
+    const start = stem.indexOf(fence, from);
+    if (start < 0) break;
+    const lineEnd = stem.indexOf('\n', start + 3);
+    const bodyStart = lineEnd >= 0 ? lineEnd + 1 : start + 3;
+    const end = stem.indexOf(fence, bodyStart);
+    if (end < 0) break;
+    const block = stem.slice(bodyStart, end).trim();
+    if (block) code += (code ? '\n' : '') + block;
+    from = end + 3;
+  }
+  return code.trim();
+}
+
+function isLongCodeTraceQuestion(q) {
+  if (!q) return false;
+  const code = codeBlockText(q);
+  if (!code) return false;
+  const codeLike = looksLikeCode(code) ||
+    /#include|#define|printf|scanf|cout\s*<<|cin\s*>>|System\.out|console\.log|<\?php|\becho\b/i.test(code);
+  if (!codeLike) return false;
+  const lineCount = code.split(/\n/).filter(line => line.trim()).length;
+  const compactChars = code.replace(/\s+/g, '').length;
+  return lineCount >= CODE_TRACE_MIN_LINES || compactChars >= CODE_TRACE_MIN_CHARS;
+}
+
+function normalSessionEligible(q) {
+  return !!q && !isColdQuestion(q) && !isLongCodeTraceQuestion(q);
+}
+
 function isQuickQuestion(q) {
   if (typeof q.quick === 'boolean') return q.quick;
   if (q.calc === true || q.needs_paper === true) return false;
@@ -2111,28 +2161,84 @@ function applyQuestionOverridesEverywhere() {
   pruneSessionQuestions();
 }
 
-function effRegeneratable(q) {
-  if (!q) return false;
-  const ov = QOV[qk(q)];
-  if (ov && typeof ov === 'object' && typeof ov.regeneratable === 'boolean') return ov.regeneratable;
-  return q.regeneratable === true;
-}
-
-function setQuestionRegeneratable(q, val) {
-  if (!q) return;
+function qovEntryFor(q) {
+  if (!q) return null;
   const k = qk(q);
   if (typeof QOV[k] !== 'object' || QOV[k] === null) {
     const prevQuick = typeof QOV[k] === 'boolean' ? QOV[k] : (q.quick !== false);
     QOV[k] = { quick: prevQuick };
   }
-  QOV[k].regeneratable = !!val;
+  return QOV[k];
+}
+
+function effRegeneratable(q) {
+  if (!q) return false;
+  if (effWellMade(q)) return false;
+  const ov = QOV[qk(q)];
+  if (ov && typeof ov === 'object' && typeof ov.regeneratable === 'boolean') return ov.regeneratable;
+  return q.regeneratable === true;
+}
+
+function effWellMade(q) {
+  if (!q) return false;
+  const ov = QOV[qk(q)];
+  if (ov && typeof ov === 'object' && ov.wellMade === true) return true;
+  return q.wellMade === true;
+}
+
+function removeVariantRefreshJob(q) {
+  const uid = questionUid(q);
+  bgGenQueue = bgGenQueue.filter(job => job.key !== uid);
+  if (variantRefreshCurrentKey === uid) variantRefreshCurrentKey = '';
+  variantRefreshTouched.delete(uid);
+}
+
+function setQuestionRegeneratable(q, val) {
+  if (!q) return;
+  const ov = qovEntryFor(q);
+  ov.regeneratable = !!val;
+  if (val) ov.wellMade = false;
+  ov._t = Date.now();
   q.regeneratable = !!val;
-  if (!val) {
-    const uid = questionUid(q);
-    bgGenQueue = bgGenQueue.filter(job => job.key !== uid);
-    if (variantRefreshCurrentKey === uid) variantRefreshCurrentKey = '';
+  q.wellMade = !!ov.wellMade;
+  if (!val) removeVariantRefreshJob(q);
+  save();
+}
+
+function setQuestionWellMade(q, val) {
+  if (!q) return;
+  const ov = qovEntryFor(q);
+  ov.wellMade = !!val;
+  if (val) ov.regeneratable = false;
+  ov._t = Date.now();
+  q.wellMade = !!val;
+  if (val) {
+    q.regeneratable = false;
+    removeVariantRefreshJob(q);
   }
   save();
+}
+
+function updateWellMadeUI(q) {
+  const btn = document.getElementById('wellmade-btn');
+  if (btn) {
+    const wellMade = effWellMade(q);
+    btn.textContent = wellMade ? '⭐ Well made' : '☆ Mark well made';
+    btn.title = wellMade ? 'Unmark to allow AI regeneration' : 'Well-made questions are protected from AI regeneration and appear more often in practice';
+    btn.style.background = wellMade ? '#fff7e6' : '';
+    btn.style.color = wellMade ? '#b45309' : 'var(--mu)';
+    btn.style.borderColor = wellMade ? '#f0b45a' : 'var(--bd)';
+  }
+  const refresh = document.getElementById('refresh-now-btn');
+  if (refresh) refresh.style.display = effWellMade(q) ? 'none' : '';
+}
+
+function toggleWellMade(n) {
+  if (MK) return;
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
+  if (!rawQ) return;
+  setQuestionWellMade(rawQ, !effWellMade(rawQ));
+  updateWellMadeUI(rawQ);
 }
 
 function toggleRegeneratable(n) {
@@ -2497,9 +2603,18 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
 
 function dueKeys(quickOnly = false) {
   const t = today();
-  const pool = (D || []).filter(q => (!quickOnly || effQuick(q)) && !isColdQuestion(q));
+  const pool = (D || []).filter(q => (!quickOnly || effQuick(q)) && normalSessionEligible(q));
 
-  const dueItems = [];
+  const byIdentity = new Map();
+  function addDue(q, key, prio, fromActive) {
+    if (!q) return;
+    const id = questionUid(q) || qk(q) || String(key);
+    const prev = byIdentity.get(id);
+    if (!prev || (fromActive && !prev.fromActive) || (fromActive === prev.fromActive && prio > prev.prio)) {
+      byIdentity.set(id, { n: key, prio, fromActive: !!fromActive });
+    }
+  }
+
   pool.forEach(q => {
     const v = V[qk(q)];
     if (v && v.d <= t) {
@@ -2519,22 +2634,22 @@ function dueKeys(quickOnly = false) {
       prio += (3 - lvl) * 100;
       prio += Math.min(50, (v.missCount || 0) * 10);
 
-      dueItems.push({ n: q.n, prio });
+      addDue(q, q.n, prio, true);
     }
   });
 
-  // Archive misses that are due
-  A.forEach((a, i) => a.errs.forEach((e, j) => {
+  const activeKeys = new Set((D || []).map(q => qk(q)));
+  A.forEach((a, i) => (a.errs || []).forEach((e, j) => {
     if (quickOnly && !effQuick(e)) return;
+    if (!normalSessionEligible(e)) return;
+    if (activeKeys.has(qk(e))) return;
     const v = V[qk(e)];
-    if (v && v.d <= t && !D.some(q => qk(q) === qk(e))) {
-      dueItems.push({ n: i + ':' + j, prio: 1500 });
-    }
+    if (v && v.d <= t) addDue(e, i + ':' + j, 1500, false);
   }));
 
-  // Sort descending by priority (wrong @ conf 3 first, then L0->L3)
-  dueItems.sort((a, b) => b.prio - a.prio);
-  return dueItems.map(item => item.n);
+  return [...byIdentity.values()]
+    .sort((a, b) => b.prio - a.prio)
+    .map(item => item.n);
 }
 
 function findQuestionByRawKey(key) {
@@ -3110,15 +3225,8 @@ function regenerateCurrentQuestion() {
   if (MK || !CURRENT_Q || P >= Q.length) return;
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
-  if (!effRegeneratable(rawQ)) {
-    alert('Mark this question as regeneratable first (♻️), then try again.');
-    return;
-  }
-
-  if (matchQuestionFamily(rawQ)) {
-    generateLocalFamilyVariant(rawQ);
-    sessionHistory[P] = null;
-    show();
+  if (effWellMade(rawQ)) {
+    alert('This question is marked Well made. Unmark it first to allow regeneration.');
     return;
   }
 
@@ -3140,6 +3248,13 @@ function regenerateCurrentQuestion() {
     return;
   }
 
+  if (matchQuestionFamily(rawQ)) {
+    generateLocalFamilyVariant(rawQ);
+    sessionHistory[P] = null;
+    show();
+    return;
+  }
+
   alert('A Gemini API key is required to regenerate questions. Please configure your Gemini API Key in Settings (⚙).');
 }
 
@@ -3148,7 +3263,8 @@ function openQuestionEditor(n) {
   const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
   const q = rawQ || byN(n);
   if (!q) return;
-  openQuestionEditorForQuestion(q);
+  const editingVariant = !!(CURRENT_Q && CURRENT_Q.origQ === q && CURRENT_Q.isShowingVariant);
+  openQuestionEditorForQuestion(q, { variant: editingVariant });
 }
 
 function openQuestionEditorByUid(uid) {
@@ -3162,10 +3278,22 @@ function deleteQuestionByUid(uid) {
 }
 
 // Edit by stable identity; saveQuestionEditor persists an override for every copy of this question.
-function openQuestionEditorForQuestion(q) {
+function openQuestionEditorForQuestion(q, opts = {}) {
   if (!q || MK) return;
   ensureQuestionUid(q);
+  const sourceKey = qk(q);
+  const variant = (V[sourceKey] && V[sourceKey]._variant) || q._variant || null;
+  const variantMode = !!(opts.variant && variant);
+  const editQ = variantMode ? Object.assign({}, q, {
+    q: variant.q,
+    o: variant.o,
+    a: variant.a,
+    e: variant.e,
+    code: variant.code
+  }) : q;
   window._qEditUid = questionUid(q);
+  window._qEditVariant = variantMode;
+  window._qEditSourceKey = sourceKey;
   const old = document.getElementById('q-editor-overlay');
   if (old) old.remove();
   const overlay = document.createElement('div');
@@ -3174,56 +3302,50 @@ function openQuestionEditorForQuestion(q) {
   overlay.innerHTML = `
     <div class="q-editor-card" role="dialog" aria-modal="true" aria-label="Edit question">
       <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
-        <b>✏️ Edit MCQ</b>
+        <b>${variantMode ? '✏️ Edit MCQ Variant' : '✏️ Edit MCQ'}</b>
         <button class="sm" onclick="closeQuestionEditor()">✕ Close</button>
       </div>
+      ${variantMode ? '<div class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac);margin-bottom:10px">✨ Editing this generated variant only — the original question stays unchanged.</div>' : ''}
       <label for="qe-stem">Question stem</label>
-      <textarea id="qe-stem" rows="4">${esc(q.q || '')}</textarea>
+      <textarea id="qe-stem" rows="4">${esc(editQ.q || '')}</textarea>
       <label for="qe-code">Code / trace block (one line per row, optional)</label>
-      <textarea id="qe-code" rows="3">${esc((Array.isArray(q.code) ? q.code.join('\n') : (q.code || '')))}</textarea>
+      <textarea id="qe-code" rows="3">${esc((Array.isArray(editQ.code) ? editQ.code.join('\n') : (editQ.code || '')))}</textarea>
       <div class="q-editor-grid">
         <div>
           <label for="qe-opt-0">Option A</label>
-          <input type="text" id="qe-opt-0" value="${esc((q.o || [])[0] || '')}">
+          <input type="text" id="qe-opt-0" value="${esc((editQ.o || [])[0] || '')}">
         </div>
         <div>
           <label for="qe-opt-1">Option B</label>
-          <input type="text" id="qe-opt-1" value="${esc((q.o || [])[1] || '')}">
+          <input type="text" id="qe-opt-1" value="${esc((editQ.o || [])[1] || '')}">
         </div>
         <div>
           <label for="qe-opt-2">Option C</label>
-          <input type="text" id="qe-opt-2" value="${esc((q.o || [])[2] || '')}">
+          <input type="text" id="qe-opt-2" value="${esc((editQ.o || [])[2] || '')}">
         </div>
         <div>
           <label for="qe-opt-3">Option D</label>
-          <input type="text" id="qe-opt-3" value="${esc((q.o || [])[3] || '')}">
+          <input type="text" id="qe-opt-3" value="${esc((editQ.o || [])[3] || '')}">
         </div>
       </div>
       <div class="q-editor-grid">
         <div>
           <label for="qe-answer">Correct option</label>
           <select id="qe-answer">
-            ${['A', 'B', 'C', 'D'].map((label, i) => `<option value="${i}" ${q.a === i ? 'selected' : ''}>${label}</option>`).join('')}
+            ${['A', 'B', 'C', 'D'].map((label, i) => `<option value="${i}" ${editQ.a === i ? 'selected' : ''}>${label}</option>`).join('')}
           </select>
         </div>
         <div>
           <label for="qe-subject">Subject</label>
-          <input type="text" id="qe-subject" value="${esc(q.s || '')}">
+          <input type="text" id="qe-subject" value="${esc(q.s || '')}" ${variantMode ? 'disabled title="Variant edits keep the source subject"' : ''}>
         </div>
         <div>
           <label for="qe-unit">Unit / code</label>
-          <input type="text" id="qe-unit" value="${esc(q.u || '')}">
-        </div>
-        <div>
-          <label for="qe-regen">Variant refresh</label>
-          <label style="display:flex;align-items:center;gap:8px;margin:0;text-transform:none;font-weight:500;font-size:13px;color:inherit">
-            <input type="checkbox" id="qe-regen" ${effRegeneratable(q) ? 'checked' : ''} style="width:auto">
-            Mark this MCQ as regeneratable
-          </label>
+          <input type="text" id="qe-unit" value="${esc(q.u || '')}" ${variantMode ? 'disabled title="Variant edits keep the source unit"' : ''}>
         </div>
       </div>
       <label for="qe-exp">Explanation / why</label>
-      <textarea id="qe-exp" rows="3">${esc(q.e || '')}</textarea>
+      <textarea id="qe-exp" rows="3">${esc(editQ.e || '')}</textarea>
       <div class="row" style="justify-content:space-between;margin-top:16px;gap:8px;flex-wrap:wrap">
         <button class="sm" style="color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionFromEditor()">🗑 Delete MCQ</button>
         <div class="row" style="gap:8px">
@@ -3245,6 +3367,8 @@ function closeQuestionEditor() {
   const overlay = document.getElementById('q-editor-overlay');
   if (overlay) overlay.remove();
   window._qEditUid = '';
+  window._qEditVariant = false;
+  window._qEditSourceKey = '';
 }
 
 function saveQuestionEditor() {
@@ -3262,12 +3386,36 @@ function saveQuestionEditor() {
   const explanation = ((document.getElementById('qe-exp') || {}).value || '').trim();
   const subject = ((document.getElementById('qe-subject') || {}).value || '').trim();
   const unit = ((document.getElementById('qe-unit') || {}).value || '').trim();
-  const regeneratable = !!((document.getElementById('qe-regen') || {}).checked);
+  const regenEl = document.getElementById('qe-regen');
+  const regeneratable = regenEl ? !!regenEl.checked : effRegeneratable(target);
   if (!stem) { alert('The question stem cannot be empty.'); return; }
   if (options.some(o => !o)) { alert('All four options are required.'); return; }
   if (!(answer >= 0 && answer < 4)) { alert('Choose a valid correct option.'); return; }
 
   const oldQk = qk(target);
+
+  if (window._qEditVariant) {
+    const vRec = V[oldQk] = V[oldQk] || {};
+    const currentVariant = vRec._variant || {};
+    vRec._variant = Object.assign({}, currentVariant, {
+      q: stem,
+      o: options,
+      a: answer,
+      e: explanation,
+      code: codeText ? codeText.split('\n') : [],
+      editedAt: Date.now()
+    });
+    vRec._useOriginal = false;
+    for (let i = 0; i < sessionHistory.length; i++) {
+      if (sessionHistory[i] && sessionHistory[i].qKey === oldQk) sessionHistory[i] = null;
+    }
+    const stableUid = ensureQuestionUid(target);
+    bgGenQueue = (bgGenQueue || []).filter(job => job && job.key !== stableUid && job.key !== oldQk);
+    save();
+    closeQuestionEditor();
+    rerenderAfterQuestionChange();
+    return;
+  }
   const stableUid = ensureQuestionUid(target);
   const patch = {
     q: stem,
@@ -3444,6 +3592,17 @@ function rerenderAfterQuestionChange() {
 }
 
 
+function updateColdButtonUI(q) {
+  const btn = document.getElementById('cold-btn');
+  if (!btn || !q) return;
+  const cold = isColdQuestion(q);
+  btn.textContent = cold ? '🧊 Cold (tap to restore)' : '🧊 Too easy';
+  btn.title = cold ? 'Restore normal scheduling for this question' : 'Mark as too easy/irrelevant — will appear very rarely';
+  btn.style.background = cold ? '#e8f4ff' : '';
+  btn.style.color = cold ? '#1971c2' : '#555';
+  btn.style.borderColor = cold ? '#74c0fc' : '#bbb';
+}
+
 function toggleColdQuestion() {
   if (MK) return; // no cold-marking during mock exams
   const rawQ = byN(Q[P]);
@@ -3457,8 +3616,6 @@ function toggleColdQuestion() {
       V[k].d = today(); // make it due normally again
       delete V[k]._coldSet;
     }
-    save();
-    show(); // re-render to update button
   } else {
     COLD_QS[n] = { cold: true, t: Date.now() };
     // Push due date far into the future (180 days)
@@ -3467,9 +3624,9 @@ function toggleColdQuestion() {
     V[k].d = today() + 180;
     V[k].stab = V[k].stab ? Math.max(V[k].stab, 180) : 180;
     V[k]._coldSet = true;
-    save();
-    show();
   }
+  save();
+  updateColdButtonUI(rawQ);
 }
 
 function quarantineCurrentQuestion() {
@@ -4063,6 +4220,7 @@ function renderCardManagerView(){
             </div>
             <div class="row" style="gap:6px">
               ${!c.conceptKey ? `<button class="sm" onclick="convertFlashcardToConcept('${esc(c.id)}')">🧠 Concept</button>` : ''}
+              <button class="sm" onclick="regenerateFlashcard('${esc(c.id)}')">✨ AI refresh</button>
               <button class="sm" onclick="editFlashcard('${esc(c.id)}')">✏️ Edit</button>
               <button class="sm" style="color:var(--no)" onclick="deleteFlashcard('${esc(c.id)}')">🗑 Delete</button>
             </div>
@@ -4071,6 +4229,74 @@ function renderCardManagerView(){
       </div>
     </div>
   `;
+}
+
+function applyRegeneratedCard(card, data) {
+  const concept = String(data.concept || '').trim();
+  const front = String(data.front || '').trim();
+  const back = String(data.back || '').trim();
+  if (!concept || !front || !back) throw new Error('AI returned an incomplete card.');
+  const html = conceptCardHtml({ concept, front, back, trap: data.trap, memoryHook: data.memoryHook });
+  card.concept = concept;
+  card.conceptKey = conceptKeyFor(card.subject, concept);
+  card.origin = 'ai';
+  card.frontText = front;
+  card.backText = back;
+  card.trap = String(data.trap || '').trim();
+  card.memoryHook = String(data.memoryHook || data.memoryHookText || '').trim();
+  card.front = html.front;
+  card.back = html.back;
+  card.updatedAt = Date.now();
+}
+
+async function regenerateFlashcard(id) {
+  const card = (CARDS || []).find(c => c.id === id);
+  if (!card) return;
+  if (!GEM_KEY) {
+    alert('A Gemini API key is required to regenerate a flashcard. Configure it in Settings (⚙).');
+    return;
+  }
+  if (getDailyApiCount() >= DAILY_API_LIMIT) {
+    alert('Daily AI request limit reached. Try again tomorrow or raise the limit in Settings.');
+    return;
+  }
+  const source = findSourceQuestionForCard(card);
+  try {
+    let data;
+    if (source) {
+      data = await generateConceptCardData(source);
+      if (!data || data.origin !== 'ai') throw new Error('AI did not return a fresh card. Try again later.');
+    } else {
+      const prompt = `Rewrite this existing flashcard into a clearer active-recall card. Keep the same topic, but improve the explanation and avoid trivia.
+Subject: ${canonSubj(card.subject || 'General')}
+Current concept: ${card.concept || ''}
+Current front: ${flashcardPlainText(card, 'front')}
+Current back: ${flashcardPlainText(card, 'back')}
+Rules:
+1. "front" asks the student to explain, compare, or apply the idea. Do not use multiple-choice wording.
+2. "back" teaches it in 2-4 sentences.
+3. "trap" names the most common mistake in one sentence.
+4. "memory_hook" is an optional short mnemonic, or "".
+5. Plain text only. No markdown, no HTML.
+Return ONLY valid JSON: {"concept":"...","front":"...","back":"...","trap":"...","memory_hook":"..."}`;
+      const res = await fetchGeminiWithFallback(prompt, 0.5, GEM_GEN_MODEL, 25000, true);
+      const parsed = extractJson(res.text);
+      data = {
+        concept: String(parsed && parsed.concept || '').trim(),
+        front: String(parsed && parsed.front || '').trim(),
+        back: String(parsed && parsed.back || '').trim(),
+        trap: String(parsed && parsed.trap || '').trim(),
+        memoryHook: String(parsed && (parsed.memory_hook || parsed.memoryHook) || '').trim()
+      };
+    }
+    applyRegeneratedCard(card, data);
+    save();
+    if (view === 'cards') renderFlashcardView();
+    else if (view === 'cardmgr') renderCardManagerView();
+    else rerenderAfterQuestionChange();
+  } catch (err) {
+    alert('Flashcard regeneration failed: ' + (err.message || err));
+  }
 }
 
 // Record a card tombstone before removal so sync cannot resurrect it on another device.
@@ -4143,6 +4369,7 @@ function viewLinkedFlashcardFromQuiz(id){
         ${c.memoryHook ? `<div class="mu sm" style="margin-top:4px"><b>Memory hook:</b> ${esc(c.memoryHook)}</div>` : ''}
       </div>
       <div class="row" style="justify-content:flex-end;gap:6px;margin-top:12px">
+        <button class="sm" onclick="regenerateFlashcard('${esc(c.id).replace(/'/g,"\\'")}');closeFlashcardModal();">✨ AI refresh</button>
         <button class="sm" onclick="editFlashcard('${esc(c.id).replace(/'/g,"\\'")}');closeFlashcardModal();">Edit card</button>
         <button class="sm p" onclick="closeFlashcardModal()">Close</button>
       </div>
@@ -4654,7 +4881,7 @@ function prepareQuestionForDisplay(rawQ) {
 function buildTodaySession(minutes = 15, quickOnly = false) {
   if (!D || !D.length) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
-  const basePool = (quickOnly ? (D || []).filter(q => effQuick(q)) : (D || [])).filter(q => !isColdQuestion(q));
+  const basePool = (quickOnly ? (D || []).filter(q => effQuick(q)) : (D || [])).filter(q => normalSessionEligible(q));
   if (!basePool.length) return [];
 
   // Exclude questions already completed today so the user never gets the exact same questions repeatedly in a single day!
@@ -4703,13 +4930,16 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
 
   const session = [];
   const added = new Set();
+  const addedIdentities = new Set();
   function add(n) {
-    if (n != null && !added.has(n)) {
-      added.add(n);
-      session.push(n);
-      return true;
-    }
-    return false;
+    if (n == null || added.has(n)) return false;
+    const q = byN(n);
+    const identity = q ? (questionUid(q) || qk(q)) : String(n);
+    if (addedIdentities.has(identity)) return false;
+    added.add(n);
+    addedIdentities.add(identity);
+    session.push(n);
+    return true;
   }
 
   if (easyFirst) add(easyFirst);
@@ -4737,14 +4967,31 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     }
   }
 
+  function weightedOrder(items) {
+    const remaining = items.slice();
+    const ordered = [];
+    while (remaining.length) {
+      let total = 0;
+      remaining.forEach(q => { total += effWellMade(q) ? 3 : 1; });
+      let pick = Math.random() * total;
+      let index = remaining.length - 1;
+      for (let i = 0; i < remaining.length; i++) {
+        pick -= effWellMade(remaining[i]) ? 3 : 1;
+        if (pick <= 0) { index = i; break; }
+      }
+      ordered.push(remaining.splice(index, 1)[0]);
+    }
+    return ordered;
+  }
+
   // Fresh unattempted items (exclude L3 unless L0-L2 are mastered)
-  const unseenItems = pool.filter(q => !V[qk(q)] && (effLevel(q) < 3)).map(q => q.n).sort(() => Math.random() - 0.5);
+  const unseenItems = weightedOrder(pool.filter(q => !V[qk(q)] && (effLevel(q) < 3))).map(q => q.n);
   while (unseenItems.length && session.length < targetQ - 1) {
     add(unseenItems.pop());
   }
 
   // Remaining filler
-  const remainingAll = pool.map(q => q.n).sort(() => Math.random() - 0.5);
+  const remainingAll = weightedOrder(pool).map(q => q.n);
   for (const n of remainingAll) {
     if (session.length >= targetQ) break;
     add(n);
@@ -5146,7 +5393,7 @@ function selectSubjectDrillQuestions(subjectName, requestedCount) {
   const seen = new Set();
   const pool = bankQuestionPool().filter(q => {
     if (!q || canonSubj(q.s) !== norm) return false;
-    if (q.quarantined || isColdQuestion(q)) return false;
+    if (q.quarantined || !normalSessionEligible(q)) return false;
     const key = qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -5290,10 +5537,13 @@ function home(preserveScroll = false) {
 
   const maxCap = getMaxInterval();
   const due = dueKeys();
-  const un = D.filter(q => !R[q.n]).map(q => q.n);
-  const wr = D.filter(q => R[q.n] === 'w').map(q => q.n);
-  const sk = D.filter(q => R[q.n] === 's').map(q => q.n);
-  const freshCount = (D || []).filter(q => !V[qk(q)]).length;
+  const un = D.filter(q => !R[q.n] && normalSessionEligible(q)).map(q => q.n);
+  const wr = D.filter(q => R[q.n] === 'w' && normalSessionEligible(q)).map(q => q.n);
+  const sk = D.filter(q => R[q.n] === 's' && normalSessionEligible(q)).map(q => q.n);
+  const freshCount = (D || []).filter(q => !V[qk(q)] && normalSessionEligible(q)).length;
+  const codeTraceDue = codeTraceDueQuestions().length;
+  const codeTraceCount = codeTracePool().length;
+  const showCodeTraceReminder = codeTraceCount > 0 && codeTraceReminderDue();
   const bankForFresh = BANKS.find(bank => bank.id === SETBANK) || BANKS[0];
   const isCurrentBankSet = bankForFresh && bankForFresh.id === SETBANK && SETI >= 0;
   const currentBankSetComplete = isCurrentBankSet && D.length > 0 && D.every(q => !!R[q.n]);
@@ -5301,7 +5551,7 @@ function home(preserveScroll = false) {
     ? (isCurrentBankSet && !currentBankSetComplete ? `📚 Continue Set ${SETI + 1}` : `📚 Next Set · ${esc(bankForFresh.name)}`)
     : `✨ Fresh Questions (up to ${Math.max(10, Math.round(todayMins * 60 / 50))} Q)`;
   const drillSubjects = bankSubjects();
-  const drillBankCount = Math.max(1, bankQuestionPool().length);
+  const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
 
   const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
   const milestone = getCurrentMilestone();
@@ -5341,6 +5591,18 @@ function home(preserveScroll = false) {
 
   $('#app').innerHTML = `
     ${renderBackupNudge()}
+    ${showCodeTraceReminder ? `
+      <div class="nudge-banner" style="background:var(--ac-bg);border-color:var(--ac);color:inherit">
+        <div>
+          🧑‍💻 <b>Code Trace Reminder:</b> It has been at least 2 days since your last long-code trace practice.
+          <span class="mu sm">${codeTraceDue} due now · ${codeTraceCount} available.</span>
+        </div>
+        <div class="row" style="gap:6px">
+          <button class="p sm" onclick="startCodeTraceSession()">Start 15 Q</button>
+          <button class="sm" onclick="snoozeCodeTraceReminder()">Snooze 1 day</button>
+        </div>
+      </div>
+    ` : ''}
     ${resumeMockBanner}
 
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
@@ -5373,6 +5635,7 @@ function home(preserveScroll = false) {
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
           <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
+          ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession()">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
         </div>
@@ -5415,9 +5678,14 @@ function home(preserveScroll = false) {
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
       </button>
-      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCalcTraceSession()">
-        🧮 Calc &amp; Tracing · 10–15 Q (L0 priority)
-      </button>
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="big-btn" style="flex:1;min-width:210px;background:var(--card);border:2px solid var(--bd)" onclick="startCalcTraceSession()">
+          🧮 Math / Calc Drill · 10–15 Q
+        </button>
+        <button class="big-btn" style="flex:1;min-width:210px;background:var(--card);border:2px solid var(--bd)" onclick="startCodeTraceSession()">
+          🧑‍💻 Code Trace Drill · 10–15 Q
+        </button>
+      </div>
       <div class="mu sm" style="text-align:center;margin-top:6px">Prioritized by spaced-repetition due date and weak areas</div>
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${bankForFresh || freshCount ? '' : 'disabled'}>
@@ -5503,6 +5771,7 @@ function buildRevisionSession(limit = 12) {
 
   const candidates = [...questions.entries()]
     .map(([key, item]) => {
+      if (!normalSessionEligible(item.q)) return null;
       const history = V[key] && Array.isArray(V[key].history) ? V[key].history : [];
       if (!history.length) return null;
       const correct = history.filter(h => h.ok).length;
@@ -5546,7 +5815,7 @@ function startQuickMode() {
       loadSet(BANKS[0].id, 0);
     }
   }
-  const pool = (D || []).filter(q => q && effQuick(q) && !isColdQuestion(q));
+  const pool = (D || []).filter(q => q && effQuick(q) && normalSessionEligible(q));
   if (!pool.length) { alert('No quick questions available in the current active deck.'); return; }
   pool.sort((a,b)=>{
     const la = effLevel(a);
@@ -5579,7 +5848,7 @@ function startFreshSet() {
         alert('You have already started today’s set. The next set is available tomorrow.');
         return;
       }
-      const remaining = D.filter(q => !R[q.n]).map(q => q.n);
+      const remaining = D.filter(q => !R[q.n] && normalSessionEligible(q)).map(q => q.n);
       if (!remaining.length) {
         alert('You have finished today’s set. The next set is available tomorrow.');
         return;
@@ -5589,8 +5858,8 @@ function startFreshSet() {
     }
 
     if (isActiveSet && !currentComplete) {
-      const remaining = D.filter(q => !R[q.n]).map(q => q.n);
-      const questions = remaining.length ? remaining : D.map(q => q.n);
+      const remaining = D.filter(q => !R[q.n] && normalSessionEligible(q)).map(q => q.n);
+      const questions = remaining.length ? remaining : D.filter(q => normalSessionEligible(q)).map(q => q.n);
       lastFreshSetDay = day;
       save();
       start(questions);
@@ -5620,7 +5889,7 @@ function startFreshSet() {
     return;
   }
 
-  const qList = D.filter(q => !V[qk(q)]).map(q => q.n).sort(() => Math.random() - 0.5).slice(0, targetQ);
+  const qList = D.filter(q => !V[qk(q)] && normalSessionEligible(q)).map(q => q.n).sort(() => Math.random() - 0.5).slice(0, targetQ);
   if (!qList.length) {
     alert('No unseen questions are available in the current set.');
     return;
@@ -5646,24 +5915,52 @@ function startSubjectDrill() {
 }
 
 function startDueReview() {
-  const due = dueKeys();
+  const seen = new Set();
+  const due = dueKeys().filter(key => {
+    const q = byN(key);
+    const id = q ? (questionUid(q) || qk(q)) : String(key);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
   if (!due.length) { alert('No MCQs are due right now.'); return; }
   start(due.slice(0, 15));
+}
+
+function codeTracePool() {
+  const seen = new Set();
+  return bankQuestionPool().filter(q => {
+    if (!q || isQuestionDeleted(q) || q.quarantined || isColdQuestion(q)) return false;
+    if (!isLongCodeTraceQuestion(q)) return false;
+    const key = questionUid(q) || qk(q);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function codeTraceDueQuestions() {
+  const t = today();
+  return codeTracePool().filter(q => {
+    const v = V[qk(q)];
+    return !v || v.d <= t;
+  });
 }
 
 function startCalcTraceSession() {
   const seen = new Set();
   const candidates = bankQuestionPool().filter(q => {
-    if (!q || isQuestionDeleted(q)) return false;
+    if (!q || isQuestionDeleted(q) || q.quarantined || isColdQuestion(q)) return false;
     const type = String(q.type || '').toLowerCase();
     if (!(q.calc || q.needs_paper || type === 'calc' || type === 'trace')) return false;
+    if (isLongCodeTraceQuestion(q)) return false;
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
   if (!candidates.length) {
-    alert('No calculation or tracing questions are available in the loaded bank.');
+    alert('No calculation or short tracing questions are available in the loaded bank.');
     return;
   }
   candidates.sort((a, b) => {
@@ -5674,17 +5971,56 @@ function startCalcTraceSession() {
   start(candidates.slice(0, 15).map(q => questionUid(q) || qk(q)));
 }
 
+function startCodeTraceSession() {
+  const seen = new Set();
+  const candidates = codeTracePool().filter(q => {
+    const key = questionUid(q) || qk(q);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!candidates.length) {
+    alert('No long code-tracing questions are available in the loaded bank.');
+    return;
+  }
+  const t = today();
+  candidates.sort((a, b) => {
+    const va = V[qk(a)];
+    const vb = V[qk(b)];
+    const da = va && va.d <= t ? 0 : (va ? 2 : 1);
+    const db = vb && vb.d <= t ? 0 : (vb ? 2 : 1);
+    if (da !== db) return da - db;
+    const lvl = effLevel(a) - effLevel(b);
+    if (lvl) return lvl;
+    return Math.random() - 0.5;
+  });
+  start(candidates.slice(0, 15).map(q => questionUid(q) || qk(q)), { kind: 'code_trace' });
+}
+
+const CODE_TRACE_REMIND_MS = 2 * 864e5;
+function codeTraceReminderDue() {
+  const now = Date.now();
+  if (now < (Number(CODE_TRACE.snoozedUntil) || 0)) return false;
+  return !CODE_TRACE.lastAt || (now - Number(CODE_TRACE.lastAt)) >= CODE_TRACE_REMIND_MS;
+}
+
+function snoozeCodeTraceReminder() {
+  CODE_TRACE.snoozedUntil = Date.now() + 864e5;
+  save();
+  home(true);
+}
+
 function startMistakes() {
-  const wr = D.filter(q => R[q.n] === 'w').map(q => q.n);
-  if (!wr.length) { alert('No mistakes yet.'); return; }
+  const wr = D.filter(q => R[q.n] === 'w' && normalSessionEligible(q)).map(q => q.n);
+  if (!wr.length) { alert('No practice mistakes yet. Long code traces are available in the Code Trace Drill.'); return; }
   start(wr.slice(0, 10));
 }
 
 function startMistakesBySubject(subjectName){
   if(!subjectName){ alert('Select a subject.'); return; }
   const norm = canonSubj(subjectName);
-  const wr = D.filter(q => R[q.n] === 'w' && canonSubj(q.s)===norm).map(q=>q.n);
-  if(!wr.length){ alert('No mistakes for this subject.'); return; }
+  const wr = D.filter(q => R[q.n] === 'w' && canonSubj(q.s)===norm && normalSessionEligible(q)).map(q=>q.n);
+  if(!wr.length){ alert('No practice mistakes for this subject. Long code traces are available in the Code Trace Drill.'); return; }
   start(wr.slice(0,20));
 }
 
@@ -5783,7 +6119,7 @@ function show() {
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
   const curLvl = effLevel(rawQ);
-  const isRegen = effRegeneratable(rawQ);
+  const isWellMade = effWellMade(rawQ);
 
   // Memory Anchor
   const mnemonicAnchor = vRec?.mnemonic ? `
@@ -5823,8 +6159,8 @@ function show() {
             <option value="2" ${curLvl === 2 ? 'selected' : ''}>L2 · Exact</option>
             <option value="3" ${curLvl === 3 ? 'selected' : ''}>L3 · Advanced</option>
           </select>
-          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isRegen ? 'background:var(--ac-bg);color:var(--ac);border-color:var(--ac)' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleRegeneratable(${rawQ.n})" title="Only marked questions receive fresh verified variants in the background">
-            ${isRegen ? '♻️ Regeneratable' : '♻️ Mark regenerate'}
+          ${!MK ? `<button class="sm" id="wellmade-btn" style="padding:2px 8px;font-size:11px;${isWellMade ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleWellMade(${rawQ.n})" title="Well-made questions are protected from AI regeneration and appear more often in practice">
+            ${isWellMade ? '⭐ Well made' : '☆ Mark well made'}
           </button>` : ''}
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
           ${isShowingVariant && activeVariant && activeVariant.verified === false ? '<span class="badge-unverified" title="Generated single-pass without blind verify">unverified</span>' : ''}
@@ -5839,8 +6175,8 @@ function show() {
       <div class="row" style="justify-content:space-between;margin-top:4px;align-items:center">
         <span class="mu">Question ${P + 1} of ${Q.length} · Q${rawQ.n} · ${esc(rawQ.s)}</span>
         <div class="row" style="gap:6px">
-          ${!MK && isRegen ? `
-            <button class="sm" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified variant for this marked question">
+          ${!MK && !isWellMade ? `
+            <button class="sm" id="refresh-now-btn" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified variant within the same unit and topic">
               ✨ Refresh now
             </button>
           ` : ''}
@@ -5850,7 +6186,7 @@ function show() {
             </button>
           ` : ''}
           ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
-          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
+          ${!MK ? `<button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
           </button>` : ''}
           ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
@@ -6543,8 +6879,6 @@ function next() {
   show();
 }
 
-// Background variant refresh queue: only user-marked questions, one at a time,
-// verified commits only. Failures stay silent and keep the current question.
 function updateVariantQueueStatus(message = '') {
   const boxes = document.querySelectorAll('#bg-gen-box');
   if (!boxes.length) return;
@@ -6552,7 +6886,7 @@ function updateVariantQueueStatus(message = '') {
   if (!text) {
     const pending = bgGenQueue.length + (genInProgress ? 1 : 0);
     if (pending) {
-      text = `✨ Refreshing marked variants in background: ${pending} queued · ${variantRefreshDone} refreshed · ${variantRefreshSkipped} skipped`;
+      text = `✨ Refreshing variants in background: ${pending} queued · ${variantRefreshDone} refreshed · ${variantRefreshSkipped} skipped`;
     } else if (variantRefreshDone || variantRefreshSkipped) {
       text = `✨ Variant refresh: ${variantRefreshDone} refreshed · ${variantRefreshSkipped} skipped`;
     }
@@ -6566,7 +6900,7 @@ function updateVariantQueueStatus(message = '') {
 
 function enqueueVariantRefresh(q, opts = {}) {
   if (!q || !GEM_KEY || MK) return false;
-  if (!effRegeneratable(q) || isQuestionDeleted(q)) return false;
+  if (effWellMade(q) || isQuestionDeleted(q)) return false;
   const uid = ensureQuestionUid(q);
   if (variantRefreshTouched.has(uid) || variantRefreshCurrentKey === uid || bgGenQueue.some(job => job.key === uid)) return false;
   if (variantRefreshSessionCount + bgGenQueue.length >= VARIANT_REFRESH_SESSION_CAP) return false;
@@ -6588,7 +6922,7 @@ function enqueueEligibleVariantRefresh(sessionKeys) {
   let added = 0;
   (sessionKeys || []).forEach(key => {
     const q = byN(key);
-    if (q && effRegeneratable(q) && enqueueVariantRefresh(q)) added++;
+    if (q && !effWellMade(q) && enqueueVariantRefresh(q)) added++;
   });
   return added;
 }
@@ -6632,7 +6966,7 @@ async function drainVariantQueue() {
 
   try {
     const current = findQuestionByUid(job.key) || job.q;
-    if (!current || isQuestionDeleted(current) || !effRegeneratable(current)) {
+    if (!current || isQuestionDeleted(current) || effWellMade(current)) {
       variantRefreshSkipped++;
     } else {
       await rewriteQuestionWithGemini(current, { background: true });
@@ -6819,23 +7153,29 @@ function normalizeVariantAnswer(raw) {
 
 async function rewriteQuestionWithGemini(targetQ, opts = {}) {
   if (!GEM_KEY) return Promise.reject(new Error('No API key'));
+  if (effWellMade(targetQ)) return Promise.reject(new Error('This question is marked Well made.'));
   try {
     const k = qk(targetQ);
     const vRec = V[k] = V[k] || {};
     const pastValues = Array.isArray(vRec._pastValues) ? vRec._pastValues : [];
+    const previousVariantStem = vRec._variant && vRec._variant.q ? [vRec._variant.q] : [];
+    const avoid = [...pastValues, ...previousVariantStem].filter(Boolean);
 
     const source = {
       subject: targetQ.s,
-      unit: targetQ.u || '',
+      unit: targetQ.u || targetQ.unit || '',
+      unit_name: targetQ.unit_name || targetQ.t || '',
+      tag: targetQ.tag || '',
+      type: targetQ.type || '',
       stem: targetQ.q,
       code: targetQ.code || [],
       options: targetQ.o,
       answer: targetQ.a,
       why: targetQ.e || '',
-      avoid: pastValues
+      avoid
     };
 
-    const promptB = 'You are an expert exam writer. Create ONE new MCQ testing the SAME concept, skill, and reasoning as the source question. If the source is calculation/trace/code, change the numbers/values AND the scenario. If the source is factual, definitional, or programming-concept based, keep the same tested fact but vary the wording, example, or code context. Rules: 1. Same topic and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers) and do not reuse numbers from "avoid". 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
+    const promptB = 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. For calculation, trace, or code questions, change the numbers/values AND the scenario, and test a related operation from the same unit. For factual, definitional, or programming-concept questions, target a related property, comparison, consequence, or application instead of copying the same tested fact. If the unit offers no meaningful sibling skill, vary the scenario/application enough that the reasoning is not a reworded copy. Rules: 1. Keep the same subject, unit/topic, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
 
     const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
@@ -6871,7 +7211,7 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
     const randomizedOpts = origIndices.map(idx => generatedOptions[idx]);
     const newAnswerIdx = origIndices.indexOf(generatedAnswer);
 
-    if (opts.background && (isQuestionDeleted(targetQ) || !effRegeneratable(targetQ))) {
+    if (opts.background && (isQuestionDeleted(targetQ) || effWellMade(targetQ))) {
       throw new Error('Question is no longer eligible for background refresh.');
     }
     if (opts.background && MK) {
@@ -6935,6 +7275,12 @@ function backToLastQuestion() {
 function done() {
   view = 'done';
   cancelRecallTimer();
+  if (SESSION_KIND === 'code_trace') {
+    CODE_TRACE.lastAt = Date.now();
+    CODE_TRACE.lastDate = localDateKey();
+    CODE_TRACE.snoozedUntil = 0;
+    SESSION_KIND = 'practice';
+  }
   save();
   try {
     // Check Level 0 completion per subject
@@ -7745,15 +8091,29 @@ function importBank(x, defaultName, replaceExisting = false) {
   return bank;
 }
 
+function isDashboardIdle() {
+  return typeof view === 'undefined' || view === 'home';
+}
+
+function refreshHomeIfIdle(message) {
+  if (isDashboardIdle()) {
+    home();
+    return;
+  }
+  if (message) {
+    try { showToast(message); } catch (e) {}
+  }
+}
+
 function loadDefaultBank() {
   defaultBankLoading = true;
   defaultBankLoadError = '';
   if (D && (BANKS || []).some(b => b && Array.isArray(b.q) && b.q.length)) {
     defaultBankLoading = false;
-    home();
+    refreshHomeIfIdle('Question bank is ready.');
     return;
   }
-  if (!D && !loadMode) home();
+  if (!D && !loadMode) refreshHomeIfIdle();
   fetch('./question_bank.json').then(response => {
     if (!response.ok) throw new Error(`Question bank request failed (${response.status}).`);
     return response.json();
@@ -7763,15 +8123,15 @@ function loadDefaultBank() {
     else {
       if (SETBANK == null) { SETBANK = bank.id; SETI = -1; }
       save();
-      home();
+      refreshHomeIfIdle('Question bank loaded.');
     }
   }).catch(error => {
     console.error('Default question bank failed to load:', error);
     defaultBankLoadError = `Could not load the default question bank: ${error.message}`;
-    home();
+    refreshHomeIfIdle();
   }).then(() => {
     defaultBankLoading = false;
-    if (!D) home();
+    if (!D) refreshHomeIfIdle();
   });
 }
 
@@ -7783,7 +8143,7 @@ function loadSet(bankId, k, startFresh = false) {
   SETBANK = bankId; SETI = k;
   D = bank.sets[k]
     .map(ix => bank.q[ix])
-    .filter(q => q && !isQuestionDeleted(q))
+    .filter(q => q && !isQuestionDeleted(q) && normalSessionEligible(q))
     .map((q, j) => {
       ensureQuestionUid(q);
       applyQuestionOverride(q);
@@ -7841,9 +8201,10 @@ function retake() {
   }
 }
 
-function start(q) {
+function start(q, opts = {}) {
   REV = null; RA.clear(); sessionLeechCount = 0;
   recallFirst = true;
+  SESSION_KIND = opts.kind || 'practice';
   variantRefreshDone = 0;
   variantRefreshSkipped = 0;
   variantRefreshSessionCount = 0;
@@ -7965,33 +8326,50 @@ function exportUI() {
         <option value="wsk">Mistakes + skipped</option>
         <option value="weak">Weak Topics (across subjects)</option>
       </select>
+      <select id="xr">
+        <option value="since">Since last export for this category</option>
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="all">All history</option>
+      </select>
       <select id="xf"><option value="md">Markdown (.md)</option><option value="txt">Plain Text (.txt)</option></select>
       <button class="p sm" onclick="exportLog(0)">⬇ Download</button>
       <button class="sm" onclick="exportLog(1)">Copy</button>
     </div>
-    <div class="mu sm" style="margin-top:4px">Exports are incremental since last successful export (per device). First export includes all history.</div>
+    <div class="mu sm" style="margin-top:4px">Each category keeps its own export checkpoint on this device. Current unresolved errors are always included.</div>
     <div id="xm" class="mu" style="margin-top:4px"></div>
   `;
 }
 
 // Build error-log or weak-topic reports from attempt history; export checkpoints are device-local metadata.
 function exportLog(copy) {
-  const scope = $('#xs').value;
-  const isMd = $('#xf').value === 'md';
+  const scope = ($('#xs') || {}).value || 'all';
+  const rangeMode = ($('#xr') || {}).value || ('since');
+  const isMd = (($('#xf') || {}).value || 'md') === 'md';
   const m = $('#xm');
   const todayStr = localDateKey();
-  let text = scope === 'weak' ? `# Weak Topics - ${todayStr}\n\n` : `# Recall Error Log - ${todayStr}\n\n`;
-  const results = [];
+  const ckptKey = 'bitmcq_export_ckpt_v2_' + scope;
   let checkpoint = null;
-  try { checkpoint = JSON.parse(localStorage.getItem('bitmcq_export_ckpt_v1') || 'null'); } catch(e){ checkpoint = null; }
+  try { checkpoint = JSON.parse(localStorage.getItem(ckptKey) || 'null'); } catch(e){ checkpoint = null; }
   if (!checkpoint || typeof checkpoint !== 'object') checkpoint = { lastAt: 0, lastTs: 0 };
-  const cutoff = Math.max(Number(checkpoint.lastTs) || 0, Number(checkpoint.lastAt) || 0);
+
+  let cutoff = 0;
+  let rangeLabel = 'All history';
+  if (rangeMode === 'since') {
+    cutoff = Math.max(Number(checkpoint.lastTs) || 0, Number(checkpoint.lastAt) || 0);
+    rangeLabel = cutoff ? `Since last ${scope === 'weak' ? 'weak-topics' : 'export'} on ${new Date(cutoff).toLocaleString()}` : 'All history (no prior export for this category)';
+  } else if (rangeMode === '7' || rangeMode === '30') {
+    cutoff = Date.now() - parseInt(rangeMode, 10) * 864e5;
+    rangeLabel = `Last ${rangeMode} days`;
+  }
+
+  let text = (scope === 'weak' ? `# Weak Topics - ${todayStr}` : `# Recall Error Log - ${todayStr}`) +
+    `\nRange: ${rangeLabel}\n\n`;
+  const results = [];
 
   function inRange(ts){
-    if (scope === 'weak') return true;
     if (!cutoff) return true;
-    const t = Number(ts) || 0;
-    return t > cutoff;
+    return (Number(ts) || 0) > cutoff;
   }
 
   function recordTs(rec){
@@ -8012,15 +8390,26 @@ function exportLog(copy) {
     if (R[q.n] === 's') addResult(q, 's', 'current', null, id);
   });
 
+  (A || []).forEach((attempt, ai) => {
+    if (!attempt) return;
+    const ts = recordTs(attempt);
+    if (!inRange(ts)) return;
+    (attempt.errs || []).forEach((rec, qi) => {
+      if (!rec) return;
+      const q = findQuestionByRecord(rec) || rec;
+      const id = questionUid(q) || recordIdentity(rec) || qk(q) || `archive:${ai}:${qi}`;
+      const status = rec.r || (rec.skipped || rec.ch < 0 ? 's' : 'w');
+      addResult(q, status === 's' ? 's' : 'w', 'archive', null, id);
+    });
+  });
+
   (L || []).forEach(rec => {
     try {
       const ts = recordTs(rec);
-      if (scope !== 'weak') {
-        if (!inRange(ts) && cutoff) return;
-      }
+      if (!inRange(ts)) return;
       const q = findQuestionByRecord(rec);
       if (!q) return;
-      const id = recordIdentity(rec) || questionUid(q) || qk(q);
+      const id = questionUid(q) || recordIdentity(rec) || qk(q);
       const isSkip = rec.ch < 0 || rec.skipped || rec.ch === -2;
       if (isSkip) {
         addResult(q, 's', 'log', rec.cf, id);
@@ -8086,17 +8475,27 @@ function exportLog(copy) {
     }
   }
 
-  const nowTs = Date.now();
-  try {
-    localStorage.setItem('bitmcq_export_ckpt_v1', JSON.stringify({ lastAt: nowTs, lastTs: nowTs, scope: scope, at: new Date().toISOString() }));
-  } catch(e){}
+  const finishExport = () => {
+    const nowTs = Date.now();
+    try {
+      localStorage.setItem(ckptKey, JSON.stringify({ lastAt: nowTs, lastTs: nowTs, scope: scope, range: rangeMode, at: new Date().toISOString() }));
+    } catch(e){}
+    if (m) {
+      const label = scope === 'weak' ? 'weak topics' : 'error log';
+      m.textContent = `${copy ? 'Copied' : 'Downloaded'} ${label} · ${unique.length} entr${unique.length === 1 ? 'y' : 'ies'} · ${rangeLabel}.`;
+    }
+  };
 
   if (!copy) {
     const fname = scope === 'weak' ? `weak-topics-${todayStr}.${isMd ? 'md' : 'txt'}` : `recall-error-log-${todayStr}.${isMd ? 'md' : 'txt'}`;
     saveFile(fname, text, isMd ? 'text/markdown' : 'text/plain');
-    if (m) m.textContent = scope === 'weak' ? 'Downloaded weak topics.' : 'Downloaded error log.';
-  } else {
-    navigator.clipboard.writeText(text).then(() => { if (m) m.textContent = scope === 'weak' ? 'Copied weak topics to clipboard.' : 'Copied to clipboard.'; });
+    finishExport();
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(finishExport).catch(err => {
+      if (m) m.textContent = 'Copy failed: ' + (err.message || err);
+    });
+  } else if (m) {
+    m.textContent = 'Clipboard is unavailable in this browser. Use Download instead.';
   }
 }
 
@@ -8233,7 +8632,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, WEEKLY_MOCK: (WEEKLY_MOCK && typeof WEEKLY_MOCK === 'object') ? WEEKLY_MOCK : {}, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, schemaVer: SCHEMA_VER }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, WEEKLY_MOCK: (WEEKLY_MOCK && typeof WEEKLY_MOCK === 'object') ? WEEKLY_MOCK : {}, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, CODE_TRACE: normalizeCodeTrace(CODE_TRACE), schemaVer: SCHEMA_VER }),
   apply: (s, opts = {}) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const currentView = typeof view !== 'undefined' ? view : 'home';
@@ -8268,16 +8667,21 @@ window.AppState = {
     PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
     WEEKLY_MOCK = (s.WEEKLY_MOCK && typeof s.WEEKLY_MOCK === 'object') ? s.WEEKLY_MOCK : {};
     COLD_QS = (s.COLD_QS && typeof s.COLD_QS === 'object') ? s.COLD_QS : {};
-    // Synchronize Leitner/FSRS V cold flags with COLD_QS
+    CODE_TRACE = normalizeCodeTrace(s.CODE_TRACE);
+    // Synchronize Leitner/FSRS V cold flags with the latest COLD_QS state.
+    const coldKeys = new Set();
     Object.entries(COLD_QS).forEach(([nStr, val]) => {
       const isCold = (val === true || (val && typeof val === 'object' && val.cold !== false));
-      if (isCold) {
-        const qObj = byN(Number(nStr));
-        if (qObj) {
-          const k = qk(qObj);
-          if (V[k]) V[k]._coldSet = true;
-        }
-      }
+      if (!isCold) return;
+      const qObj = byN(Number(nStr));
+      if (qObj) coldKeys.add(qk(qObj));
+    });
+    Object.keys(V).forEach(k => {
+      if (V[k] && V[k]._coldSet && !coldKeys.has(k)) delete V[k]._coldSet;
+    });
+    coldKeys.forEach(k => {
+      if (!V[k]) V[k] = {};
+      V[k]._coldSet = true;
     });
     applyQuestionOverridesEverywhere();
     save();

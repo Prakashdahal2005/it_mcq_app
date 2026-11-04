@@ -164,6 +164,7 @@
       PB_MOCK_SCORE: typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : 0,
       WEEKLY_MOCK: (s.WEEKLY_MOCK && typeof s.WEEKLY_MOCK === 'object' && !Array.isArray(s.WEEKLY_MOCK)) ? s.WEEKLY_MOCK : {},
       COLD_QS: (s.COLD_QS && typeof s.COLD_QS === 'object' && !Array.isArray(s.COLD_QS)) ? s.COLD_QS : {},
+      CODE_TRACE: (s.CODE_TRACE && typeof s.CODE_TRACE === 'object' && !Array.isArray(s.CODE_TRACE)) ? s.CODE_TRACE : {},
       schemaVer: typeof s.schemaVer === 'number' ? s.schemaVer : 1
     };
     n.BANKS = n.BANKS.filter(function (b) { return b && typeof b === 'object'; }).map(function (b) {
@@ -190,6 +191,7 @@
     if (s.CARDS && s.CARDS.length) return true;
     if (s.V && Object.keys(s.V).length) return true;
     if (s.COLD_QS && Object.keys(s.COLD_QS).length) return true;
+    if (s.CODE_TRACE && (Number(s.CODE_TRACE.lastAt) || Number(s.CODE_TRACE.snoozedUntil))) return true;
     if (s.QEDITS && Object.keys(s.QEDITS).length) return true;
     if (s.QDELETED && Object.keys(s.QDELETED).length) return true;
     return false;
@@ -244,7 +246,6 @@
       base.d = Math.max(x.d || 0, y.d || 0);
       base.missCount = Math.max(x.missCount || 0, y.missCount || 0);
       if (x.confWrongRetest || y.confWrongRetest) base.confWrongRetest = Math.max(x.confWrongRetest || 0, y.confWrongRetest || 0);
-      if (x._coldSet || y._coldSet) base._coldSet = true;
 
       if (x.stab != null || y.stab != null) {
         var xLatest = (x.history && x.history.length) ? x.history[x.history.length - 1].t : 0;
@@ -427,6 +428,38 @@
     return out;
   }
 
+  function mergeCodeTrace(a, b) {
+    a = (a && typeof a === 'object') ? a : {};
+    b = (b && typeof b === 'object') ? b : {};
+    var aAt = Number(a.lastAt) || 0;
+    var bAt = Number(b.lastAt) || 0;
+    var latest = aAt >= bAt ? a : b;
+    return {
+      lastAt: Math.max(aAt, bAt),
+      lastDate: latest.lastDate || '',
+      snoozedUntil: Math.max(Number(a.snoozedUntil) || 0, Number(b.snoozedUntil) || 0)
+    };
+  }
+
+  function mergeQov(a, b) {
+    var out = {};
+    var keys = {};
+    Object.keys(a || {}).forEach(function (k) { keys[k] = 1; });
+    Object.keys(b || {}).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+      var va = (a || {})[k];
+      var vb = (b || {})[k];
+      if (typeof va === 'boolean') va = { quick: va };
+      if (typeof vb === 'boolean') vb = { quick: vb };
+      if (!va || typeof va !== 'object') { if (vb && typeof vb === 'object') out[k] = vb; return; }
+      if (!vb || typeof vb !== 'object') { out[k] = va; return; }
+      var ta = Number(va._t) || 0;
+      var tb = Number(vb._t) || 0;
+      out[k] = tb >= ta ? Object.assign({}, va, vb) : Object.assign({}, vb, va);
+    });
+    return out;
+  }
+
   function mergeQuestionEdits(a, b) {
     var out = {};
     Object.keys(a || {}).forEach(function (k) { if (a[k] && typeof a[k] === 'object') out[k] = a[k]; });
@@ -601,12 +634,13 @@
         ? (remote.todayMins || local.todayMins || 15)
         : (local.todayMins || remote.todayMins || 15),
       lastFreshSetDay: active.lastFreshSetDay == null ? null : active.lastFreshSetDay,
-      QOV: Object.assign({}, local.QOV || {}, remote.QOV || {}),
+      QOV: mergeQov(local.QOV, remote.QOV),
       QEDITS: mergeQuestionEdits(local.QEDITS, remote.QEDITS),
       QDELETED: mergeQuestionDeletes(local.QDELETED, remote.QDELETED),
       CARDS: mergeCards(local.CARDS, remote.CARDS, cardTombstones),
       CARD_TOMBSTONES: cardTombstones,
       COLD_QS: mergeColdQs(local.COLD_QS, remote.COLD_QS),
+      CODE_TRACE: mergeCodeTrace(local.CODE_TRACE, remote.CODE_TRACE),
       RESOURCE_MARKS: Object.assign({}, local.RESOURCE_MARKS || {}, remote.RESOURCE_MARKS || {}),
       FIX_DAYS: mergeFixDays(local.FIX_DAYS, remote.FIX_DAYS),
       DIAGNOSTIC_DONE: !!(local.DIAGNOSTIC_DONE || remote.DIAGNOSTIC_DONE),
