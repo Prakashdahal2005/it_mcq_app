@@ -1,14 +1,14 @@
 {
  "meta": {
-  "total_questions": 1727,
+  "total_questions": 1743,
   "subjects": 19,
   "schema": "id, question (markdown; KaTeX $..$ for maths), options A-D, answer, level 0-3, type, unit/unit_name/unit_conf, regeneratable, shuffle_safe, giveaway_risk, explanation (null = fill with Gemini), source"
  },
  "subjects": [
   {
-   "subject": "Introduction to IT",
-   "subject_code": "BIT101",
-   "question_count": 90,
+    "subject": "Introduction to IT",
+    "subject_code": "BIT101",
+    "question_count": 94,
    "questions": [
     {
      "id": 1,
@@ -1978,14 +1978,102 @@
      "giveaway_risk": false,
      "unit_name": "assembler ≠ compiler",
      "explanation": "Compiler = high-level language; interpreter runs line by line; linker joins object files.",
-     "source": "sibling"
-    }
-   ]
-  },
-  {
-   "subject": "C Programming",
-   "subject_code": "BIT102",
-   "question_count": 74,
+      "source": "sibling"
+     },
+     {
+      "id": "U8-01",
+      "question": "Which is the best example of an IT application in healthcare?",
+      "options": {
+       "A": "Using an ERP system to manage supplier invoices",
+       "B": "Using telemedicine to consult a specialist remotely",
+       "C": "Using a spreadsheet to calculate employee salaries",
+       "D": "Using a word processor to type a general letter"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Application and impact of IT",
+      "unit_conf": "high",
+      "explanation": "Telemedicine is a healthcare-specific IT application; the other options are general business or office uses.",
+      "source": "original"
+     },
+     {
+      "id": "U8-02",
+      "question": "Which impact of IT is primarily organizational rather than individual?",
+      "options": {
+       "A": "A student taking an online class at home",
+       "B": "A customer receiving faster online support",
+       "C": "A firm redesigning its workflows around an integrated information system",
+       "D": "An employee using a smartphone for personal banking"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Application and impact of IT",
+      "unit_conf": "high",
+      "explanation": "The firm-level workflow redesign changes how the whole organization operates; the other options describe effects on individuals.",
+      "source": "original"
+     },
+     {
+      "id": "U8-03",
+      "question": "Which is a societal impact of IT rather than a purely organizational one?",
+      "options": {
+       "A": "Reduced paperwork within one department",
+       "B": "Improved inventory accuracy in one warehouse",
+       "C": "Faster payroll processing for one company",
+       "D": "A widening digital divide between connected and unconnected groups"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Application and impact of IT",
+      "unit_conf": "high",
+      "explanation": "The digital divide affects society broadly, while the other options are internal organizational outcomes.",
+      "source": "original"
+     },
+     {
+      "id": "U8-04",
+      "question": "Which statement best describes IT-business alignment?",
+      "options": {
+       "A": "IT priorities are planned to support the organization's strategic objectives",
+       "B": "IT work is limited to repairing hardware and networks",
+       "C": "IT decisions are made only by the IT department",
+       "D": "IT spending is minimized regardless of business goals"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Application and impact of IT",
+      "unit_conf": "high",
+      "explanation": "Alignment means IT strategy and investment are deliberately linked to business strategy, not treated as an isolated technical function.",
+      "source": "original"
+     }
+    ]
+   },
+   {
+    "subject": "C Programming",
+    "subject_code": "BIT102",
+    "question_count": 78,
    "questions": [
     {
      "id": 1,
@@ -3609,12 +3697,100 @@
      "giveaway_risk": false,
      "unit_name": "pointer arithmetic",
      "explanation": "1000 + 3·4. Slips: 1003 ignored the scaling; 1006 used 2-byte int; 1024 used 8 bytes.",
-     "source": "sibling"
-    }
-   ]
-  },
-  {
-   "subject": "Digital Logic",
+      "source": "sibling"
+     },
+     {
+      "id": "U3-01",
+      "question": "Which standard C output conversion specifier prints a single character?",
+      "options": {
+       "A": "%d",
+       "B": "%c",
+       "C": "%s",
+       "D": "%f"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Input/output functions",
+      "unit_conf": "high",
+      "explanation": "%c prints one character; %s prints a string, %d an integer, and %f a floating-point value.",
+      "source": "original"
+     },
+     {
+      "id": "U3-02",
+      "question": "When reading an int with the standard C input function, why must the argument be &n rather than n?",
+      "options": {
+       "A": "The format specifier should be %f",
+       "B": "scanf cannot read integer variables",
+       "C": "It must pass the address of n, as in scanf(\"%d\", &n);",
+       "D": "The format string must not be in quotes"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Input/output functions",
+      "unit_conf": "high",
+      "explanation": "scanf needs a pointer to the variable it must modify, so an int requires &n rather than n.",
+      "source": "original"
+     },
+     {
+      "id": "U3-03",
+      "question": "In the C format specifier %8.2f, what does .2 specify?",
+      "options": {
+       "A": "Two variables are printed",
+       "B": "The minimum field width is 2",
+       "C": "Two decimal places are removed",
+       "D": "Two digits are printed after the decimal point"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Input/output functions",
+      "unit_conf": "high",
+      "explanation": "The .2 precision prints two digits after the decimal point; 8 is the minimum field width.",
+      "source": "original"
+     },
+     {
+      "id": "U3-04",
+      "question": "Which statement about the standard C output function is correct?",
+      "options": {
+       "A": "It returns the number of characters written, or a negative value on error",
+       "B": "It always returns 0 after printing",
+       "C": "It cannot print a literal percent sign",
+       "D": "It reads formatted input from the keyboard"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Input/output functions",
+      "unit_conf": "high",
+      "explanation": "printf returns the character count or a negative value on failure; %% prints a literal percent sign, while scanf reads input.",
+      "source": "original"
+     }
+    ]
+   },
+   {
+    "subject": "Digital Logic",
    "subject_code": "BIT103",
    "question_count": 61,
    "questions": [
@@ -14426,9 +14602,9 @@
    ]
   },
   {
-   "subject": "Web Technology",
-   "subject_code": "BIT251",
-   "question_count": 120,
+    "subject": "Web Technology",
+    "subject_code": "BIT251",
+    "question_count": 124,
    "questions": [
     {
      "id": 1,
@@ -17058,12 +17234,100 @@
      "giveaway_risk": false,
      "unit_name": "JS dialogs",
      "explanation": "alert only informs; prompt returns text.",
-     "source": "sibling"
-    }
-   ]
-  },
-  {
-   "subject": "Systems Analysis and Design",
+      "source": "sibling"
+     },
+     {
+      "id": "U13-01",
+      "question": "Which php.ini directive controls whether PHP error messages are displayed in the browser?",
+      "options": {
+       "A": "display_errors",
+       "B": "error_log",
+       "C": "max_execution_time",
+       "D": "upload_max_filesize"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 13,
+      "unit_name": "13 Debugging PHP",
+      "unit_conf": "high",
+      "explanation": "display_errors controls browser display of errors; error_log sets the log destination, and the other directives control execution time or uploads.",
+      "source": "original"
+     },
+     {
+      "id": "U13-02",
+      "question": "What is the difference between error handling and error reporting in PHP?",
+      "options": {
+       "A": "Error reporting fixes bugs automatically",
+       "B": "Error reporting controls which errors are shown or logged, while error handling defines how errors are acted on",
+       "C": "Error handling only suppresses every error",
+       "D": "They are identical terms"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 13,
+      "unit_name": "13 Debugging PHP",
+      "unit_conf": "high",
+      "explanation": "Reporting selects the errors that are displayed or logged; handling determines the response, such as logging, suppressing, or converting an error into an exception.",
+      "source": "original"
+     },
+     {
+      "id": "U13-03",
+      "question": "Which PHP construct is used to catch an exception?",
+      "options": {
+       "A": "try",
+       "B": "throw",
+       "C": "catch",
+       "D": "finally"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 13,
+      "unit_name": "13 Debugging PHP",
+      "unit_conf": "high",
+      "explanation": "try encloses risky code, throw raises an exception, catch handles it, and finally runs cleanup code.",
+      "source": "original"
+     },
+     {
+      "id": "U13-04",
+      "question": "What does the @ operator do in PHP?",
+      "options": {
+       "A": "Logs the next error to a file",
+       "B": "Turns every error into an exception",
+       "C": "Stops the script on every error",
+       "D": "Suppresses error messages for the following expression"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 13,
+      "unit_name": "13 Debugging PHP",
+      "unit_conf": "high",
+      "explanation": "The @ operator suppresses error messages for the expression that follows; explicit logging still needs error_log or an error handler.",
+      "source": "original"
+     }
+    ]
+   },
+   {
+    "subject": "Systems Analysis and Design",
    "subject_code": "BIT253",
    "question_count": 90,
    "questions": [
@@ -22798,9 +23062,9 @@
    ]
   },
   {
-   "subject": "Management Information System",
-   "subject_code": "BIT353",
-   "question_count": 109,
+    "subject": "Management Information System",
+    "subject_code": "BIT353",
+    "question_count": 113,
    "questions": [
     {
      "id": 2,
@@ -25190,12 +25454,100 @@
      "giveaway_risk": false,
      "unit_name": "ERP / SCM / CRM",
      "explanation": "CRM = customers; ERP = internal integration.",
-     "source": "sibling"
-    }
-   ]
-  },
-  {
-   "subject": "E-Commerce",
+      "source": "sibling"
+     },
+     {
+      "id": "U2-01",
+      "question": "Which best describes the relationship between a business process and an information system?",
+      "options": {
+       "A": "An information system supports and automates parts of a business process",
+       "B": "A business process is a type of database",
+       "C": "An information system replaces every human decision in a process",
+       "D": "A business process is used only by government agencies"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Global business and collaboration",
+      "unit_conf": "high",
+      "explanation": "A business process is a set of activities that produces value; an information system supports and coordinates those activities rather than replacing all human judgment.",
+      "source": "original"
+     },
+     {
+      "id": "U2-02",
+      "question": "Which statement best distinguishes e-business from e-commerce?",
+      "options": {
+       "A": "E-business refers only to online retail sales",
+       "B": "E-business includes e-commerce plus internal and partner-facing digital processes",
+       "C": "E-commerce excludes online transactions",
+       "D": "The two terms are exact synonyms"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Global business and collaboration",
+      "unit_conf": "high",
+      "explanation": "E-commerce covers buying and selling electronically, while e-business is broader and includes internal and partner-facing digital processes.",
+      "source": "original"
+     },
+     {
+      "id": "U2-03",
+      "question": "Which is the best example of social business rather than ordinary collaboration?",
+      "options": {
+       "A": "Two employees exchanging email about a report",
+       "B": "A manager holding a face-to-face team meeting",
+       "C": "Employees using an internal social platform to share expertise across departments",
+       "D": "A customer calling a help desk"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Global business and collaboration",
+      "unit_conf": "high",
+      "explanation": "Social business uses social platforms and networks to improve collaboration and knowledge sharing across the organization; the other options are ordinary collaboration or support channels.",
+      "source": "original"
+     },
+     {
+      "id": "U2-04",
+      "question": "Which role do enterprise systems play in linking an organization?",
+      "options": {
+       "A": "They store only individual employee files",
+       "B": "They replace all external suppliers",
+       "C": "They prevent data sharing between departments",
+       "D": "They integrate information and processes across business functions"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Global business and collaboration",
+      "unit_conf": "high",
+      "explanation": "Enterprise systems link business functions by integrating shared information and processes, improving coordination across the organization.",
+      "source": "original"
+     }
+    ]
+   },
+   {
+    "subject": "E-Commerce",
    "subject_code": "BIT403",
    "question_count": 109,
    "questions": [
