@@ -913,6 +913,12 @@ function normalizeCodeTrace(v) {
 }
 function isColdQuestion(q) {
   if (!q) return false;
+  const uid = (typeof questionUid === 'function' ? questionUid(q) : null) || (typeof qk === 'function' ? qk(q) : null);
+  if (uid && COLD_QS[uid] !== undefined) {
+    const vu = COLD_QS[uid];
+    if (vu === true) return true;
+    if (vu && typeof vu === 'object') return vu.cold !== false;
+  }
   const v = COLD_QS[q.n];
   if (v === true) return true;
   if (v && typeof v === 'object') return v.cold !== false;
@@ -2468,6 +2474,63 @@ function canonSubj(s) {
   return str;
 }
 const cl = s => canonSubj(s);
+const CANONICAL_SUBJECTS = [
+  'Introduction to IT',
+  'C Programming',
+  'Digital Logic',
+  'Basic Mathematics: Calculus & Functions',
+  'Microprocessor & Computer Architecture',
+  'Data Structures & Algorithms',
+  'Linear & Abstract Algebra',
+  'Basic Statistics',
+  'Object Oriented Programming - C++',
+  'Operating Systems',
+  'Database Management System',
+  'Software Engineering',
+  'Computer Graphics',
+  'Network & Data Communications',
+  'Management Information System',
+  'Web Technology',
+  'Artificial Intelligence',
+  'Systems Analysis & Design',
+  'E-Commerce'
+];
+const SYLLABUS_UNIT_COUNTS = {
+  'Introduction to IT': 8,
+  'C Programming': 11,
+  'Digital Logic': 7,
+  'Basic Mathematics: Calculus & Functions': 10,
+  'Microprocessor & Computer Architecture': 8,
+  'Data Structures & Algorithms': 10,
+  'Linear & Abstract Algebra': 10,
+  'Basic Statistics': 8,
+  'Object Oriented Programming - C++': 8,
+  'Operating Systems': 5,
+  'Database Management System': 8,
+  'Software Engineering': 10,
+  'Computer Graphics': 10,
+  'Network & Data Communications': 6,
+  'Management Information System': 7,
+  'Web Technology': 14,
+  'Artificial Intelligence': 8,
+  'Systems Analysis & Design': 5,
+  'E-Commerce': 7
+};
+const SYLLABUS_TOTAL_UNITS = Object.values(SYLLABUS_UNIT_COUNTS).reduce((sum, count) => sum + count, 0);
+const MISSING_BANK_UNITS = [
+  { subject: 'Introduction to IT', unit: 8, name: 'Application and impact of IT' },
+  { subject: 'C Programming', unit: 3, name: 'Input/output functions' },
+  { subject: 'Web Technology', unit: 13, name: 'Debugging PHP' },
+  { subject: 'Management Information System', unit: 2, name: 'Global business and collaboration' }
+];
+function questionScopeUnit(q) {
+  if (!q) return null;
+  const rawUnit = q.unit != null ? String(q.unit).trim() : '';
+  if (/^\d+$/.test(rawUnit)) return Number(rawUnit);
+  const name = String(q.unit_name || '').trim();
+  const match = name.match(/^(?:unit\s*)?(\d+)\b/i);
+  return match ? Number(match[1]) : null;
+}
 const DAY_MS = 86400000;
 const localDateKey = (ts = Date.now()) => {
   const d = new Date(ts);
@@ -2482,6 +2545,60 @@ const localDayIndex = (ts = Date.now()) => {
 };
 const today = () => localDayIndex(Date.now());
 const hl = s => String(s).replace(/\b(NOT|EXCEPT|FALSE|INCORRECT|ALWAYS|ONLY|NEVER)\b/g, '<mark>$1</mark>');
+
+function questionsAnsweredToday() {
+  const todayKey = localDateKey();
+  const out = new Set();
+  (L || []).forEach(r => {
+    if (!r || localDateKey(r.t) !== todayKey) return;
+    if (r.uid) out.add(r.uid);
+    if (r.k) out.add(r.k);
+  });
+  return out;
+}
+
+function wasAnsweredToday(q, doneSet) {
+  if (!q) return false;
+  const set = doneSet || questionsAnsweredToday();
+  return set.has(questionUid(q)) || set.has(qk(q));
+}
+
+function latestPracticeRecordMap() {
+  const latest = new Map();
+  (L || []).forEach(r => {
+    if (!r || r.mock === 1) return;
+    [r.uid, r.qid, r.k].forEach(key => {
+      if (key == null || key === '') return;
+      const prev = latest.get(key);
+      if (!prev || (r.t || 0) >= (prev.t || 0)) latest.set(key, r);
+    });
+  });
+  return latest;
+}
+
+function latestPracticeRecordFor(q, latest) {
+  if (!q) return null;
+  const m = latest || latestPracticeRecordMap();
+  return m.get(questionUid(q)) || m.get(qk(q)) || null;
+}
+
+function currentPracticeQuestions(status) {
+  const latest = latestPracticeRecordMap();
+  const doneToday = questionsAnsweredToday();
+  return bankQuestionPool().filter(q => {
+    if (!q || !normalSessionEligible(q) || wasAnsweredToday(q, doneToday)) return false;
+    const r = latestPracticeRecordFor(q, latest);
+    if (!r) return false;
+    if (status === 'w') return !r.ok && r.ch !== -1;
+    if (status === 's') return !r.ok && r.ch === -1;
+    return false;
+  });
+}
+
+function sessionKeyForQuestion(q) {
+  if (!q) return null;
+  return q.n != null ? q.n : (questionUid(q) || qk(q));
+}
 
 function getDaysLeft() {
   if (!EXAM_DATE) {
@@ -2603,7 +2720,7 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
 
 function dueKeys(quickOnly = false) {
   const t = today();
-  const pool = (D || []).filter(q => (!quickOnly || effQuick(q)) && normalSessionEligible(q));
+  const pool = bankQuestionPool().filter(q => (!quickOnly || effQuick(q)) && normalSessionEligible(q));
 
   const byIdentity = new Map();
   function addDue(q, key, prio, fromActive) {
@@ -2634,7 +2751,7 @@ function dueKeys(quickOnly = false) {
       prio += (3 - lvl) * 100;
       prio += Math.min(50, (v.missCount || 0) * 10);
 
-      addDue(q, q.n, prio, true);
+      addDue(q, sessionKeyForQuestion(q), prio, true);
     }
   });
 
@@ -3231,10 +3348,6 @@ function regenerateCurrentQuestion() {
   }
 
   if (GEM_KEY) {
-    if (getDailyApiCount() >= DAILY_API_LIMIT) {
-      alert('Daily AI request limit reached. Try again tomorrow or raise the limit in Settings.');
-      return;
-    }
     const qStem = $('#q-stem');
     if (qStem) qStem.innerHTML = '<span class="c-sk">✨ Generating verified AI variant with blind validation...</span>';
     rewriteQuestionWithGemini(rawQ, { background: false }).then(() => {
@@ -3605,11 +3718,13 @@ function updateColdButtonUI(q) {
 
 function toggleColdQuestion() {
   if (MK) return; // no cold-marking during mock exams
-  const rawQ = byN(Q[P]);
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
   const n = rawQ.n;
+  const uid = (typeof questionUid === 'function' ? questionUid(rawQ) : null) || (typeof qk === 'function' ? qk(rawQ) : null);
   if (isColdQuestion(rawQ)) {
-    COLD_QS[n] = { cold: false, t: Date.now() };
+    if (uid) COLD_QS[uid] = { cold: false, t: Date.now() };
+    if (n != null) COLD_QS[n] = { cold: false, t: Date.now() };
     // Remove extended interval we set
     const k = qk(rawQ);
     if (V[k] && V[k]._coldSet) {
@@ -3617,7 +3732,8 @@ function toggleColdQuestion() {
       delete V[k]._coldSet;
     }
   } else {
-    COLD_QS[n] = { cold: true, t: Date.now() };
+    if (uid) COLD_QS[uid] = { cold: true, t: Date.now() };
+    if (n != null) COLD_QS[n] = { cold: true, t: Date.now() };
     // Push due date far into the future (180 days)
     const k = qk(rawQ);
     V[k] = V[k] || {};
@@ -3790,7 +3906,7 @@ function conceptCardFallback(rawQ) {
 // Prefer Gemini when configured, but use the local fallback when AI is unavailable or not configured.
 async function generateConceptCardData(rawQ) {
   const fallback = conceptCardFallback(rawQ);
-  if (!GEM_KEY || getDailyApiCount() >= DAILY_API_LIMIT) return fallback;
+  if (!GEM_KEY) return fallback;
   try {
     const prompt = `You create concept flashcards for a BSc CSIT student preparing for the MIT entrance exam. Extract the ONE underlying concept from the source MCQ and turn it into an active-recall concept card.
 
@@ -3925,7 +4041,6 @@ async function generateFreeformFlashcards(promptText, subject, count) {
   const topic = String(promptText || '').trim();
   if (!topic) throw new Error('Enter a topic or prompt first.');
   if (!GEM_KEY) throw new Error('AI generation needs an API key in Settings.');
-  if (getDailyApiCount() >= DAILY_API_LIMIT) throw new Error('Daily API limit reached. Try again tomorrow.');
   const n = Math.max(1, Math.min(12, parseInt(count, 10) || 5));
   const subj = canonSubj(subject || 'General');
   const prompt = `You create active-recall flashcards for a BSc CSIT student preparing for the MIT entrance exam.
@@ -4030,7 +4145,7 @@ async function generateFreeformFlashcardsFromUI() {
 }
 
 async function addFlashcardForCurrent() {
-  const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (Q && P < Q.length ? byN(Q[P]) : null);
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : (Q && P < Q.length ? byN(Q[P]) : null);
   if (!rawQ) return;
   const btn = (window.event && window.event.target && window.event.target.tagName === 'BUTTON') ? window.event.target : null;
   const original = btn ? btn.innerHTML : '';
@@ -4038,17 +4153,33 @@ async function addFlashcardForCurrent() {
     btn.disabled = true;
     btn.innerHTML = '⏳ Generating concept card...';
   }
+  let targetCardId = null;
   try {
     const data = await generateConceptCardData(rawQ);
     const result = saveConceptCard(rawQ, data);
-    if (result.duplicate) alert('A concept card for this idea is already in your review deck.');
-    else if (result.card) alert(data.origin === 'ai' ? 'AI concept card added to your review deck.' : 'Concept card added to your review deck.');
-    else alert('Could not add flashcard.');
+    const targetCard = result.card || (CARDS || []).find(c => !c.grad && (c.sourceQk === qk(rawQ) || c.qk === qk(rawQ)));
+    targetCardId = targetCard ? targetCard.id : null;
+    if (result.duplicate) {
+      if (typeof showToast === 'function') showToast('A concept card for this idea is already in your review deck.');
+    } else if (result.card) {
+      if (typeof showToast === 'function') showToast(data.origin === 'ai' ? 'AI concept card added to your review deck.' : 'Concept card added to your review deck.');
+    }
+    if (targetCardId) {
+      if (btn && btn.parentNode) {
+        btn.outerHTML = `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(targetCardId).replace(/'/g, "\\'")}')">📖 View flashcard</button>`;
+      }
+      if (typeof sessionHistory !== 'undefined' && sessionHistory && sessionHistory[P]) {
+        sessionHistory[P].feedbackHtml = $('#fb') ? $('#fb').innerHTML : sessionHistory[P].feedbackHtml;
+      }
+      viewLinkedFlashcardFromQuiz(targetCardId);
+    } else {
+      alert('Could not add flashcard.');
+    }
   } catch (err) {
     console.warn('Add concept card failed:', err);
     alert('Could not add flashcard: ' + (err.message || err));
   } finally {
-    if (btn) {
+    if (btn && !targetCardId) {
       btn.disabled = false;
       btn.innerHTML = original;
     }
@@ -4200,7 +4331,10 @@ function renderCardManagerView(){
         <b class="sm">Generate cards from a prompt</b>
         <textarea id="fcgen_prompt" rows="2" placeholder="e.g. normalization forms with examples, or common OS deadlock mistakes" style="margin:6px 0;width:100%"></textarea>
         <div class="row" style="gap:6px;flex-wrap:wrap">
-          <input type="text" id="fcgen_subject" placeholder="Subject (optional)" style="flex:1;min-width:150px">
+          <select id="fcgen_subject" style="flex:1;min-width:170px">
+            <option value="">-- Choose Subject (optional) --</option>
+            ${CANONICAL_SUBJECTS.map(s => `<option value="${esc(s)}" ${filter === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+          </select>
           <input type="number" id="fcgen_count" value="5" min="1" max="12" style="width:70px">
           <button class="p" id="fcgen_btn" onclick="generateFreeformFlashcardsFromUI()">Generate cards</button>
           <button onclick="exportDueFlashcards()">Export due (.md)</button>
@@ -4254,10 +4388,6 @@ async function regenerateFlashcard(id) {
   if (!card) return;
   if (!GEM_KEY) {
     alert('A Gemini API key is required to regenerate a flashcard. Configure it in Settings (⚙).');
-    return;
-  }
-  if (getDailyApiCount() >= DAILY_API_LIMIT) {
-    alert('Daily AI request limit reached. Try again tomorrow or raise the limit in Settings.');
     return;
   }
   const source = findSourceQuestionForCard(card);
@@ -4395,6 +4525,10 @@ function editFlashcard(id){
       <button onclick="cancelFlashcardEdit()">Cancel</button>
     </div></div>
     <div class="card">
+      <label class="mu sm">Subject</label>
+      <select id="fce_subject" style="margin:4px 0 12px;width:100%">
+        ${CANONICAL_SUBJECTS.map(s => `<option value="${esc(s)}" ${canonSubj(c.subject || '') === canonSubj(s) ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+      </select>
       <label class="mu sm">Concept</label>
       <input type="text" id="fce_concept" value="${esc(c.concept || '')}" style="margin:4px 0 12px;width:100%">
       <label class="mu sm">Front (prompt)</label>
@@ -4423,6 +4557,10 @@ function cancelFlashcardEdit(){
 function saveFlashcardEdits(id){
   const c = (CARDS||[]).find(x=>x.id===id);
   if(!c) return;
+  const selectedSubj = ($('#fce_subject')?.value || '').trim();
+  if (selectedSubj) {
+    c.subject = canonSubj(selectedSubj);
+  }
   const data = {
     concept: ($('#fce_concept')?.value || '').trim(),
     front: ($('#fce_front')?.value || '').trim(),
@@ -4879,30 +5017,34 @@ function prepareQuestionForDisplay(rawQ) {
 // Probabilistic Spaced Session Construction (FSRS-scheduled, unbroken subject runs, easy L0 first item)
 // Compose an interleaved set from due, weak, fresh, and filler items without duplicating questions.
 function buildTodaySession(minutes = 15, quickOnly = false) {
-  if (!D || !D.length) return [];
+  const allBank = bankQuestionPool().filter(q => normalSessionEligible(q));
+  if (!allBank.length && (!D || !D.length)) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
-  const basePool = (quickOnly ? (D || []).filter(q => effQuick(q)) : (D || [])).filter(q => normalSessionEligible(q));
+  const basePool = quickOnly ? allBank.filter(q => effQuick(q)) : allBank;
   if (!basePool.length) return [];
 
-  // Exclude questions already completed today so the user never gets the exact same questions repeatedly in a single day!
-  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  // Exclude questions already completed today (using local calendar date)
+  const todayKey = localDateKey();
   const doneTodayKeys = new Set(
     (L || [])
-      .filter(r => r && r.t >= startOfToday)
-      .map(r => r.k)
+      .filter(r => r && localDateKey(r.t) === todayKey)
+      .map(r => r.uid || r.k)
   );
 
-  let pool = basePool.filter(q => !doneTodayKeys.has(qk(q)));
-  if (pool.length < Math.min(5, targetQ)) {
-    // If user answered almost all questions today, allow unattempted questions from basePool
-    pool = basePool;
-  }
+  const isAvailableToday = q => {
+    if (!q) return false;
+    const uid = questionUid(q) || qk(q);
+    const k = qk(q);
+    return !doneTodayKeys.has(uid) && !doneTodayKeys.has(k);
+  };
 
-  const due = dueKeys(quickOnly).filter(candidateN => {
-    const q = byN(candidateN);
-    return q && !doneTodayKeys.has(qk(q));
+  const pool = basePool.filter(isAvailableToday);
+  if (!pool.length) return [];
+
+  const due = dueKeys(quickOnly).filter(candidateKey => {
+    const q = byN(candidateKey);
+    return q && isAvailableToday(q);
   });
-  const lockedSet = new Set(pool.filter(q => isLockedIn(q)).map(q => q.n));
 
   // Easy first question: pick an L0 item with high historical accuracy (randomize top candidates)
   const easyFirstCandidates = pool.filter(q => (effLevel(q) === 0 || q.level == null) && V[qk(q)]?.history?.some(h => h.ok));
@@ -4916,29 +5058,33 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
       return accB - accA;
     });
     const pickCount = Math.min(3, easyFirstCandidates.length);
-    easyFirst = easyFirstCandidates[Math.floor(Math.random() * pickCount)].n;
+    const chosen = easyFirstCandidates[Math.floor(Math.random() * pickCount)];
+    easyFirst = questionUid(chosen) || qk(chosen);
   } else {
     const l0Candidates = pool.filter(q => effLevel(q) === 0);
     if (l0Candidates.length) {
-      easyFirst = l0Candidates[Math.floor(Math.random() * l0Candidates.length)].n;
+      const chosen = l0Candidates[Math.floor(Math.random() * l0Candidates.length)];
+      easyFirst = questionUid(chosen) || qk(chosen);
     }
   }
 
   const weakSubjects = new Set(
     milestoneSubjectSignals().filter(s => s.isWeak).map(s => s.k)
   );
+  const coverageSnapshot = calculateUnitCoverage();
+  const coverageReserve = Math.min(targetQ - 1, Math.max(4, Math.round(targetQ * 0.4)));
+  const weakCap = Math.max(2, Math.round(targetQ * 0.2));
+  const dueCap = Math.max(1, targetQ - coverageReserve - weakCap - (easyFirst ? 1 : 0));
 
   const session = [];
-  const added = new Set();
   const addedIdentities = new Set();
-  function add(n) {
-    if (n == null || added.has(n)) return false;
-    const q = byN(n);
-    const identity = q ? (questionUid(q) || qk(q)) : String(n);
+  function add(itemOrKey) {
+    if (itemOrKey == null) return false;
+    const q = typeof itemOrKey === 'object' ? itemOrKey : byN(itemOrKey);
+    const identity = q ? (questionUid(q) || qk(q)) : String(itemOrKey);
     if (addedIdentities.has(identity)) return false;
-    added.add(n);
     addedIdentities.add(identity);
-    session.push(n);
+    session.push(identity);
     return true;
   }
 
@@ -4946,24 +5092,26 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
 
   // Due items (priority-sorted from dueKeys, max 3 leeches per session)
   let leechCountInSession = 0;
-  for (const candidateN of due) {
-    if (session.length >= targetQ - 3) break;
-    const candQ = byN(candidateN);
+  let dueAdded = 0;
+  for (const candidateKey of due) {
+    if (dueAdded >= dueCap) break;
+    const candQ = byN(candidateKey);
     const v = candQ ? V[qk(candQ)] : null;
     const isLeech = v && v.missCount >= 3;
     if (isLeech) {
       if (leechCountInSession >= 3) continue;
       leechCountInSession++;
     }
-    add(candidateN);
+    if (add(candidateKey)) dueAdded++;
   }
 
   if (weakSubjects.size > 0) {
     const weakPool = pool.filter(q => weakSubjects.has(cl(q.s)) && (effLevel(q) === 0 || effLevel(q) === 1));
-    weakPool.sort(() => Math.random() - 0.5);
+    weakPool.sort((a, b) => (effLevel(a) - effLevel(b)) || (Math.random() - 0.5));
+    let weakAdded = 0;
     for (const q of weakPool) {
-      if (session.length >= targetQ - 2) break;
-      add(q.n);
+      if (weakAdded >= weakCap || session.length >= targetQ - coverageReserve) break;
+      if (add(q)) weakAdded++;
     }
   }
 
@@ -4984,17 +5132,21 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     return ordered;
   }
 
-  // Fresh unattempted items (exclude L3 unless L0-L2 are mastered)
-  const unseenItems = weightedOrder(pool.filter(q => !V[qk(q)] && (effLevel(q) < 3))).map(q => q.n);
-  while (unseenItems.length && session.length < targetQ - 1) {
-    add(unseenItems.pop());
-  }
+  // Coverage-first fill: least-covered units, one question per unit in this pass
+  const coveragePool = pool.filter(q => !addedIdentities.has(questionUid(q) || qk(q)));
+  const coveragePicks = pickCoverageQuestions(coveragePool, Math.min(coverageReserve, targetQ - session.length), coverageSnapshot, {
+    maxPerUnit: 1,
+    exclude: addedIdentities
+  });
+  coveragePicks.forEach(q => add(q));
 
-  // Remaining filler
-  const remainingAll = weightedOrder(pool).map(q => q.n);
-  for (const n of remainingAll) {
+  // Remaining filler (prefer lower levels first)
+  const remainingAll = pool.filter(q => !addedIdentities.has(questionUid(q) || qk(q)));
+  remainingAll.sort((a, b) => (effLevel(a) - effLevel(b)) || (Math.random() - 0.5));
+  const orderedRemaining = weightedOrder(remainingAll);
+  for (const q of orderedRemaining) {
     if (session.length >= targetQ) break;
-    add(n);
+    add(q);
   }
 
   // Appendix Rule 12: Ensure unbroken subject runs, with easyFirst's subject run placed first
@@ -5144,6 +5296,209 @@ function readinessStats() {
   return { overall, subjects, l0, first };
 }
 
+function calculateUnitCoverage() {
+  const now = Date.now();
+  const sevenDays = 7 * 86400000;
+  const subjects = {};
+  Object.entries(SYLLABUS_UNIT_COUNTS).forEach(([subject, unitCount]) => {
+    const units = {};
+    for (let unit = 1; unit <= unitCount; unit++) {
+      units[unit] = {
+        subject,
+        unit,
+        name: `Unit ${unit}`,
+        bankCount: 0,
+        touchedCount: 0,
+        knownCount: 0,
+        knownDays: new Set(),
+        recentConf3Miss: false,
+        solid: false
+      };
+    }
+    subjects[subject] = { subject, unitCount, units, touchedUnits: 0, solidUnits: 0, bankSupportedUnits: 0 };
+  });
+  MISSING_BANK_UNITS.forEach(item => {
+    const subject = subjects[item.subject];
+    const unit = subject && subject.units[item.unit];
+    if (unit) unit.name = item.name;
+  });
+
+  const byUid = new Map();
+  const byQk = new Map();
+  let unmappedQuestions = 0;
+  bankQuestionPool().forEach(q => {
+    if (!q || typeof q !== 'object') return;
+    const uid = questionUid(q);
+    if (uid) byUid.set(uid, q);
+    if (q.qid) byUid.set(q.qid, q);
+    const key = qk(q);
+    if (key) byQk.set(key, q);
+    if (isQuestionDeleted(q) || q.quarantined) return;
+    const subject = subjects[canonSubj(q.s)];
+    const unit = questionScopeUnit(q);
+    if (!subject || unit == null || unit < 1 || unit > subject.unitCount) {
+      unmappedQuestions++;
+      return;
+    }
+    const entry = subject.units[unit];
+    entry.bankCount++;
+    if (q.unit_name && entry.name === `Unit ${unit}`) entry.name = String(q.unit_name);
+  });
+
+  const resolveRecordQuestion = rec => {
+    if (!rec) return null;
+    return (rec.uid && byUid.get(rec.uid)) || (rec.qid && byUid.get(rec.qid)) || (rec.k && byQk.get(rec.k)) || null;
+  };
+  const recordUnit = rec => {
+    const q = resolveRecordQuestion(rec);
+    if (!q) return null;
+    const subject = subjects[canonSubj(q.s)];
+    const unit = questionScopeUnit(q);
+    if (!subject || unit == null || unit < 1 || unit > subject.unitCount) return null;
+    return { subject, entry: subject.units[unit], q };
+  };
+
+  const latestByIdentity = new Map();
+  (L || []).forEach(rec => {
+    if (!rec || rec.mock === 1) return;
+    const found = recordUnit(rec);
+    if (!found) return;
+    const identity = questionUid(found.q) || qk(found.q);
+    const prev = latestByIdentity.get(identity);
+    if (!prev || (rec.t || 0) >= (prev.rec.t || 0)) latestByIdentity.set(identity, { rec, entry: found.entry });
+  });
+  latestByIdentity.forEach(({ rec, entry }) => {
+    entry.touchedCount++;
+    const conf = rec.cf != null ? rec.cf : (rec.conf != null ? rec.conf : null);
+    const skipped = rec.skipped === true || rec.ch === -1;
+    if (rec.ok === true && !skipped && (conf == null || conf >= 2)) entry.knownCount++;
+  });
+  (L || []).forEach(rec => {
+    if (!rec || rec.mock === 1) return;
+    const conf = rec.cf != null ? rec.cf : (rec.conf != null ? rec.conf : null);
+    const skipped = rec.skipped === true || rec.ch === -1;
+    const found = recordUnit(rec);
+    if (!found) return;
+    if (rec.ok === true && !skipped && (conf == null || conf >= 2)) {
+      found.entry.knownDays.add(localDateKey(rec.t || 0));
+    }
+    if (!rec.ok && !skipped && conf === 3 && (now - (rec.t || 0)) < sevenDays) {
+      found.entry.recentConf3Miss = true;
+    }
+  });
+
+  Object.values(subjects).forEach(subject => {
+    Object.values(subject.units).forEach(entry => {
+      const threshold = Math.min(2, entry.bankCount);
+      entry.solid = entry.bankCount > 0 && entry.knownCount >= threshold && entry.knownDays.size >= 2 && !entry.recentConf3Miss;
+    });
+    subject.touchedUnits = Object.values(subject.units).filter(entry => entry.touchedCount > 0).length;
+    subject.solidUnits = Object.values(subject.units).filter(entry => entry.solid).length;
+    subject.bankSupportedUnits = Object.values(subject.units).filter(entry => entry.bankCount > 0).length;
+  });
+  const subjectList = Object.values(subjects);
+  const missingBankUnits = [];
+  subjectList.forEach(subject => {
+    Object.values(subject.units).forEach(entry => {
+      if (entry.bankCount === 0) missingBankUnits.push({ subject: subject.subject, unit: entry.unit, name: entry.name });
+    });
+  });
+  return {
+    subjects,
+    subjectList,
+    totalUnits: SYLLABUS_TOTAL_UNITS,
+    touchedUnits: subjectList.reduce((sum, subject) => sum + subject.touchedUnits, 0),
+    solidUnits: subjectList.reduce((sum, subject) => sum + subject.solidUnits, 0),
+    bankSupportedUnits: subjectList.reduce((sum, subject) => sum + subject.bankSupportedUnits, 0),
+    missingBankUnits,
+    unmappedQuestions
+  };
+}
+
+function coverageUnitOfQuestion(snapshot, q) {
+  if (!snapshot || !q) return null;
+  const subject = snapshot.subjects[canonSubj(q.s)];
+  const unit = questionScopeUnit(q);
+  return subject && unit != null ? (subject.units[unit] || null) : null;
+}
+
+function pickCoverageQuestions(pool, limit, snapshot, opts = {}) {
+  const snap = snapshot || calculateUnitCoverage();
+  const doneToday = opts.doneToday || questionsAnsweredToday();
+  const excluded = opts.exclude || new Set();
+  const questions = [];
+  const unmapped = [];
+  const seen = new Set();
+  (pool || []).forEach(q => {
+    if (!q || !normalSessionEligible(q) || isQuestionDeleted(q) || q.quarantined) return;
+    const identity = questionUid(q) || qk(q);
+    if (seen.has(identity) || excluded.has(identity) || wasAnsweredToday(q, doneToday)) return;
+    seen.add(identity);
+    const unit = coverageUnitOfQuestion(snap, q);
+    if (unit) questions.push({ q, identity, unit });
+    else unmapped.push({ q, identity });
+  });
+  if (!questions.length && (!opts.includeUnmapped || !unmapped.length)) return [];
+
+  const rankItems = items => items.sort((a, b) => {
+    const va = V[qk(a.q)] || {}, vb = V[qk(b.q)] || {};
+    const ha = va.history && va.history.length ? va.history[va.history.length - 1] : null;
+    const hb = vb.history && vb.history.length ? vb.history[vb.history.length - 1] : null;
+    const unseenA = !V[qk(a.q)] ? 0 : 1;
+    const unseenB = !V[qk(b.q)] ? 0 : 1;
+    if (unseenA !== unseenB) return unseenA - unseenB;
+    const wrongA = ha && !ha.ok ? 0 : 1;
+    const wrongB = hb && !hb.ok ? 0 : 1;
+    if (wrongA !== wrongB) return wrongA - wrongB;
+    return (effLevel(a.q) - effLevel(b.q)) || (Math.random() - 0.5);
+  });
+
+  const groups = new Map();
+  questions.forEach(item => {
+    const key = `${item.unit.subject}::${item.unit.unit}`;
+    if (!groups.has(key)) groups.set(key, { key, unit: item.unit, items: [] });
+    groups.get(key).items.push(item);
+  });
+  const sortedGroups = [...groups.values()];
+  sortedGroups.forEach(group => rankItems(group.items));
+  sortedGroups.sort((a, b) => {
+    const ua = a.unit, ub = b.unit;
+    const untouchedA = ua.touchedCount === 0 ? 0 : 1;
+    const untouchedB = ub.touchedCount === 0 ? 0 : 1;
+    if (untouchedA !== untouchedB) return untouchedA - untouchedB;
+    if (ua.solid !== ub.solid) return ua.solid ? 1 : -1;
+    const ratioA = ua.knownCount / Math.max(1, ua.bankCount);
+    const ratioB = ub.knownCount / Math.max(1, ub.bankCount);
+    if (ratioA !== ratioB) return ratioA - ratioB;
+    const sa = snap.subjects[ua.subject], sb = snap.subjects[ub.subject];
+    const subjectRatioA = sa ? sa.touchedUnits / Math.max(1, sa.unitCount) : 1;
+    const subjectRatioB = sb ? sb.touchedUnits / Math.max(1, sb.unitCount) : 1;
+    if (subjectRatioA !== subjectRatioB) return subjectRatioA - subjectRatioB;
+    return (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  });
+
+  const maxPerUnit = Math.max(1, opts.maxPerUnit || 2);
+  const selected = [];
+  const used = new Set();
+  for (let round = 0; round < maxPerUnit && selected.length < limit; round++) {
+    for (const group of sortedGroups) {
+      if (selected.length >= limit) break;
+      const next = group.items.find(item => !used.has(item.identity));
+      if (!next) continue;
+      used.add(next.identity);
+      selected.push(next.q);
+    }
+  }
+  if (opts.includeUnmapped && selected.length < limit && unmapped.length) {
+    rankItems(unmapped);
+    for (const item of unmapped) {
+      if (selected.length >= limit) break;
+      selected.push(item.q);
+    }
+  }
+  return selected;
+}
+
 function diagnosticSubjectStats() {
   const mockRecords = (L || []).filter(rec => rec && rec.mock === 1);
   if (!mockRecords.length) return { available: false, subjects: {}, source: 'none' };
@@ -5237,10 +5592,11 @@ function syncStatusChip() {
   return `<button class="chip ${cls}" style="cursor:pointer" onclick="openSettings()" title="${esc(st.message || label)}">${label}</button>`;
 }
 
-function renderReadinessMeter() {
-  if (!D || !D.length) return '';
-  const TARGET_MARK = 75;
+function renderReadinessMeter(coverageSnapshot) {
+  if (!(D && D.length) && !bankQuestionPool().length) return '';
+  const TARGET_MARK = Number(localStorage.getItem('bitmcq_target_mark')) || 80;
   const stats = readinessStats();
+  const unitCoverage = coverageSnapshot || calculateUnitCoverage();
   const overall = stats.overall;
   const projectedMark = Math.round(overall.score * 1000) / 10;
   const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
@@ -5276,6 +5632,14 @@ function renderReadinessMeter() {
 
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
   const unattemptedInDeck = [...activeDeckSubjs].filter(s => !stats.subjects[s]);
+  const nextUntouched = [];
+  unitCoverage.subjectList.forEach(subject => {
+    Object.values(subject.units).forEach(entry => {
+      if (entry.bankCount > 0 && entry.touchedCount === 0) nextUntouched.push(entry);
+    });
+  });
+  const nextUntouchedPreview = nextUntouched.slice(0, 6);
+  const missingBankPreview = unitCoverage.missingBankUnits.slice(0, 6);
 
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
@@ -5291,7 +5655,7 @@ function renderReadinessMeter() {
         ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
       </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded.</p>
+    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded. Unit coverage measures breadth; Due Review and Mistakes are retention, not breadth.</p>
 
     <div class="readiness-container">
       <div class="readiness-ring-wrap">
@@ -5307,12 +5671,16 @@ function renderReadinessMeter() {
       <div style="flex:1;min-width:200px">
         <div class="row" style="gap:6px;margin-bottom:8px">
           <span class="chip">🔒 Locked in: <b>${lockedCount}/${studiedTotal} studied</b> (${lockedPct}%)</span>
-          <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">Gap: <b>${markGap >= 0 ? '+' : ''}${markGap} marks</b></span>
+          <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">${markGap >= 0 ? 'Ahead: <b>+' + markGap + ' marks</b>' : 'Gap: <b>' + markGap + ' marks</b>'}</span>
         </div>
-        <div class="row sm mu" style="gap:10px">
+        <div class="row sm mu" style="gap:10px;flex-wrap:wrap">
           <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions</span>
           <span>✅ Raw first-attempt: <b>${Math.round(overall.raw * 100)}%</b></span>
           <span>🎯 L0 mastered: <b>${l0Mastered}/${l0Tracked}</b> subjects</span>
+          <span>🧭 Units touched: <b>${unitCoverage.touchedUnits}/${unitCoverage.totalUnits}</b></span>
+          <span>🛡️ Solid units: <b>${unitCoverage.solidUnits}/${unitCoverage.totalUnits}</b></span>
+          <span>🏦 Bank supports: <b>${unitCoverage.bankSupportedUnits}/${unitCoverage.totalUnits}</b></span>
+          ${unitCoverage.unmappedQuestions ? `<span>⚠️ Unmapped questions: <b>${unitCoverage.unmappedQuestions}</b></span>` : ''}
         </div>
       </div>
     </div>
@@ -5325,6 +5693,8 @@ function renderReadinessMeter() {
     <div class="subject-card-grid">
       ${rows.map(r => {
         const fixCount = (FIX_DAYS[r.k] || []).length;
+        const cov = unitCoverage.subjects[canonSubj(r.k)];
+        const covText = cov ? `${cov.touchedUnits}/${cov.unitCount} units` : '';
         let dotClass = 'dot-gray';
         let statusText = `Calibrating (${r.tot}/15)`;
         if (r.isCalibrated) {
@@ -5342,13 +5712,16 @@ function renderReadinessMeter() {
             <div class="row sm" style="align-items:center;font-size:12px;margin-top:2px">
               <span class="status-dot ${dotClass}"></span>
               <b>${statusText}</b>
-              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d · ${Math.round((typeof r.acc==='number'?r.acc:0)*100)}%</span>
+              <span class="mu" style="margin-left:auto">${covText ? covText + ' · ' : ''}${r.tot} att · ${fixCount}d · ${Math.round((typeof r.acc==='number'?r.acc:0)*100)}%</span>
             </div>
           </div>
         `;
       }).join('')}
     </div>
     ${unattemptedInDeck.length ? `<p class="mu sm" style="margin-top:14px">📚 <b>Not yet attempted in active deck:</b> ${unattemptedInDeck.map(s => esc(s)).join(' · ')}</p>` : ''}
+    ${nextUntouchedPreview.length ? `<p class="mu sm" style="margin-top:8px">🧭 <b>Next untouched units:</b> ${nextUntouchedPreview.map(entry => esc(`${entry.subject} U${entry.unit} ${entry.name}`)).join(' · ')}</p>` : ''}
+    ${missingBankPreview.length ? `<p class="mu sm" style="margin-top:8px">🏦 <b>No bank questions yet:</b> ${missingBankPreview.map(entry => esc(`${entry.subject} U${entry.unit} ${entry.name}`)).join(' · ')}</p>` : ''}
+    ${unitCoverage.unmappedQuestions ? `<p class="mu sm" style="margin-top:8px">⚠️ <b>${unitCoverage.unmappedQuestions} bank questions have no numeric unit.</b> They stay in practice but are excluded from coverage.</p>` : ''}
   </div>
   `;
 }
@@ -5391,42 +5764,35 @@ function bankSubjects() {
 function selectSubjectDrillQuestions(subjectName, requestedCount) {
   const norm = canonSubj(subjectName);
   const seen = new Set();
+  const doneToday = questionsAnsweredToday();
   const pool = bankQuestionPool().filter(q => {
     if (!q || canonSubj(q.s) !== norm) return false;
-    if (q.quarantined || !normalSessionEligible(q)) return false;
+    if (q.quarantined || !normalSessionEligible(q) || wasAnsweredToday(q, doneToday)) return false;
     const key = qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 
-  const rank = q => {
-    const rec = V[qk(q)];
-    const history = rec && Array.isArray(rec.history) ? rec.history : [];
-    if (!history.length) return 0;
-    const last = history[history.length - 1];
-    const dueDay = rec && (typeof rec.d === 'number' ? rec.d : rec.due);
-    if ((last && !last.ok) || (typeof dueDay === 'number' && dueDay <= today())) return 1;
-    return 2;
-  };
-
-  pool.sort((a, b) => {
-    const ra = rank(a), rb = rank(b);
-    if (ra !== rb) return ra - rb;
-    const la = effLevel(a), lb = effLevel(b);
-    if (la !== lb) return la - lb;
-    return Math.random() - 0.5;
-  });
-
   const wanted = Number.isFinite(requestedCount) ? Math.floor(requestedCount) : 15;
   const count = Math.max(1, Math.min(pool.length, wanted));
-  return { pool, selected: pool.slice(0, count), total: pool.length };
+  const unitKeys = new Set(pool.map(q => {
+    const unit = questionScopeUnit(q);
+    return unit == null ? null : `${canonSubj(q.s)}::${unit}`;
+  }).filter(Boolean));
+  const maxPerUnit = Math.max(2, Math.ceil(count / Math.max(1, unitKeys.size)));
+  const selected = pickCoverageQuestions(pool, count, calculateUnitCoverage(), { maxPerUnit, doneToday, includeUnmapped: true });
+  return { pool, selected, total: pool.length };
 }
 
 function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
   const result = selectSubjectDrillQuestions(subjectName, requestedCount);
   if (!result.pool.length) {
     alert('No questions found for subject: ' + subjectName);
+    return;
+  }
+  if (!result.selected.length) {
+    alert('No mapped syllabus-unit questions are available for: ' + subjectName);
     return;
   }
   if (result.total < requestedCount) {
@@ -5537,19 +5903,14 @@ function home(preserveScroll = false) {
 
   const maxCap = getMaxInterval();
   const due = dueKeys();
-  const un = D.filter(q => !R[q.n] && normalSessionEligible(q)).map(q => q.n);
-  const wr = D.filter(q => R[q.n] === 'w' && normalSessionEligible(q)).map(q => q.n);
-  const sk = D.filter(q => R[q.n] === 's' && normalSessionEligible(q)).map(q => q.n);
-  const freshCount = (D || []).filter(q => !V[qk(q)] && normalSessionEligible(q)).length;
+  const wr = currentPracticeQuestions('w').map(sessionKeyForQuestion);
+  const sk = currentPracticeQuestions('s').map(sessionKeyForQuestion);
   const codeTraceDue = codeTraceDueQuestions().length;
   const codeTraceCount = codeTracePool().length;
   const showCodeTraceReminder = codeTraceCount > 0 && codeTraceReminderDue();
-  const bankForFresh = BANKS.find(bank => bank.id === SETBANK) || BANKS[0];
-  const isCurrentBankSet = bankForFresh && bankForFresh.id === SETBANK && SETI >= 0;
-  const currentBankSetComplete = isCurrentBankSet && D.length > 0 && D.every(q => !!R[q.n]);
-  const freshButtonText = bankForFresh
-    ? (isCurrentBankSet && !currentBankSetComplete ? `📚 Continue Set ${SETI + 1}` : `📚 Next Set · ${esc(bankForFresh.name)}`)
-    : `✨ Fresh Questions (up to ${Math.max(10, Math.round(todayMins * 60 / 50))} Q)`;
+  const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !V[qk(q)]).length;
+  const freshButtonText = `✨ Practice Unseen Questions (${freshCount} available)`;
+  const coverage = calculateUnitCoverage();
   const drillSubjects = bankSubjects();
   const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
 
@@ -5630,11 +5991,12 @@ function home(preserveScroll = false) {
       <div class="row" style="justify-content:space-between">
         <div>
           <h2 style="margin:0 0 4px">🎯 Today's Mission</h2>
-          <div class="mu">Interleaved · easy first question, due items, weakest subject</div>
+          <div class="mu">Interleaved · easy first, capped due review, weak subjects, then least-covered units</div>
         </div>
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
           <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
+          <span class="chip">🧭 Units: <b>${coverage.touchedUnits}/${coverage.totalUnits}</b></span>
           ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession()">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
@@ -5686,15 +6048,20 @@ function home(preserveScroll = false) {
           🧑‍💻 Code Trace Drill · 10–15 Q
         </button>
       </div>
-      <div class="mu sm" style="text-align:center;margin-top:6px">Prioritized by spaced-repetition due date and weak areas</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">Due and weak practice are capped so breadth gets a share of every session</div>
 
-      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${bankForFresh || freshCount ? '' : 'disabled'}>
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCoverageMission()">
+        🧭 Coverage Mission · ${coverage.touchedUnits}/${coverage.totalUnits} units touched
+      </button>
+      <div class="mu sm" style="text-align:center;margin-top:6px">Least-covered units first · ${coverage.bankSupportedUnits}/${coverage.totalUnits} units have bank questions · ${coverage.missingBankUnits.length} bank gap(s)</div>
+
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
         ${freshButtonText}
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">${bankForFresh ? 'Finish current set before advancing.' : `${freshCount} unseen questions available`}</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">${freshCount} unattempted questions across all 19 subjects</div>
     </div>
 
-    ${renderReadinessMeter()}
+    ${renderReadinessMeter(coverage)}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
     <div class="card" style="margin-top:14px">
@@ -5711,8 +6078,8 @@ function home(preserveScroll = false) {
           </div>
           <div class="row" style="margin-bottom:12px;gap:6px">
             <button class="sm" onclick="startMistakes()" ${wr.length ? '' : 'disabled'}>Retry mistakes (capped at 5)</button>
-            <button class="sm" onclick="start(${JSON.stringify(un)})" ${un.length ? '' : 'disabled'}>Unattempted (${un.length})</button>
-            <button class="sm" onclick="start(${JSON.stringify(sk)})" ${sk.length ? '' : 'disabled'}>Skipped (${sk.length})</button>
+            <button class="sm" onclick="startUnattemptedSession()" ${freshCount ? '' : 'disabled'}>Unattempted (${freshCount})</button>
+            <button class="sm" onclick="startSkippedSession()" ${sk.length ? '' : 'disabled'}>Skipped (${sk.length})</button>
           </div>
 
           <div class="row" style="margin-top:12px">
@@ -5725,7 +6092,10 @@ function home(preserveScroll = false) {
           </div>
 
           <hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
-          ${bankCard()}
+          <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <span class="sm mu">📚 <b>${(BANKS || []).reduce((n, b) => n + (Array.isArray(b.q) ? b.q.length : 0), 0)}</b> questions loaded across ${(BANKS || []).length} bank(s)</span>
+            <button class="sm" onclick="forceReloadBank()">🔄 Reload bundled bank</button>
+          </div>
           ${revCard()}
           <div style="margin-top:14px">
             <h3>Error Log &amp; Data Export</h3>
@@ -5746,7 +6116,7 @@ function home(preserveScroll = false) {
 function startToday() {
   const qList = buildTodaySession(todayMins, false);
   if (!qList.length) {
-    alert('No questions available in the current set.');
+    alert('All available questions have been completed for today! Check back tomorrow or try a subject drill or mock.');
     return;
   }
   start(qList);
@@ -5754,7 +6124,12 @@ function startToday() {
 
 function buildRevisionSession(limit = 12) {
   const questions = new Map();
-  (D || []).forEach(q => questions.set(qk(q), { key: q.n, q }));
+  const doneToday = questionsAnsweredToday();
+  bankQuestionPool().forEach(q => {
+    if (q && normalSessionEligible(q)) {
+      questions.set(qk(q), { key: q.n != null ? q.n : (questionUid(q) || qk(q)), q });
+    }
+  });
   A.forEach((attempt, ai) => (attempt.errs || []).forEach((q, qi) => {
     const key = `${ai}:${qi}`;
     questions.set(qk(q), { key, q });
@@ -5772,6 +6147,7 @@ function buildRevisionSession(limit = 12) {
   const candidates = [...questions.entries()]
     .map(([key, item]) => {
       if (!normalSessionEligible(item.q)) return null;
+      if (wasAnsweredToday(item.q, doneToday)) return null;
       const history = V[key] && Array.isArray(V[key].history) ? V[key].history : [];
       if (!history.length) return null;
       const correct = history.filter(h => h.ok).length;
@@ -5810,91 +6186,59 @@ function startCommuteQuick() {
 }
 
 function startQuickMode() {
-  if (!D || !D.length) {
-    if (BANKS.length && BANKS[0].sets && BANKS[0].sets[0]) {
-      loadSet(BANKS[0].id, 0);
-    }
-  }
-  const pool = (D || []).filter(q => q && effQuick(q) && normalSessionEligible(q));
-  if (!pool.length) { alert('No quick questions available in the current active deck.'); return; }
-  pool.sort((a,b)=>{
-    const la = effLevel(a);
-    const lb = effLevel(b);
-    return la - lb;
+  const doneToday = questionsAnsweredToday();
+  const pool = bankQuestionPool().filter(q =>
+    q && effQuick(q) && normalSessionEligible(q) && !wasAnsweredToday(q, doneToday)
+  );
+  if (!pool.length) { alert('No quick questions are left for today. Try again tomorrow or start a full practice session.'); return; }
+  pool.sort((a, b) => effLevel(a) - effLevel(b));
+  const keyOf = q => questionUid(q) || qk(q);
+  const un = pool.filter(q => !V[qk(q)]);
+  const due = pool.filter(q => {
+    const v = V[qk(q)];
+    if (!v) return false;
+    const dueDay = typeof v.d === 'number' ? v.d : v.due;
+    return typeof dueDay === 'number' && dueDay <= today();
   });
-  const un = pool.filter(q => !R[q.n]).map(q=>q.n);
-  const due = pool.filter(q => R[q.n] === 'w' || (V[qk(q)] && (V[qk(q)].d <= today() || V[qk(q)].due <= today()))).map(q=>q.n);
-  const rest = pool.filter(q => !un.includes(q.n) && !due.includes(q.n)).map(q=>q.n);
-  let list = [...due, ...un, ...rest];
+  const unKeys = new Set(un.map(keyOf));
+  const dueKeysSet = new Set(due.map(keyOf));
+  const rest = pool.filter(q => !unKeys.has(keyOf(q)) && !dueKeysSet.has(keyOf(q)));
   const seen = new Set();
-  list = list.filter(n=>{ if(n == null || seen.has(n)) return false; seen.add(n); return true; });
-  if(!list.length){ alert('No quick questions available.'); return; }
+  const list = [...due, ...un, ...rest].filter(q => {
+    const key = keyOf(q);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!list.length) { alert('No quick questions available.'); return; }
   isQuick = true;
   try { localStorage.setItem('bitmcq_quick', 'true'); } catch(e){}
-  start(list.slice(0, Math.max(10, Math.round((todayMins||15)*0.8))));
+  start(list.slice(0, Math.max(10, Math.round((todayMins || 15) * 0.8))).map(keyOf));
 }
 
 function startFreshSet() {
-  const day = today();
   const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
-
-  if (BANKS.length) {
-    const bank = BANKS.find(item => item.id === SETBANK) || BANKS[0];
-    const isActiveSet = SETBANK === bank.id && SETI >= 0;
-    const currentComplete = isActiveSet && D.length > 0 && D.every(q => !!R[q.n]);
-
-    if (lastFreshSetDay === day) {
-      if (!isActiveSet || currentComplete) {
-        alert('You have already started today’s set. The next set is available tomorrow.');
-        return;
-      }
-      const remaining = D.filter(q => !R[q.n] && normalSessionEligible(q)).map(q => q.n);
-      if (!remaining.length) {
-        alert('You have finished today’s set. The next set is available tomorrow.');
-        return;
-      }
-      start(remaining);
-      return;
-    }
-
-    if (isActiveSet && !currentComplete) {
-      const remaining = D.filter(q => !R[q.n] && normalSessionEligible(q)).map(q => q.n);
-      const questions = remaining.length ? remaining : D.filter(q => normalSessionEligible(q)).map(q => q.n);
-      lastFreshSetDay = day;
-      save();
-      start(questions);
-      return;
-    }
-
-    const completed = new Set(A
-      .filter(attempt => attempt.bankId === bank.id && isArchivedSetComplete(attempt))
-      .map(attempt => attempt.bi));
-    if (isActiveSet) completed.add(SETI);
-    const firstIndex = isActiveSet ? (SETI + 1) % bank.sets.length : 0;
-    let nextIndex = -1;
-    for (let offset = 0; offset < bank.sets.length; offset++) {
-      const index = (firstIndex + offset) % bank.sets.length;
-      if (!completed.has(index)) {
-        nextIndex = index;
-        break;
-      }
-    }
-    if (nextIndex < 0) {
-      alert(`You have completed all ${bank.sets.length} sets in ${bank.name}.`);
-      return;
-    }
-
-    lastFreshSetDay = day;
-    loadSet(bank.id, nextIndex, true);
+  const pool = bankQuestionPool().filter(q => normalSessionEligible(q) && !V[qk(q)]);
+  if (!pool.length) {
+    alert('All normal-session bank questions have been attempted. Use Today’s Mission or Due Review to keep practiced questions solid.');
     return;
   }
-
-  const qList = D.filter(q => !V[qk(q)] && normalSessionEligible(q)).map(q => q.n).sort(() => Math.random() - 0.5).slice(0, targetQ);
-  if (!qList.length) {
-    alert('No unseen questions are available in the current set.');
+  const pick = pickCoverageQuestions(pool, targetQ, calculateUnitCoverage(), { maxPerUnit: 2, includeUnmapped: true });
+  if (!pick.length) {
+    alert('No unattempted questions are left for today. Use Today’s Mission or Due Review to keep practiced questions solid.');
     return;
   }
-  start(qList);
+  start(pick.map(q => questionUid(q) || qk(q)));
+}
+
+function startCoverageMission() {
+  const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
+  const pick = pickCoverageQuestions(bankQuestionPool(), targetQ, calculateUnitCoverage(), { maxPerUnit: 2, includeUnmapped: true });
+  if (!pick.length) {
+    alert('No coverage questions are available right now. Questions already answered today are excluded.');
+    return;
+  }
+  start(pick.map(q => questionUid(q) || qk(q)));
 }
 
 function startSubjectDrill() {
@@ -5927,11 +6271,108 @@ function startDueReview() {
   start(due.slice(0, 15));
 }
 
+function isCodeSnippetQuestion(q) {
+  if (!q) return false;
+  if (isLongCodeTraceQuestion(q)) return true;
+  const code = codeBlockText(q);
+  if (code && (looksLikeCode(code) || /#include|printf|scanf|cout|cin|int |void |char |for\s*\(|while\s*\(|System\.out|console\.log|<\?php|\becho\b/i.test(code))) return true;
+  const s = String(q.s || '').toLowerCase();
+  const stem = String(q.q || '');
+  if ((s.includes('c prog') || s.includes('c++') || s.includes('data structure')) &&
+      (code || looksLikeCode(stem) || /#include|printf|scanf|cout|cin/i.test(stem))) {
+    return true;
+  }
+  return false;
+}
+
+// Deterministic Math/Calc Families (verified in code, 100% accurate, zero AI hallucination)
+const rndInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pickItem = arr => arr[rndInt(0, arr.length - 1)];
+const shuffleList = arr => arr.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
+
+function calcOptions(answer, candidates) {
+  const seen = new Set([answer]);
+  const opts = [answer];
+  for (const candidate of candidates) {
+    if (opts.length >= 4) break;
+    const value = Number(candidate);
+    if (!Number.isFinite(value) || seen.has(value)) continue;
+    seen.add(value);
+    opts.push(value);
+  }
+  let bump = 1;
+  while (opts.length < 4) {
+    const value = answer + bump++;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    opts.push(value);
+  }
+  return shuffleList(opts);
+}
+
+function genPageBitsQuestion() {
+  const pageKB = pickItem([1, 2, 4, 8]);
+  const spaceKB = pageKB * pickItem([16, 32, 64, 128, 256]);
+  const pageBits = Math.log2(spaceKB / pageKB);
+  const offsetBits = Math.log2(pageKB * 1024);
+  const totalBits = Math.log2(spaceKB * 1024);
+  const four = calcOptions(pageBits, [offsetBits, totalBits, Math.log2(spaceKB), spaceKB / pageKB]);
+  return {
+    id: `calc_os_page_${spaceKB}_${pageKB}`,
+    s: 'Operating Systems',
+    q: `A system has a ${spaceKB} KB virtual address space and ${pageKB} KB pages. How many bits form the page number (VPN)?`,
+    o: four.map(String),
+    a: four.indexOf(pageBits),
+    e: `${spaceKB} KB / ${pageKB} KB = ${spaceKB / pageKB} pages = 2^${pageBits}. So ${pageBits} bits form the page number.`,
+    calc: true,
+    needs_paper: true,
+    type: 'calc',
+    level: 0
+  };
+}
+
+function genDetScaleQuestion() {
+  const n = pickItem([2, 3, 4]); const k = pickItem([2, 3]); const d = pickItem([2, 3, 4, 5]);
+  const ans = Math.pow(k, n) * d;
+  const four = calcOptions(ans, [k * d, Math.pow(k, 2) * d, Math.pow(k, n), k * n * d]);
+  return {
+    id: `calc_det_${n}x${n}_k${k}_d${d}`,
+    s: 'Linear & Abstract Algebra',
+    q: `A is a ${n}x${n} matrix with det(A) = ${d}. What is det(${k}A)?`,
+    o: four.map(String),
+    a: four.indexOf(ans),
+    e: `det(kA) = k^n * det(A) = ${k}^${n} * ${d} = ${ans}.`,
+    calc: true,
+    needs_paper: true,
+    type: 'calc',
+    level: 0
+  };
+}
+
+function genPipelineCyclesQuestion() {
+  const k = pickItem([4, 5, 6]);
+  const n = pickItem([10, 20, 50, 100]);
+  const ans = k + n - 1;
+  const four = calcOptions(ans, [k * n, k + n, (k - 1) * n, k + n - 2]);
+  return {
+    id: `calc_pipeline_k${k}_n${n}`,
+    s: 'Microprocessor & Computer Architecture',
+    q: `In a processor pipeline with ${k} stages and no stalls or hazards, how many clock cycles are needed to execute ${n} independent instructions?`,
+    o: four.map(String),
+    a: four.indexOf(ans),
+    e: `Clock cycles = k + (n - 1) = ${k} + (${n} - 1) = ${ans}.`,
+    calc: true,
+    needs_paper: true,
+    type: 'calc',
+    level: 0
+  };
+}
+
 function codeTracePool() {
   const seen = new Set();
   return bankQuestionPool().filter(q => {
     if (!q || isQuestionDeleted(q) || q.quarantined || isColdQuestion(q)) return false;
-    if (!isLongCodeTraceQuestion(q)) return false;
+    if (!isCodeSnippetQuestion(q)) return false;
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -5951,16 +6392,16 @@ function startCalcTraceSession() {
   const seen = new Set();
   const candidates = bankQuestionPool().filter(q => {
     if (!q || isQuestionDeleted(q) || q.quarantined || isColdQuestion(q)) return false;
+    if (isCodeSnippetQuestion(q)) return false; // Code traces strictly stay in Code Trace drill!
     const type = String(q.type || '').toLowerCase();
-    if (!(q.calc || q.needs_paper || type === 'calc' || type === 'trace')) return false;
-    if (isLongCodeTraceQuestion(q)) return false;
+    if (!(q.calc || q.needs_paper || type === 'calc')) return false;
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
   if (!candidates.length) {
-    alert('No calculation or short tracing questions are available in the loaded bank.');
+    alert('No calculation questions are available in the loaded bank. Try tapping Reload Default Bank in Settings.');
     return;
   }
   candidates.sort((a, b) => {
@@ -5968,7 +6409,21 @@ function startCalcTraceSession() {
     if (lvl) return lvl;
     return Math.random() - 0.5;
   });
-  start(candidates.slice(0, 15).map(q => questionUid(q) || qk(q)));
+  // Add deterministic, code-verified calculation families so the drill never
+  // runs dry and never depends on AI correctness.
+  const generated = [genPageBitsQuestion(), genDetScaleQuestion(), genPipelineCyclesQuestion()];
+  const selected = candidates.slice(0, 12);
+  const sessionKeys = new Set(candidates.map(q => questionUid(q) || qk(q)));
+  generated.forEach(q => {
+    const key = questionUid(q) || qk(q);
+    if (sessionKeys.has(key)) return;
+    sessionKeys.add(key);
+    selected.push(q);
+  });
+  clearDrillDeck();
+  DRILL_SUBJECT = 'Math / Calc Mixed';
+  DRILL_D = selected.slice(0, 15).map((q, i) => ({ ...q, n: DRILL_N_BASE + i }));
+  start(DRILL_D.map(q => q.n));
 }
 
 function startCodeTraceSession() {
@@ -6011,17 +6466,37 @@ function snoozeCodeTraceReminder() {
 }
 
 function startMistakes() {
-  const wr = D.filter(q => R[q.n] === 'w' && normalSessionEligible(q)).map(q => q.n);
-  if (!wr.length) { alert('No practice mistakes yet. Long code traces are available in the Code Trace Drill.'); return; }
+  const wr = currentPracticeQuestions('w').map(sessionKeyForQuestion);
+  if (!wr.length) { alert('No practice mistakes left for today. Long code traces are available in the Code Trace Drill.'); return; }
   start(wr.slice(0, 10));
 }
 
 function startMistakesBySubject(subjectName){
   if(!subjectName){ alert('Select a subject.'); return; }
   const norm = canonSubj(subjectName);
-  const wr = D.filter(q => R[q.n] === 'w' && canonSubj(q.s)===norm && normalSessionEligible(q)).map(q=>q.n);
-  if(!wr.length){ alert('No practice mistakes for this subject. Long code traces are available in the Code Trace Drill.'); return; }
+  const wr = currentPracticeQuestions('w')
+    .filter(q => canonSubj(q.s) === norm)
+    .map(sessionKeyForQuestion);
+  if(!wr.length){ alert('No practice mistakes for this subject today. Long code traces are available in the Code Trace Drill.'); return; }
   start(wr.slice(0,20));
+}
+
+function startUnattemptedSession() {
+  const doneToday = questionsAnsweredToday();
+  const pool = bankQuestionPool().filter(q =>
+    q && normalSessionEligible(q) && !V[qk(q)] && !wasAnsweredToday(q, doneToday)
+  );
+  if (!pool.length) { alert('No unattempted questions are left for today. Try the Due Review or a full mock.'); return; }
+  const targetQ = Math.max(10, Math.round((todayMins || 15) * 60 / 50));
+  const pick = pickCoverageQuestions(pool, targetQ, calculateUnitCoverage(), { maxPerUnit: 2, doneToday, includeUnmapped: true });
+  if (!pick.length) { alert('No unattempted questions are left for today. Try the Due Review or a full mock.'); return; }
+  start(pick.map(sessionKeyForQuestion));
+}
+
+function startSkippedSession() {
+  const sk = currentPracticeQuestions('s').map(sessionKeyForQuestion);
+  if (!sk.length) { alert('No skipped questions are left for today.'); return; }
+  start(sk.slice(0, 20));
 }
 
 function editExamDate() {
@@ -6253,26 +6728,15 @@ function show() {
               </div>
             `}
 
-            ${(!MK && !hist.locked && !(isReview && recallFirst)) ? `
-              ${CURRENT_Q && CURRENT_Q.qType === 'fr' ? `
-                <div class="card" style="margin-top:10px;padding:10px 12px">
-                  <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
-                    <input id="free-answer" type="text" placeholder="Type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();submitFreeResponse();}">
-                    <button class="sm p" onclick="submitFreeResponse()">Submit answer</button>
-                  </div>
-                  <div class="mu sm" style="margin-top:6px">After submission you’ll see the expected answer/explanation and confirm correct/wrong (Confidence 2, Unsure).</div>
-                  <div id="free-answer-panel"></div>
+            ${(!MK && !hist.locked && !(isReview && recallFirst) && CURRENT_Q && CURRENT_Q.qType === 'fr') ? `
+              <div class="card" style="margin-top:10px;padding:10px 12px">
+                <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+                  <input id="free-answer" type="text" placeholder="Type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();submitFreeResponse();}">
+                  <button class="sm p" onclick="submitFreeResponse()">Submit answer</button>
                 </div>
-              ` : `
-                <div class="card" style="margin-top:10px;padding:10px 12px">
-                  <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
-                    <input id="typed-answer" type="text" placeholder="Optional: type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();showTypedAnswerPanel();}">
-                    <button class="sm" onclick="showTypedAnswerPanel()">Check typed</button>
-                  </div>
-                  <div class="mu sm" style="margin-top:6px">Typed answers are self-graded as Confidence 2 (Unsure). MCQ buttons stay primary.</div>
-                  <div id="typed-answer-panel"></div>
-                </div>
-              `}
+                <div class="mu sm" style="margin-top:6px">After submission you’ll see the expected answer/explanation and confirm correct/wrong (Confidence 2, Unsure).</div>
+                <div id="free-answer-panel"></div>
+              </div>
             ` : ''}
             <div id="fb">${hist.locked ? (hist.feedbackHtml || '') : ''}</div>
           </div>
@@ -6686,7 +7150,7 @@ function pick(i, cfOverride) {
 
   if (ok) {
     if (rawQ._k) mark(rawQ._k, 1, origPickedIndex);
-    else { R[rawQ.n] = 'c'; delete W[rawQ.n]; }
+    else if (rawQ.n != null) { R[rawQ.n] = 'c'; delete W[rawQ.n]; }
     bs[i].classList.add('ok');
     const isFastMastery = timeTakenMs < 15000;
     $('#fb').innerHTML = `
@@ -6702,7 +7166,15 @@ function pick(i, cfOverride) {
           ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-          <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
+          ${(() => {
+            const rawQ2 = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (typeof byN === 'function' && Q && P < Q.length ? byN(Q[P]) : null);
+            if (!rawQ2) return '';
+            const sqk = typeof qk === 'function' ? qk(rawQ2) : '';
+            const linked = (CARDS || []).find(c => !c.grad && (c.sourceQk === sqk || c.qk === sqk));
+            return linked
+              ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>`
+              : `<button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>`;
+          })()}
         </div>
         ${resourceHtml}
         ${isLeech ? `<div class="ladder-box"><div class="ladder-title">🔥 Leech Rescue Ladder</div><div>1) Read explanation carefully  2) Do a quick drill on this unit  3) Review via flashcards tomorrow</div></div>` : ''}
@@ -6723,7 +7195,7 @@ function pick(i, cfOverride) {
   } else {
     // Wrong Answer
     if (rawQ._k) mark(rawQ._k, 0, origPickedIndex);
-    else { R[rawQ.n] = 'w'; W[rawQ.n] = origPickedIndex; }
+    else if (rawQ.n != null) { R[rawQ.n] = 'w'; W[rawQ.n] = origPickedIndex; }
     bs[i].classList.add('no');
     if (bs[CURRENT_Q.displayA]) bs[CURRENT_Q.displayA].classList.add('ok');
 
@@ -6740,15 +7212,16 @@ function pick(i, cfOverride) {
           ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-      <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
-      ${(() => {
-        const rawQ2 = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (typeof byN === 'function' && Q && P < Q.length ? byN(Q[P]) : null);
-        if (!rawQ2) return '';
-        const sqk = typeof qk === 'function' ? qk(rawQ2) : '';
-        const linked = (CARDS || []).find(c => !c.grad && (c.sourceQk === sqk || c.qk === sqk));
-        return linked ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>` : '';
-      })()}
-    </div>
+          ${(() => {
+            const rawQ2 = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (typeof byN === 'function' && Q && P < Q.length ? byN(Q[P]) : null);
+            if (!rawQ2) return '';
+            const sqk = typeof qk === 'function' ? qk(rawQ2) : '';
+            const linked = (CARDS || []).find(c => !c.grad && (c.sourceQk === sqk || c.qk === sqk));
+            return linked
+              ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>`
+              : `<button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>`;
+          })()}
+        </div>
     ${rescueLadderHtml}
     ${resourceHtml}
   </div>
@@ -6799,7 +7272,7 @@ function dontKnow() {
     };
     L.push(REC);
     if (rawQ._k) mark(rawQ._k, 0, -1);
-    else { R[rawQ.n] = 's'; }
+    else if (rawQ.n != null) { R[rawQ.n] = 's'; }
     sr(rawQ, false);
   }
 
@@ -6827,13 +7300,14 @@ function dontKnow() {
         ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
       </div>
       <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-        <button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>
         ${(() => {
           const rawQ2 = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (typeof byN === 'function' && Q && P < Q.length ? byN(Q[P]) : null);
           if (!rawQ2) return '';
           const sqk = typeof qk === 'function' ? qk(rawQ2) : '';
           const linked = (CARDS || []).find(c => !c.grad && (c.sourceQk === sqk || c.qk === sqk));
-          return linked ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>` : '';
+          return linked
+            ? `<button class="sm" onclick="viewLinkedFlashcardFromQuiz('${esc(linked.id).replace(/'/g,"\\'")}')">📖 View flashcard</button>`
+            : `<button class="sm" onclick="addFlashcardForCurrent()">➕ Add Flashcard for this concept</button>`;
         })()}
       </div>
       ${resourceHtml}
@@ -7172,10 +7646,15 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
       options: targetQ.o,
       answer: targetQ.a,
       why: targetQ.e || '',
-      avoid
+      avoid,
+      is_cold_marked: isColdQuestion(targetQ)
     };
 
-    const promptB = 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. For calculation, trace, or code questions, change the numbers/values AND the scenario, and test a related operation from the same unit. For factual, definitional, or programming-concept questions, target a related property, comparison, consequence, or application instead of copying the same tested fact. If the unit offers no meaningful sibling skill, vary the scenario/application enough that the reasoning is not a reworded copy. Rules: 1. Keep the same subject, unit/topic, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
+    const isCold = isColdQuestion(targetQ);
+    const coldRule = isCold
+      ? ' SPECIAL RULE: The student marked the source question as "Too Easy / Cold". They have already mastered this basic definition/fact. You MUST NOT rephrase or ask the same fact. You MUST generate an ADJACENT DISCRIMINATING question or sibling concept in the same unit/topic (e.g. testing the counter-rule, boundary case, or opposite side of the confusion trap).'
+      : '';
+    const promptB = 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. For calculation, trace, or code questions, change the numbers/values AND the scenario, and test a related operation from the same unit. For factual, definitional, or programming-concept questions, target a related property, comparison, consequence, or application instead of copying the same tested fact. If the unit offers no meaningful sibling skill, vary the scenario/application enough that the reasoning is not a reworded copy.' + coldRule + ' Rules: 1. Keep the same subject, unit/topic, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
 
     const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
@@ -7283,30 +7762,15 @@ function done() {
   }
   save();
   try {
-    // Check Level 0 completion per subject
+    // Check Level 0 completion per subject (full bank, stable question identity)
     const subjMap = {};
-    (BANKS||[]).forEach(b=>{
-      if(Array.isArray(b.q)) b.q.forEach(q=>{
-        const lvl = (typeof q.lvl==='number'?q.lvl:(typeof q.level==='number'?q.level:1));
-        if(lvl===0){
-          const s = canonSubj(q.s);
-          subjMap[s] = subjMap[s] || {total:0, done:0};
-          subjMap[s].total++;
-          if(R[q.n]) subjMap[s].done++;
-        }
-      });
+    bankQuestionPool().forEach(q => {
+      if (!q || effLevel(q) !== 0) return;
+      const s = canonSubj(q.s);
+      subjMap[s] = subjMap[s] || { total: 0, done: 0 };
+      subjMap[s].total++;
+      if (V[qk(q)] || (q.n != null && R[q.n])) subjMap[s].done++;
     });
-    if(D){
-      D.forEach(q=>{
-        const lvl = (typeof q.lvl==='number'?q.lvl:(typeof q.level==='number'?q.level:1));
-        if(lvl===0){
-          const s = canonSubj(q.s);
-          subjMap[s] = subjMap[s] || {total:0, done:0};
-          subjMap[s].total++;
-          if(R[q.n]) subjMap[s].done++;
-        }
-      });
-    }
     Object.keys(subjMap).forEach(s=>{
       if(subjMap[s].total>0 && subjMap[s].done===subjMap[s].total && !localStorage.getItem('bitmcq_l0done_'+s)){
         localStorage.setItem('bitmcq_l0done_'+s,'1');
@@ -7314,7 +7778,16 @@ function done() {
       }
     });
   } catch(e){}
-  const r = Q.map((n, i) => QRESULTS[i] || (typeof n === 'string' ? (A[n.split(':')[0]].errs[n.split(':')[1]].fx ? 'c' : 'w') : R[n]));
+  const r = Q.map((n, i) => {
+    if (QRESULTS[i]) return QRESULTS[i];
+    if (typeof n === 'string' && /^\d+:\d+$/.test(n)) {
+      const [a, b] = n.split(':');
+      const err = A[a] && A[a].errs && A[a].errs[b];
+      return err ? (err.fx ? 'c' : 'w') : null;
+    }
+    const q = byN(n);
+    return q && q.n != null ? R[q.n] : null;
+  });
   const c = r.filter(x => x === 'c').length;
   const w = r.filter(x => x === 'w').length;
   const s = r.filter(x => x === 's').length;
@@ -7326,6 +7799,7 @@ function done() {
   Q.forEach((k, idx) => {
     if (r[idx] === 'c') {
       const q = byN(k);
+      if (!q) return;
       const priorMiss = L.find(item => item.k === qk(q) && !item.ok && localDateKey(item.t) !== todayDateStr);
       if (priorMiss) recoveredCount++;
     }
@@ -7336,6 +7810,7 @@ function done() {
   Q.forEach((k, idx) => {
     if (r[idx] === 'c') {
       const q = byN(k);
+      if (!q) return;
       const label = q.unit_name ? `${q.s}: ${q.unit_name}` : q.s;
       if (!knownConcepts.includes(label)) knownConcepts.push(label);
     }
@@ -7347,10 +7822,12 @@ function done() {
   Q.forEach((k, idx) => {
     if (r[idx] === 'w' || r[idx] === 's') {
       const q = byN(k);
+      if (!q) return;
       const label = q.unit_name ? `${q.s}: ${q.unit_name}` : q.s;
-      if (!revisitConcepts.includes(label)) {
+      const key = sessionKeyForQuestion(q);
+      if (!revisitConcepts.includes(label) && key != null) {
         revisitConcepts.push(label);
-        revisitKeys.push(q.n);
+        revisitKeys.push(key);
       }
     }
   });
@@ -7450,7 +7927,7 @@ function done() {
           <ul style="margin:6px 0 0;padding-left:18px;font-size:13px">
             ${revisitConcepts.slice(0, 2).map(c => `<li>${esc(c)}</li>`).join('') || '<li class="c-ok">Clean run! Nothing missed.</li>'}
           </ul>
-          ${revisitKeys.length ? `<button class="sm p" style="margin-top:8px" onclick="start(${JSON.stringify(revisitKeys)})">⚡ Drill These (${revisitKeys.length} Q)</button>` : ''}
+          ${revisitKeys.length ? `<button class="sm p" style="margin-top:8px" onclick="start(${esc(JSON.stringify(revisitKeys))})">⚡ Drill These (${revisitKeys.length} Q)</button>` : ''}
         </div>
       </div>
 
@@ -7459,7 +7936,7 @@ function done() {
 
       <p class="row" style="margin-top:20px;justify-content:space-between">
         <button class="p big-btn" onclick="home()">Back to Dashboard</button>
-        ${revisitKeys.length ? `<button class="big-btn" onclick="start(${JSON.stringify(revisitKeys)})">Retry Missteps Now</button>` : ''}
+        ${revisitKeys.length ? `<button class="big-btn" onclick="start(${esc(JSON.stringify(revisitKeys))})">Retry Missteps Now</button>` : ''}
         <button class="big-btn" onclick="backToLastQuestion()">Back to Last Question</button>
       </p>
     </div>
@@ -8105,10 +8582,11 @@ function refreshHomeIfIdle(message) {
   }
 }
 
-function loadDefaultBank() {
+function loadDefaultBank(force = false) {
   defaultBankLoading = true;
   defaultBankLoadError = '';
-  if (D && (BANKS || []).some(b => b && Array.isArray(b.q) && b.q.length)) {
+  const hasFullBank = D && (BANKS || []).some(b => b && Array.isArray(b.q) && b.q.length >= 1000);
+  if (!force && hasFullBank) {
     defaultBankLoading = false;
     refreshHomeIfIdle('Question bank is ready.');
     return;
@@ -8123,7 +8601,7 @@ function loadDefaultBank() {
     else {
       if (SETBANK == null) { SETBANK = bank.id; SETI = -1; }
       save();
-      refreshHomeIfIdle('Question bank loaded.');
+      refreshHomeIfIdle('Question bank loaded (' + bank.q.length + ' Qs).');
     }
   }).catch(error => {
     console.error('Default question bank failed to load:', error);
@@ -8133,6 +8611,11 @@ function loadDefaultBank() {
     defaultBankLoading = false;
     if (!D) refreshHomeIfIdle();
   });
+}
+
+function forceReloadBank() {
+  if (!confirm('Reload the full default question bank (1,727 questions with calculations and code traces)? Your attempt history, flashcards, and spaced repetition data will be preserved.')) return;
+  loadDefaultBank(true);
 }
 
 function loadSet(bankId, k, startFresh = false) {
@@ -8536,13 +9019,21 @@ function openSettings() {
           <input type="text" id="gm_ver" value="${esc(GEM_VERIFY_MODEL)}" placeholder="gemini-3.8-flash" style="margin-top:4px;width:100%">
         </div>
         <div style="flex:1;min-width:200px">
-          <label class="mu sm">Daily Request Limit</label>
-          <input type="number" id="gm_lim" value="${DAILY_API_LIMIT}" min="10" max="1500" style="margin-top:4px;width:100%">
+          <label class="mu sm">Target Readiness Goal (%)</label>
+          <input type="number" id="gm_target" value="${Number(localStorage.getItem('bitmcq_target_mark')) || 80}" min="50" max="100" style="margin-top:4px;width:100%">
         </div>
       </div>
 
       <div class="row" style="margin-top:14px;justify-content:space-between;align-items:center">
-        <span class="mu sm">API calls today: <b>${dailyCount}</b> / ${DAILY_API_LIMIT}</span>
+        <span class="mu sm">API calls today: <b>${dailyCount}</b></span>
+      </div>
+
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)">
+        <label class="mu sm" style="display:block;margin-bottom:6px">Default Question Bank</label>
+        <div class="row" style="gap:8px;align-items:center">
+          <button type="button" class="sm" onclick="forceReloadBank()">🔄 Reload / Sync Bundled Bank (1,727 Qs with Calc & Code Traces)</button>
+          <span class="mu sm">${(BANKS || []).reduce((n, b) => n + (b.q ? b.q.length : 0), 0)} questions loaded</span>
+        </div>
       </div>
 
       <div style="margin-top:18px">
@@ -8615,8 +9106,12 @@ function saveSettings() {
   GEM_FALLBACK_MODEL = $('#gm_fb').value.trim() || 'gemini-2.0-flash-lite';
   GEM_VERIFY_MODEL = $('#gm_ver').value.trim() || 'gemini-3.8-flash';
   GEM_MODEL = GEM_GEN_MODEL;
-  DAILY_API_LIMIT = parseInt($('#gm_lim').value || '150', 10);
+  DAILY_API_LIMIT = 500;
   QUIET_MODE = $('#qm') ? $('#qm').checked : false;
+  const targetMarkVal = parseInt($('#gm_target') ? $('#gm_target').value : '80', 10);
+  if (!isNaN(targetMarkVal) && targetMarkVal >= 50 && targetMarkVal <= 100) {
+    localStorage.setItem('bitmcq_target_mark', String(targetMarkVal));
+  }
 
   localStorage.setItem('bitmcq_gem', GEM_KEY);
   localStorage.setItem('bitmcq_gem_gen', GEM_GEN_MODEL);
@@ -8815,8 +9310,10 @@ function fixMockOptionScrambleBug() {
       rec.unfixed = false;
       if (q) {
         rec.ch = q.a;
-        R[q.n] = 'c';
-        delete W[q.n];
+        if (q.n != null) {
+          R[q.n] = 'c';
+          delete W[q.n];
+        }
 
         // Repair FSRS neural stability in V
         const vk = qk(q);
@@ -8843,7 +9340,7 @@ function fixMockOptionScrambleBug() {
       rec.ok = false;
       rec.ch = -1;
       if (q) {
-        R[q.n] = 's';
+        if (q.n != null) R[q.n] = 's';
         badQuestions.push([q, undefined]);
       }
     }
