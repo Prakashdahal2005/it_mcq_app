@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total_questions": 1743,
+  "total_questions": 1810,
   "subjects": 19,
   "schema": "id, question (markdown; KaTeX $..$ for maths), options A-D, answer, level 0-3, type, unit/unit_name/unit_conf, regeneratable, shuffle_safe, giveaway_risk, explanation (null = fill with Gemini), source"
  },
@@ -8,7 +8,7 @@
   {
     "subject": "Introduction to IT",
     "subject_code": "BIT101",
-    "question_count": 94,
+    "question_count": 98,
    "questions": [
     {
      "id": 1,
@@ -2067,13 +2067,101 @@
       "unit_conf": "high",
       "explanation": "Alignment means IT strategy and investment are deliberately linked to business strategy, not treated as an isolated technical function.",
       "source": "original"
+     },
+     {
+      "id": 116,
+      "question": "Which description best identifies a database system?",
+      "options": {
+       "A": "A DBMS together with its database and the people or applications using it",
+       "B": "The DBMS software alone, excluding the stored data and its users",
+       "C": "The organized data alone, independent of its management software",
+       "D": "The database and hardware, excluding the DBMS and application programs"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Database systems",
+      "unit_conf": "high",
+      "explanation": "A database system includes the database, the DBMS, and the users or application programs interacting with them.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 117,
+      "question": "Which statement best characterizes open-source software?",
+      "options": {
+       "A": "It is public domain and automatically has no copyright conditions",
+       "B": "It is necessarily free of charge and has no license conditions",
+       "C": "Its source code may be used, studied, modified, and redistributed under its license",
+       "D": "It cannot be sold or included in commercial products"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Application and impact of IT",
+      "unit_conf": "high",
+      "explanation": "Open-source licenses make source available and grant specified rights to use, study, modify, and redistribute it; they do not imply public domain or prohibit commercial use.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 118,
+      "question": "Which statement correctly distinguishes digital and analog computers?",
+      "options": {
+       "A": "Digital systems represent continuously varying quantities; analog systems use discrete states",
+       "B": "Digital systems represent discrete values; analog systems use continuously varying quantities",
+       "C": "Both systems represent information only as continuously varying quantities",
+       "D": "Analog systems quantize every input into symbols, while digital systems preserve continuous values"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Introduction to computer",
+      "unit_conf": "high",
+      "explanation": "Digital systems represent information as discrete states; analog systems model quantities with continuously varying signals.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 119,
+      "question": "Which Internet service resolves a domain name to its associated IP address?",
+      "options": {
+       "A": "DHCP",
+       "B": "FTP",
+       "C": "SMTP",
+       "D": "DNS"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Networks and Internet services",
+      "unit_conf": "high",
+      "explanation": "DNS translates domain names to IP addresses; DHCP assigns configuration, FTP transfers files, and SMTP sends email.",
+      "source": "scope-expansion"
      }
     ]
    },
    {
     "subject": "C Programming",
     "subject_code": "BIT102",
-    "question_count": 78,
+    "question_count": 81,
    "questions": [
     {
      "id": 1,
@@ -3786,13 +3874,79 @@
       "unit_conf": "high",
       "explanation": "printf returns the character count or a negative value on failure; %% prints a literal percent sign, while scanf reads input.",
       "source": "original"
+     },
+     {
+      "id": 84,
+      "question": "In a C string stored in a character array, what marks the end of the string?",
+      "options": {
+       "A": "A newline character, which every C string must end with",
+       "B": "The end-of-file value appended to the character array",
+       "C": "A stored character count placed after the final array element",
+       "D": "The null character, written as '\\0'"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Arrays and strings",
+      "unit_conf": "high",
+      "explanation": "C strings are terminated by the null character; a newline is not a general string terminator.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 85,
+      "question": "When a C function receives an ordinary integer argument by value, assigning to its parameter:",
+      "options": {
+       "A": "The caller's variable is modified because C passes all arguments by reference",
+       "B": "Only the function's local parameter copy is changed",
+       "C": "The caller's variable is modified only if the parameter is declared static",
+       "D": "The assignment is invalid because function parameters are read-only"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Functions",
+      "unit_conf": "high",
+      "explanation": "C passes ordinary arguments by value, so the parameter is a local copy; a pointer can be used to modify caller data.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 86,
+      "question": "Which sequence gives the usual stages from C source text to a running program?",
+      "options": {
+       "A": "Preprocessing, compilation, linking, assembling, loading",
+       "B": "Compilation, preprocessing, linking, assembling, loading",
+       "C": "Preprocessing, compilation, assembling, linking, loading",
+       "D": "Preprocessing, assembling, compilation, loading, linking"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Preprocessor",
+      "unit_conf": "high",
+      "explanation": "The preprocessor handles directives, the compiler translates source, the assembler creates object code, and linking and loading prepare execution.",
+      "source": "scope-expansion"
      }
     ]
    },
    {
     "subject": "Digital Logic",
    "subject_code": "BIT103",
-   "question_count": 61,
+   "question_count": 65,
    "questions": [
     {
      "id": 1,
@@ -5125,13 +5279,101 @@
      "unit_name": "multiplexer",
      "explanation": "2ⁿ inputs need n selects: 2⁵ = 32.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 76,
+      "question": "What is the primary role of the arithmetic logic unit?",
+      "options": {
+       "A": "Perform arithmetic and Boolean operations on data values",
+       "B": "Select the next instruction address and issue control signals",
+       "C": "Hold status flags produced by the most recent operation",
+       "D": "Move bits between registers without performing logic"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT103",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Processor logic design",
+      "unit_conf": "high",
+      "explanation": "The ALU performs arithmetic and logical operations; instruction sequencing and long-term storage are separate functions.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 77,
+      "question": "How may a don't-care entry be used when simplifying a Boolean function with a K-map?",
+      "options": {
+       "A": "Treat it as zero or one when that choice simplifies the expression without changing specified outputs",
+       "B": "Always treat it as zero, regardless of neighboring cells",
+       "C": "Always treat it as one, regardless of neighboring cells",
+       "D": "Keep it as an X in the final Boolean expression"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT103",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Simplification of Boolean functions",
+      "unit_conf": "high",
+      "explanation": "A don't-care may be assigned either value for simplification, provided the expression remains valid for specified minterms.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 78,
+      "question": "For a flip-flop, propagation delay describes the time between:",
+      "options": {
+       "A": "The input becoming stable and the next active clock edge",
+       "B": "The clock edge and the end of the required hold interval",
+       "C": "The triggering event and the output reaching its corresponding stable state",
+       "D": "Two consecutive clock edges, regardless of input changes"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT103",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Sequential logic",
+      "unit_conf": "high",
+      "explanation": "Propagation delay is the interval from the triggering input or clock event until the output reflects the resulting state change.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 79,
+      "question": "Which statement distinguishes an encoder from a decoder?",
+      "options": {
+       "A": "An encoder selects one data input; a decoder routes one selected input to an output",
+       "B": "An encoder maps an active input to a coded output; a decoder maps a code to an active output",
+       "C": "An encoder stores one bit; a decoder stores one byte",
+       "D": "An encoder selects a clock edge; a decoder changes a flip-flop's triggering mode"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT103",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Combinational logic",
+      "unit_conf": "high",
+      "explanation": "An encoder converts an active input line into a coded representation; a decoder interprets a coded input and activates the corresponding output.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Microprocessor and Computer Architecture",
    "subject_code": "BIT151",
-   "question_count": 92,
+   "question_count": 96,
    "questions": [
     {
      "id": 2,
@@ -7146,13 +7388,101 @@
      "unit_name": "RISC ≠ CISC",
      "explanation": "The distractors are classic CISC traits.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 136,
+      "question": "Which statement best distinguishes the ALU from the control unit?",
+      "options": {
+       "A": "The ALU stores instructions; the control unit stores operands",
+       "B": "The ALU selects memory addresses; the control unit performs arithmetic",
+       "C": "The ALU stores status flags; the control unit stores temporary data",
+       "D": "The ALU performs arithmetic and logic; the control unit coordinates processor operations"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT151",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Introduction to microprocessor",
+      "unit_conf": "high",
+      "explanation": "The ALU performs arithmetic and logic, while the control unit issues signals and coordinates operations.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 137,
+      "question": "Which operation is a shift microoperation?",
+      "options": {
+       "A": "Adding two register contents",
+       "B": "Applying a bitwise AND to two registers",
+       "C": "Comparing two register values for equality",
+       "D": "Moving the bit positions in a register to the left or right"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT151",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Microoperations",
+      "unit_conf": "high",
+      "explanation": "A shift microoperation moves bit positions; addition and complement are arithmetic and logic operations.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 138,
+      "question": "In direct memory access (DMA), what is transferred with reduced CPU involvement?",
+      "options": {
+       "A": "The CPU executes a separate load and store instruction for every transferred byte",
+       "B": "A block of data is transferred between an I/O device and memory with reduced per-unit CPU involvement",
+       "C": "A device controller converts an instruction's opcode into an operand",
+       "D": "The control unit copies an entire program into a processor register"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT151",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Input and output organization",
+      "unit_conf": "high",
+      "explanation": "DMA coordinates block transfers between an I/O device and memory, avoiding CPU handling of every individual data unit.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 139,
+      "question": "An instruction pipeline differs from an arithmetic pipeline mainly because it overlaps:",
+      "options": {
+       "A": "One arithmetic computation is divided into stages for different data items",
+       "B": "Separate programs are compiled simultaneously by independent processors",
+       "C": "Stages of instruction processing for different instructions overlap",
+       "D": "Different instructions are executed in parallel by independent processors"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT151",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Pipelining",
+      "unit_conf": "high",
+      "explanation": "An instruction pipeline overlaps instruction stages; an arithmetic pipeline divides an arithmetic computation into stages.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Object Oriented Programming, C++",
    "subject_code": "BIT153",
-   "question_count": 76,
+   "question_count": 79,
    "questions": [
     {
      "id": 1,
@@ -8817,13 +9147,79 @@
      "unit_name": "virtual destructor",
      "explanation": "Without virtual, only the base destructor runs.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 96,
+      "question": "Which feature is more characteristic of object-oriented design than a purely procedural approach?",
+      "options": {
+       "A": "Grouping state and related operations around objects",
+       "B": "Separating all data from every operation that uses it",
+       "C": "Using procedures without representing entities as objects",
+       "D": "Storing every program value in a global variable"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT153",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Introduction",
+      "unit_conf": "high",
+      "explanation": "Object-oriented design organizes software around objects combining state and behavior; procedural design emphasizes procedures and control flow.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 97,
+      "question": "Which statement correctly distinguishes a function template from a class template?",
+      "options": {
+       "A": "A function template parameterizes functions; a class template parameterizes classes",
+       "B": "A function template can use types; a class template cannot",
+       "C": "A class template is a runtime object; a function template is a header file",
+       "D": "A function template defines a class; a class template defines a function"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT153",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Templates and exception handling",
+      "unit_conf": "high",
+      "explanation": "Function templates parameterize function definitions; class templates parameterize class definitions.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 98,
+      "question": "What does seeking a C++ file pointer allow a program to do?",
+      "options": {
+       "A": "It changes the current stream position to support access at a chosen location",
+       "B": "It converts a text stream into a binary stream",
+       "C": "It clears the end-of-file state and closes the file",
+       "D": "It inserts a delimiter between formatted output fields"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT153",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 Files and streams",
+      "unit_conf": "high",
+      "explanation": "File-position operations move the stream position, enabling access at selected locations rather than only sequentially.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Data Structures and Algorithms",
    "subject_code": "BIT201",
-   "question_count": 95,
+   "question_count": 98,
    "questions": [
     {
      "id": 1,
@@ -10904,13 +11300,79 @@
      "unit_name": "sort complexity",
      "explanation": "O(n log n) is the average case (and merge sort's always).",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 104,
+      "question": "What is the purpose of a base case in a recursive function?",
+      "options": {
+       "A": "Ensure every recursive call uses more memory than the previous call",
+       "B": "Provide a condition that stops further recursive calls",
+       "C": "Convert each recursive call into a queue operation",
+       "D": "Make a recursive function return a value of type void"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT201",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Recursion",
+      "unit_conf": "high",
+      "explanation": "A base case terminates the recursive chain; without a reachable base case, recursion may continue indefinitely.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 105,
+      "question": "In a singly linked list, inserting a node after a known node generally requires:",
+      "options": {
+       "A": "Shift all later list elements one array position to the right",
+       "B": "Change the head pointer even when insertion is after an interior node",
+       "C": "Sort the list before changing a link",
+       "D": "Set the new node's next link to the successor, then link the known node to the new node"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT201",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 List",
+      "unit_conf": "high",
+      "explanation": "Linked-list insertion changes the relevant pointers; it does not require shifting subsequent elements.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 106,
+      "question": "What condition is required for the usual binary search algorithm on an array?",
+      "options": {
+       "A": "The array must contain distinct values",
+       "B": "The array length must be a power of two",
+       "C": "The array must be sorted by the searched key",
+       "D": "The array must be stored as a linked list"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT201",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 9,
+      "unit_name": "9 Searching",
+      "unit_conf": "high",
+      "explanation": "Binary search repeatedly discards half the remaining range based on ordering, so the sequence must be sorted.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Database Management System",
    "subject_code": "BIT202",
-   "question_count": 96,
+   "question_count": 99,
    "questions": [
     {
      "id": 1,
@@ -13013,13 +13475,79 @@
      "unit_name": "ER extensions",
      "explanation": "Generalization is bottom-up; specialization is top-down.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 117,
+      "question": "Logical data independence means that a change to the conceptual schema should, as far as possible, avoid requiring changes to:",
+      "options": {
+       "A": "A change to physical storage requires no change to the conceptual schema",
+       "B": "A change to the conceptual schema should not require changes to external views and application programs",
+       "C": "Every user must access the database through the same external view",
+       "D": "Applications must be rewritten whenever an index is added"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT202",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Concepts and architecture",
+      "unit_conf": "high",
+      "explanation": "Logical data independence separates external views and applications from changes to the conceptual schema.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 118,
+      "question": "A schedule is conflict-serializable when it is conflict-equivalent to:",
+      "options": {
+       "A": "A schedule that produces the same final values, even if conflicting operations differ",
+       "B": "A schedule with all reads before all writes",
+       "C": "Some serial ordering of the same transactions, with conflicts preserved",
+       "D": "A schedule in which no two transactions overlap in time"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT202",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Transaction processing and concurrency control",
+      "unit_conf": "high",
+      "explanation": "Conflict serializability means the schedule is conflict-equivalent to a serial schedule; conflict-equivalent schedules preserve the order of conflicting operations.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 119,
+      "question": "Which description best fits a document-oriented NoSQL database?",
+      "options": {
+       "A": "It stores records as documents with fields that may have nested structure",
+       "B": "It requires every record to use the same normalized relational schema",
+       "C": "It stores values only as pairs of keys and scalar values",
+       "D": "It represents data exclusively as vertices and edges"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT202",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 8,
+      "unit_name": "8 NoSQL",
+      "unit_conf": "high",
+      "explanation": "Document-oriented databases store document records, often with flexible and nested fields; relational tables use a tabular schema.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Operating Systems",
    "subject_code": "BIT204",
-   "question_count": 72,
+   "question_count": 75,
    "questions": [
     {
      "id": 1,
@@ -14598,13 +15126,79 @@
      "unit_name": "page replacement",
      "explanation": "Faults: 2, 3, 1, 5, 2, 4 (only the second 2 hits). 5 is the LRU result; 7 counts every reference.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 121,
+      "question": "Which statement distinguishes an OS service from a system call?",
+      "options": {
+       "A": "An OS service is a facility provided by the OS; a system call is an interface a program uses to request it",
+       "B": "An OS service is a hardware interrupt; a system call is a device driver",
+       "C": "An OS service is an application program; a system call is a process state",
+       "D": "An OS service is always user-level code; a system call is always a scheduling algorithm"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT204",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 System structures",
+      "unit_conf": "high",
+      "explanation": "OS services describe facilities such as I/O; system calls provide an interface through which programs request OS functionality.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 122,
+      "question": "Paging avoids external fragmentation because it:",
+      "options": {
+       "A": "It allocates each process a single variable-sized contiguous region",
+       "B": "It eliminates the need to translate virtual addresses",
+       "C": "It maps fixed-size pages to frames, so a process need not occupy contiguous physical memory",
+       "D": "It ensures that every allocated frame is completely filled with process data"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT204",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Memory management and file systems",
+      "unit_conf": "high",
+      "explanation": "Paging maps fixed-size pages to frames, so a process need not occupy one contiguous block; internal fragmentation can still occur.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 123,
+      "question": "Which statement best distinguishes interrupt-driven I/O from DMA-based I/O?",
+      "options": {
+       "A": "The CPU services device events while DMA transfers blocks with less per-unit CPU involvement",
+       "B": "Interrupt-driven I/O can notify the CPU of device events; DMA can transfer a block directly between device and memory",
+       "C": "DMA handles only errors, while interrupts handle only memory allocation",
+       "D": "Interrupt-driven I/O requires polling, whereas DMA eliminates device controllers"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT204",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Input/output management",
+      "unit_conf": "high",
+      "explanation": "Interrupt-driven I/O notifies the CPU to service device events; DMA transfers blocks between a device and memory with reduced CPU involvement.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
     "subject": "Web Technology",
     "subject_code": "BIT251",
-    "question_count": 124,
+    "question_count": 128,
    "questions": [
     {
      "id": 1,
@@ -17323,13 +17917,101 @@
       "unit_conf": "high",
       "explanation": "The @ operator suppresses error messages for the expression that follows; explicit logging still needs error_log or an error handler.",
       "source": "original"
+     },
+     {
+      "id": 189,
+      "question": "Which statement correctly distinguishes XSD from DTD?",
+      "options": {
+       "A": "DTD supports richer data types than XSD, which describes only element names",
+       "B": "DTD is a transformation language; XSD is a query language",
+       "C": "DTD validates JSON; XSD validates HTML",
+       "D": "XSD can specify data types for XML content; DTD has more limited data-typing facilities"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 XML",
+      "unit_conf": "high",
+      "explanation": "XSD supports data types and namespaces, while DTD describes document structure with more limited typing.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 190,
+      "question": "In object-oriented PHP, what is an object created from a class?",
+      "options": {
+       "A": "A class is a runtime instance; an object is its reusable definition",
+       "B": "An object is a database table containing PHP variables",
+       "C": "An object is a function that must return a string",
+       "D": "An object is a runtime instance with the properties and methods defined by its class"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 9,
+      "unit_name": "9 Objects",
+      "unit_conf": "high",
+      "explanation": "A class describes a type; an object is an instance whose properties and methods are accessed at runtime.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 191,
+      "question": "Which statement distinguishes parsing CSV from parsing JSON?",
+      "options": {
+       "A": "CSV represents nested objects; JSON represents only fixed columns",
+       "B": "CSV is commonly read as delimited fields; JSON is parsed into structured objects, arrays, and values",
+       "C": "CSV requires XML tags; JSON requires HTML elements",
+       "D": "CSV is binary data; JSON is a text encoding for image files"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 14,
+      "unit_name": "14 File handling",
+      "unit_conf": "high",
+      "explanation": "CSV represents delimited records and fields; JSON represents structured values including objects and arrays.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 192,
+      "question": "In PHP, which superglobal is normally used to read fields submitted by an HTTP POST form?",
+      "options": {
+       "A": "$_GET",
+       "B": "$_SERVER",
+       "C": "$_POST",
+       "D": "$_FILES"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 10,
+      "unit_name": "10 Handling forms",
+      "unit_conf": "high",
+      "explanation": "PHP exposes fields submitted with the POST method through the $_POST superglobal; uploaded files are handled separately through $_FILES.",
+      "source": "scope-expansion"
      }
     ]
    },
    {
     "subject": "Systems Analysis and Design",
    "subject_code": "BIT253",
-   "question_count": 90,
+   "question_count": 94,
    "questions": [
     {
      "id": 1,
@@ -19300,13 +19982,101 @@
      "unit_name": "feasibility",
      "explanation": "Technical = can we build it; operational = will it be used.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 136,
+      "question": "During project identification and selection, a proposed systems-development project is most worth pursuing when it:",
+      "options": {
+       "A": "Aligns with organizational goals and appears feasible relative to its expected benefits and resources",
+       "B": "Uses the newest available technology regardless of organizational need",
+       "C": "Has the largest possible number of features before requirements are analyzed",
+       "D": "Has the shortest schedule even if it does not address a business need"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT253",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Planning",
+      "unit_conf": "high",
+      "explanation": "Project identification and selection prioritize proposals that support organizational objectives and have a reasonable expected value and feasibility.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 137,
+      "question": "Which logic-modeling tool is suited to tabulating combinations of conditions and their resulting actions?",
+      "options": {
+       "A": "Decision table",
+       "B": "Data-flow diagram",
+       "C": "Entity-relationship diagram",
+       "D": "Gantt chart"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT253",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Analysis",
+      "unit_conf": "high",
+      "explanation": "A decision table compactly lists condition combinations and the actions associated with each combination.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 138,
+      "question": "An ER diagram in a conceptual data model primarily describes:",
+      "options": {
+       "A": "The order in which network packets are routed",
+       "B": "The detailed layout of physical database files",
+       "C": "Entities, their attributes, and the relationships among them",
+       "D": "The sequence of program statements executed at runtime"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT253",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Design",
+      "unit_conf": "high",
+      "explanation": "ER modeling captures entities, attributes, and relationships at a conceptual level.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 139,
+      "question": "Which testing stage is typically performed by selected users in their actual or intended environment before broad release?",
+      "options": {
+       "A": "Alpha testing is performed by actual customers at their sites; beta testing is done only by developers",
+       "B": "Beta testing involves selected users trying the system in a real or intended environment before broad release",
+       "C": "Acceptance testing is completed before users agree on requirements",
+       "D": "Unit testing determines whether the finished system meets organizational acceptance criteria"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT253",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Implementation and maintenance",
+      "unit_conf": "high",
+      "explanation": "Beta testing uses selected users in a real or intended environment; alpha testing is generally conducted in-house, while acceptance testing determines whether user needs are met.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Network and Data Communications",
    "subject_code": "BIT254",
-   "question_count": 87,
+   "question_count": 90,
    "questions": [
     {
      "id": 1,
@@ -21211,13 +21981,79 @@
      "unit_name": "subnetting",
      "explanation": "5 host bits: 2⁵ − 2 = 30. Slips: 32 forgot reserved addresses; 31; 62 = /26.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 102,
+      "question": "Which network performance measure is the amount of data successfully delivered per unit time?",
+      "options": {
+       "A": "Latency",
+       "B": "Attenuation",
+       "C": "Distortion",
+       "D": "Throughput"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT254",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Physical layer and media",
+      "unit_conf": "high",
+      "explanation": "Throughput measures successful data delivery rate; latency is delay, while attenuation and distortion affect signals.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 103,
+      "question": "Which statement distinguishes flow control from error control?",
+      "options": {
+       "A": "Flow control detects corrupted frames; error control regulates the sender's rate",
+       "B": "Flow control selects routes; error control assigns network addresses",
+       "C": "Flow control and error control are two names for signal attenuation",
+       "D": "Flow control regulates transmission to match receiver capacity; error control detects or recovers from transmission errors"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT254",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Data link layer",
+      "unit_conf": "high",
+      "explanation": "Flow control regulates transmission relative to receiver capacity; error control detects or recovers from transmission errors.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 104,
+      "question": "What is a benefit of caching a recently resolved DNS name-to-address mapping?",
+      "options": {
+       "A": "It guarantees that every cached response is authoritative",
+       "B": "It can answer repeated queries faster and reduce the need for further DNS lookups",
+       "C": "It assigns a new IP address to the requesting host",
+       "D": "It encrypts the application data sent to the resolved address"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT254",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Application layer",
+      "unit_conf": "high",
+      "explanation": "A resolver can reuse a cached DNS mapping while it remains valid, reducing repeated lookup work and response time.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Software Engineering",
    "subject_code": "BIT302",
-   "question_count": 84,
+   "question_count": 88,
    "questions": [
     {
      "id": 1,
@@ -23058,13 +23894,101 @@
      "unit_name": "reverse ≠ re-engineering",
      "explanation": "Re-engineering also restructures or rebuilds.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 158,
+      "question": "A software architectural pattern is best described as:",
+      "options": {
+       "A": "A reusable organization of system components and their relationships for a recurring design problem",
+       "B": "A chronological record of every source-code change",
+       "C": "A test case that checks one function in isolation",
+       "D": "A user-interface description listing every screen field"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT302",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Architectural design",
+      "unit_conf": "high",
+      "explanation": "An architectural pattern is a reusable high-level organization of components and interactions for a recurring architectural problem.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 159,
+      "question": "Which configuration-management activity tracks and controls different versions of software components?",
+      "options": {
+       "A": "Release management",
+       "B": "Version management",
+       "C": "Change management",
+       "D": "Requirements validation"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT302",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 10,
+      "unit_name": "10 Configuration management",
+      "unit_conf": "high",
+      "explanation": "Version management records and controls component versions; change management evaluates requested changes, while release management prepares releases.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 160,
+      "question": "A behavioral system model primarily describes:",
+      "options": {
+       "A": "How a system behaves over time or in response to events",
+       "B": "The physical location of hardware nodes",
+       "C": "The static relationships among data entities only",
+       "D": "The modules and packages used to organize source code"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT302",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 System modeling",
+      "unit_conf": "high",
+      "explanation": "Behavioral models describe dynamic system behavior, such as responses to events and changes over time.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 161,
+      "question": "Which ethical responsibility is most relevant when a software defect could put users at risk?",
+      "options": {
+       "A": "Raise and address the safety concern even if doing so delays release",
+       "B": "Keep the defect private so the release schedule is unaffected",
+       "C": "Prioritize the vendor's revenue over foreseeable user harm",
+       "D": "Assume users are responsible for discovering all safety defects"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT302",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Introduction",
+      "unit_conf": "high",
+      "explanation": "Professional ethics require practitioners to take foreseeable risks to users and the public seriously and raise safety concerns responsibly.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
     "subject": "Management Information System",
     "subject_code": "BIT353",
-    "question_count": 113,
+    "question_count": 117,
    "questions": [
     {
      "id": 2,
@@ -25543,13 +26467,101 @@
       "unit_conf": "high",
       "explanation": "Enterprise systems link business functions by integrating shared information and processes, improving coordination across the organization.",
       "source": "original"
+     },
+     {
+      "id": 261,
+      "question": "Which is an example of a complementary organizational asset that can help an organization gain value from IT?",
+      "options": {
+       "A": "A faster processor installed in a server",
+       "B": "Managerial support together with redesigned work processes",
+       "C": "A higher-resolution monitor for each employee",
+       "D": "An additional network cable in the equipment room"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Global business and collaboration",
+      "unit_conf": "high",
+      "explanation": "Complementary organizational assets include supportive management, appropriate business processes, and training that help realize value from technology investments.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 262,
+      "question": "A sociotechnical view of an information system emphasizes the interaction of:",
+      "options": {
+       "A": "An information system consists only of computer hardware and its voltage levels",
+       "B": "An information system is defined only by its database tables and network cables",
+       "C": "An information system is the set of software licenses and file extensions it uses",
+       "D": "People, organizational arrangements, and technology influence one another in an information system"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Information systems in global business",
+      "unit_conf": "high",
+      "explanation": "An information system is sociotechnical: technology works within organizational and human contexts.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 263,
+      "question": "Compared with a value chain, a value web emphasizes:",
+      "options": {
+       "A": "A value chain describes activities within a firm",
+       "B": "A value web is only a sequence of activities inside one firm",
+       "C": "A value chain is a network of independent firms coordinating value creation",
+       "D": "A value web coordinates value creation among connected firms and partners"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Information systems, organization and strategy",
+      "unit_conf": "high",
+      "explanation": "A value web focuses on connected firms and partners, whereas a value chain commonly examines activities within a firm.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 264,
+      "question": "Which is a central purpose of business-intelligence infrastructure?",
+      "options": {
+       "A": "Replace transaction-processing systems with manual record keeping",
+       "B": "Combine data and analytical tools to support reporting and organizational decisions",
+       "C": "Prevent combining information from different operational sources",
+       "D": "Store business data without supporting retrieval or analysis"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT353",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Foundations of business intelligence",
+      "unit_conf": "high",
+      "explanation": "BI infrastructure integrates data, tools, and analytical capabilities to support reporting and decision-making.",
+      "source": "scope-expansion"
      }
     ]
    },
    {
     "subject": "E-Commerce",
    "subject_code": "BIT403",
-   "question_count": 109,
+   "question_count": 113,
    "questions": [
     {
      "id": 1,
@@ -27940,13 +28952,101 @@
      "unit_name": "security dimensions",
      "explanation": "Confidentiality = secrecy; authenticity = identity; nonrepudiation = cannot deny.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 263,
+      "question": "In a Vickrey auction, the winning bidder typically pays:",
+      "options": {
+       "A": "The highest bidder wins and pays the highest bid",
+       "B": "The lowest bidder wins and pays the second-lowest bid",
+       "C": "The highest bidder wins and pays the second-highest bid",
+       "D": "All bidders pay the same fixed amount after the auction"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT403",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Payment systems",
+      "unit_conf": "high",
+      "explanation": "A Vickrey auction is a sealed-bid second-price auction: the highest bidder wins but pays the second-highest bid.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 264,
+      "question": "Integrating an e-commerce system with an organization's ERP system primarily helps to:",
+      "options": {
+       "A": "Synchronize online orders with internal inventory, accounting, and fulfillment processes",
+       "B": "Authorize card transactions between the buyer's and seller's banks",
+       "C": "Display product descriptions and collect a customer's selections",
+       "D": "Resolve the public IP address of the organization's web server"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT403",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Building an e-commerce system",
+      "unit_conf": "high",
+      "explanation": "ERP integration connects online transactions with internal enterprise processes such as inventory, accounting, and order fulfillment.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 265,
+      "question": "Which statement best distinguishes Google Analytics from social-media analytics?",
+      "options": {
+       "A": "Google Analytics can measure website behavior and conversions; social-media analytics focus on activity and engagement on social platforms",
+       "B": "Google Analytics measures only email delivery; social-media analytics measure only search rankings",
+       "C": "Google Analytics creates payment certificates; social-media analytics encrypt customer records",
+       "D": "Google Analytics is limited to server uptime; social-media analytics are limited to inventory levels"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT403",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Optimizing e-commerce systems",
+      "unit_conf": "high",
+      "explanation": "Web analytics examine visits and behavior on a site, while social-media analytics examine activity and engagement on social platforms.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 266,
+      "question": "Which statement distinguishes phishing from pharming?",
+      "options": {
+       "A": "Phishing encrypts stored files; pharming encrypts network traffic",
+       "B": "Phishing is a denial-of-service attack; pharming is a distributed denial-of-service attack",
+       "C": "Phishing tricks a user into disclosing information, often through a deceptive message; pharming redirects a user to a fraudulent site",
+       "D": "Phishing changes an IP routing table; pharming sends unsolicited bulk email"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT403",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Security",
+      "unit_conf": "high",
+      "explanation": "Phishing commonly uses deceptive communications to trick users; pharming redirects users to fraudulent sites, often through manipulated name resolution.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Computer Graphics",
    "subject_code": "BIT304",
-   "question_count": 55,
+   "question_count": 59,
    "questions": [
     {
      "id": 1,
@@ -29147,13 +30247,101 @@
      "unit_name": "transformations",
      "explanation": "(6, 2) → (12, 4). Slips: scale first then translate; translation only; scaling only.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 92,
+      "question": "Which description characterizes a wireframe representation of a 3D object?",
+      "options": {
+       "A": "It represents the object's boundary surfaces as filled polygons",
+       "B": "It represents vertices and edges without explicitly representing filled surfaces",
+       "C": "It recursively divides space into eight cubic regions",
+       "D": "It represents an object by sweeping a cross-section along a path"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT304",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 3D object representation and curves",
+      "unit_conf": "high",
+      "explanation": "A wireframe represents an object's vertices and edges; unlike boundary-surface models, it does not explicitly describe filled faces.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 93,
+      "question": "In key-frame animation, an animator specifies:",
+      "options": {
+       "A": "An animator specifies every pixel independently for every frame",
+       "B": "An animator specifies the display's physical dimensions at selected times",
+       "C": "An animator specifies clipping windows for the frames",
+       "D": "An animator specifies important poses at selected times, with intermediate motion filled in"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT304",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 9,
+      "unit_name": "9 Virtual reality and animation",
+      "unit_conf": "high",
+      "explanation": "Key framing defines important states at selected times; intervening motion can be filled in.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 94,
+      "question": "In a 2D viewing transformation, the window represents:",
+      "options": {
+       "A": "The region of device coordinates where the selected scene is displayed",
+       "B": "The position of the viewer relative to the 3D scene",
+       "C": "The depth range used by visible-surface detection",
+       "D": "The selected region of world coordinates to be mapped for display"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT304",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 2D viewing and clipping",
+      "unit_conf": "high",
+      "explanation": "The window is the selected region in world coordinates; the viewport is its destination on the display.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 95,
+      "question": "A 3D point $(2,-1,3)$ is translated by $(-1,4,2)$. What are its new coordinates?",
+      "options": {
+       "A": "$(3,-5,1)$",
+       "B": "$(1,3,5)$",
+       "C": "$(1,-5,5)$",
+       "D": "$(2,3,5)$"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "calc",
+      "tag": "L1 - BIT304",
+      "regeneratable": true,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 3D graphics",
+      "unit_conf": "high",
+      "explanation": "Add the translation vector componentwise: $(2-1,-1+4,3+2)=(1,3,5)$.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Artificial Intelligence",
    "subject_code": "BIT252",
-   "question_count": 100,
+   "question_count": 104,
    "questions": [
     {
      "id": 2,
@@ -31344,13 +32532,101 @@
      "unit_name": "uninformed search",
      "explanation": "DFS uses a stack; greedy is informed (f = h).",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 202,
+      "question": "An agent's sensors provide only an incomplete view of the current state. How is this environment classified?",
+      "options": {
+       "A": "Fully observable, because the agent receives some sensor information",
+       "B": "Deterministic, because the sensor values are numeric",
+       "C": "Partially observable, because the agent must infer hidden aspects of the state",
+       "D": "Static, because the sensor does not display every state variable"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - BIT252",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Agents",
+      "unit_conf": "high",
+      "explanation": "An environment is partially observable when the agent's sensors do not reveal the complete state needed for decision-making.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 203,
+      "question": "Which search method repeatedly moves to a neighboring state with a better heuristic value and can stop at a local optimum?",
+      "options": {
+       "A": "Hill climbing",
+       "B": "A* search",
+       "C": "Breadth-first search",
+       "D": "Iterative deepening search"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT252",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Problem solving by searching",
+      "unit_conf": "high",
+      "explanation": "Hill climbing makes local moves guided by an evaluation or heuristic and may stop at a local optimum without finding a global solution.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 204,
+      "question": "A propositional formula in conjunctive normal form (CNF) is written as:",
+      "options": {
+       "A": "A conjunction of clauses, where each clause is a disjunction of literals",
+       "B": "A disjunction of clauses, where each clause is a conjunction of literals",
+       "C": "A sequence of implications with no logical connectives",
+       "D": "A conjunction containing only unnegated variables"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT252",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Knowledge representation",
+      "unit_conf": "high",
+      "explanation": "CNF is an AND of clauses, with each clause an OR of literals; the reversed OR-of-ANDs form is DNF.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 205,
+      "question": "Which statement distinguishes a recurrent neural network from a feed-forward network?",
+      "options": {
+       "A": "A recurrent network has no weighted connections between units",
+       "B": "A feed-forward network must contain a cycle through its output layer",
+       "C": "A recurrent network can carry state or information across sequence steps",
+       "D": "A feed-forward network can learn only from unlabelled examples"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT252",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Neural networks",
+      "unit_conf": "high",
+      "explanation": "Recurrent networks include feedback or state connections useful for sequences; feed-forward networks pass signals without cycles.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Basic Mathematics: Calculus & Functions",
    "subject_code": "MTH104",
-   "question_count": 143,
+   "question_count": 146,
    "questions": [
     {
      "id": 1,
@@ -34481,13 +35757,79 @@
      "unit_name": "increasing / decreasing",
      "explanation": "f′ = 3(x−1)(x−3) < 0 on (1, 3). The second option is where f increases.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 136,
+      "question": "If $f(x)=(3x+1)^2$, what is $f'(x)$?",
+      "options": {
+       "A": "$2(3x+1)$",
+       "B": "$6(3x+1)$",
+       "C": "$3(3x+1)^2$",
+       "D": "$6x+1$"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "calc",
+      "tag": "L0 - MTH104",
+      "regeneratable": true,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 3,
+      "unit_name": "3 Differentiation",
+      "unit_conf": "high",
+      "explanation": "By the chain rule, differentiate the outer square and multiply by the inner derivative 3, giving $6(3x+1)$.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 137,
+      "question": "If $F'(x)=f(x)$, what is $\\int_1^3 f(x)\\,dx$?",
+      "options": {
+       "A": "$F(1)-F(3)$",
+       "B": "$f(3)-f(1)$",
+       "C": "$F(3)+F(1)$",
+       "D": "$F(3)-F(1)$"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "calc",
+      "tag": "L0 - MTH104",
+      "regeneratable": true,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 5,
+      "unit_name": "5 Integration",
+      "unit_conf": "high",
+      "explanation": "By the Fundamental Theorem of Calculus, evaluate an antiderivative at the upper bound and subtract its value at the lower bound.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 138,
+      "question": "Which integration technique is based on the product rule for differentiation?",
+      "options": {
+       "A": "Substitution",
+       "B": "Partial fractions",
+       "C": "The ratio test",
+       "D": "Integration by parts"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - MTH104",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Techniques of integration",
+      "unit_conf": "high",
+      "explanation": "Integration by parts reverses the product rule: $\\int u\\,dv=uv-\\int v\\,du$.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Linear Algebra and Abstract Algebra",
    "subject_code": "MTH168",
-   "question_count": 95,
+   "question_count": 98,
    "questions": [
     {
      "id": 1,
@@ -36568,13 +37910,79 @@
      "unit_name": "orthogonality",
      "explanation": "u·v = 6 − 2k − 4 = 2 − 2k = 0. Slips: −1 sign error; 3 dropped the third term; 2 arithmetic slip.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 91,
+      "question": "Why is a homogeneous linear system $Ax=0$ always consistent?",
+      "options": {
+       "A": "Its coefficient matrix must be invertible",
+       "B": "The zero vector is always a solution",
+       "C": "It must have more equations than unknowns",
+       "D": "Every coefficient in its matrix is nonzero"
+      },
+      "answer": "B",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - MTH168",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Linear equations",
+      "unit_conf": "high",
+      "explanation": "Substituting the zero vector gives $A0=0$, so every homogeneous linear system has at least the trivial solution.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 92,
+      "question": "The eigenvalues of a square matrix $A$ are found by solving:",
+      "options": {
+       "A": "$\\det(A+\\lambda I)=1$",
+       "B": "$A\\lambda=0$ for every vector",
+       "C": "$\\det(A-\\lambda I)=0$",
+       "D": "$A^{-1}=\\lambda I$"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "recall",
+      "tag": "L0 - MTH168",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Eigenvalues and eigenvectors",
+      "unit_conf": "high",
+      "explanation": "An eigenvalue makes $A-\\lambda I$ singular, so it satisfies the characteristic equation $\\det(A-\\lambda I)=0$.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 93,
+      "question": "Which property is required of the identity element in a group?",
+      "options": {
+       "A": "Combining any group element with the identity leaves the element unchanged",
+       "B": "Combining any two group elements always gives the identity",
+       "C": "Every group element must equal its own inverse",
+       "D": "The operation must be ordinary multiplication of real numbers"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - MTH168",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 9,
+      "unit_name": "9 Groups and subgroups",
+      "unit_conf": "high",
+      "explanation": "A group identity e satisfies e*a=a*e=a for every group element a.",
+      "source": "scope-expansion"
+     }
    ]
   },
   {
    "subject": "Basic Statistics",
    "subject_code": "STA154",
-   "question_count": 79,
+   "question_count": 82,
    "questions": [
     {
      "id": 1,
@@ -38305,7 +39713,73 @@
      "unit_name": "scales of measurement",
      "explanation": "Equal intervals but no true zero. Ratio is the trap: 0 °C is not 'no temperature'.",
      "source": "sibling"
-    }
+    },
+     {
+      "id": 76,
+      "question": "What is a distinguishing feature of a Pareto chart?",
+      "options": {
+       "A": "Categories are shown in descending frequency, often with a cumulative-percentage line",
+       "B": "Observations are grouped into quartiles in a box",
+       "C": "A circle is divided into sectors proportional to category frequency",
+       "D": "Two numerical variables are plotted as paired points"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - STA154",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 2,
+      "unit_name": "2 Diagrammatical and graphical presentation",
+      "unit_conf": "high",
+      "explanation": "A Pareto chart orders categories from most to least frequent and commonly overlays cumulative percentages.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 77,
+      "question": "Given $P(A\\mid B)=0.4$, $P(B)=0.5$, and $P(A)=0.2$, what is $P(B\\mid A)$?",
+      "options": {
+       "A": "0.1",
+       "B": "0.4",
+       "C": "1.0",
+       "D": "0.5"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "calc",
+      "tag": "L0 - STA154",
+      "regeneratable": true,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Introduction to probability",
+      "unit_conf": "high",
+      "explanation": "Bayes' rule gives $P(B\\mid A)=P(A\\mid B)P(B)/P(A)=0.4\\times0.5/0.2=1.0$.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 78,
+      "question": "Which distribution commonly models the number of independent events occurring in a fixed interval at a constant average rate?",
+      "options": {
+       "A": "Binomial",
+       "B": "Poisson",
+       "C": "Normal",
+       "D": "Uniform"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - STA154",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Probability distributions",
+      "unit_conf": "high",
+      "explanation": "The Poisson distribution models event counts in a fixed interval under the usual constant-rate and independence assumptions.",
+      "source": "scope-expansion"
+     }
    ]
   }
  ]
