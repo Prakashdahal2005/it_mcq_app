@@ -2532,15 +2532,17 @@ function questionScopeUnit(q) {
   return match ? Number(match[1]) : null;
 }
 const DAY_MS = 86400000;
-const localDateKey = (ts = Date.now()) => {
-  const d = new Date(ts);
+const localDateKey = (ts) => {
+  const d = ts == null ? new Date() : new Date(ts);
+  if (isNaN(d.getTime())) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
-const localDayIndex = (ts = Date.now()) => {
-  const d = new Date(ts);
+const localDayIndex = (ts) => {
+  const d = ts == null ? new Date() : new Date(ts);
+  if (isNaN(d.getTime())) return NaN;
   return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
 };
 const today = () => localDayIndex(Date.now());
@@ -2549,9 +2551,12 @@ const hl = s => String(s).replace(/\b(NOT|EXCEPT|FALSE|INCORRECT|ALWAYS|ONLY|NEV
 function questionsAnsweredToday() {
   const todayKey = localDateKey();
   const out = new Set();
+  if (!todayKey) return out;
   (L || []).forEach(r => {
-    if (!r || localDateKey(r.t) !== todayKey) return;
+    if (!r || r.mock === 1 || r.t == null) return;
+    if (localDateKey(r.t) !== todayKey) return;
     if (r.uid) out.add(r.uid);
+    if (r.qid) out.add(r.qid);
     if (r.k) out.add(r.k);
   });
   return out;
@@ -2580,6 +2585,14 @@ function latestPracticeRecordFor(q, latest) {
   if (!q) return null;
   const m = latest || latestPracticeRecordMap();
   return m.get(questionUid(q)) || m.get(qk(q)) || null;
+}
+
+// A question is "unattempted" only when it has no non-mock practice record.
+// Mock submissions also write spaced-repetition state, so raw V[] is not a
+// reliable indicator of whether the user has actually practiced a question.
+function hasPracticeAttempt(q, latest) {
+  if (!q) return false;
+  return !!latestPracticeRecordFor(q, latest || latestPracticeRecordMap());
 }
 
 function currentPracticeQuestions(status) {
@@ -5023,13 +5036,9 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   const basePool = quickOnly ? allBank.filter(q => effQuick(q)) : allBank;
   if (!basePool.length) return [];
 
-  // Exclude questions already completed today (using local calendar date)
-  const todayKey = localDateKey();
-  const doneTodayKeys = new Set(
-    (L || [])
-      .filter(r => r && localDateKey(r.t) === todayKey)
-      .map(r => r.uid || r.k)
-  );
+  // Exclude practice questions already completed today. Mock attempts do not
+  // consume the day's practice pool, and legacy records without a timestamp are ignored.
+  const doneTodayKeys = questionsAnsweredToday();
 
   const isAvailableToday = q => {
     if (!q) return false;
@@ -5038,7 +5047,11 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     return !doneTodayKeys.has(uid) && !doneTodayKeys.has(k);
   };
 
-  const pool = basePool.filter(isAvailableToday);
+  let pool = basePool.filter(isAvailableToday);
+  if (pool.length < Math.min(5, targetQ)) {
+    // Safety valve: never report "finished for today" while eligible questions exist.
+    pool = basePool;
+  }
   if (!pool.length) return [];
 
   const due = dueKeys(quickOnly).filter(candidateKey => {
@@ -5908,7 +5921,8 @@ function home(preserveScroll = false) {
   const codeTraceDue = codeTraceDueQuestions().length;
   const codeTraceCount = codeTracePool().length;
   const showCodeTraceReminder = codeTraceCount > 0 && codeTraceReminderDue();
-  const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !V[qk(q)]).length;
+  const latestPractice = latestPracticeRecordMap();
+  const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice)).length;
   const freshButtonText = `✨ Practice Unseen Questions (${freshCount} available)`;
   const coverage = calculateUnitCoverage();
   const drillSubjects = bankSubjects();
@@ -6116,7 +6130,10 @@ function home(preserveScroll = false) {
 function startToday() {
   const qList = buildTodaySession(todayMins, false);
   if (!qList.length) {
-    alert('All available questions have been completed for today! Check back tomorrow or try a subject drill or mock.');
+    const eligible = bankQuestionPool().filter(q => normalSessionEligible(q)).length;
+    alert(eligible
+      ? 'No practice questions could be assembled right now. Try a subject drill or a mock.'
+      : 'No normal-session questions are available. Cold-marked and long code-trace questions are excluded.');
     return;
   }
   start(qList);
@@ -6193,7 +6210,8 @@ function startQuickMode() {
   if (!pool.length) { alert('No quick questions are left for today. Try again tomorrow or start a full practice session.'); return; }
   pool.sort((a, b) => effLevel(a) - effLevel(b));
   const keyOf = q => questionUid(q) || qk(q);
-  const un = pool.filter(q => !V[qk(q)]);
+  const latestPractice = latestPracticeRecordMap();
+  const un = pool.filter(q => !hasPracticeAttempt(q, latestPractice));
   const due = pool.filter(q => {
     const v = V[qk(q)];
     if (!v) return false;
@@ -6218,7 +6236,8 @@ function startQuickMode() {
 
 function startFreshSet() {
   const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
-  const pool = bankQuestionPool().filter(q => normalSessionEligible(q) && !V[qk(q)]);
+  const latestPractice = latestPracticeRecordMap();
+  const pool = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice));
   if (!pool.length) {
     alert('All normal-session bank questions have been attempted. Use Today’s Mission or Due Review to keep practiced questions solid.');
     return;
@@ -6483,8 +6502,9 @@ function startMistakesBySubject(subjectName){
 
 function startUnattemptedSession() {
   const doneToday = questionsAnsweredToday();
+  const latestPractice = latestPracticeRecordMap();
   const pool = bankQuestionPool().filter(q =>
-    q && normalSessionEligible(q) && !V[qk(q)] && !wasAnsweredToday(q, doneToday)
+    q && normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice) && !wasAnsweredToday(q, doneToday)
   );
   if (!pool.length) { alert('No unattempted questions are left for today. Try the Due Review or a full mock.'); return; }
   const targetQ = Math.max(10, Math.round((todayMins || 15) * 60 / 50));
