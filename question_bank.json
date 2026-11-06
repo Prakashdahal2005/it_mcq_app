@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total_questions": 1810,
+  "total_questions": 1821,
   "subjects": 19,
   "schema": "id, question (markdown; KaTeX $..$ for maths), options A-D, answer, level 0-3, type, unit/unit_name/unit_conf, regeneratable, shuffle_safe, giveaway_risk, explanation (null = fill with Gemini), source"
  },
@@ -8,7 +8,7 @@
   {
     "subject": "Introduction to IT",
     "subject_code": "BIT101",
-    "question_count": 98,
+    "question_count": 99,
    "questions": [
     {
      "id": 1,
@@ -2155,13 +2155,35 @@
       "unit_conf": "high",
       "explanation": "DNS translates domain names to IP addresses; DHCP assigns configuration, FTP transfers files, and SMTP sends email.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 120,
+      "question": "Which statement distinguishes a data warehouse from data mining?",
+      "options": {
+       "A": "A warehouse stores integrated data for analysis; data mining discovers patterns in data",
+       "B": "A warehouse discovers patterns; data mining stores operational records",
+       "C": "A warehouse is a query language; data mining is a database model",
+       "D": "A warehouse is a network device; data mining is a security policy"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT101",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 6,
+      "unit_name": "6 Database systems",
+      "unit_conf": "high",
+      "explanation": "A data warehouse provides integrated data for analysis; data mining applies methods to discover patterns or relationships in data.",
+      "source": "scope-expansion"
      }
     ]
    },
    {
     "subject": "C Programming",
     "subject_code": "BIT102",
-    "question_count": 81,
+    "question_count": 82,
    "questions": [
     {
      "id": 1,
@@ -3939,6 +3961,28 @@
       "unit_name": "8 Preprocessor",
       "unit_conf": "high",
       "explanation": "The preprocessor handles directives, the compiler translates source, the assembler creates object code, and linking and loading prepare execution.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 87,
+      "question": "Which statement distinguishes an algorithm from a flowchart?",
+      "options": {
+       "A": "An algorithm is a graphical diagram; a flowchart is a sequence of machine instructions",
+       "B": "An algorithm is a finite problem-solving procedure; a flowchart is a graphical representation of steps and decisions",
+       "C": "An algorithm is always written in C; a flowchart is always written in assembly",
+       "D": "An algorithm describes hardware; a flowchart describes only data types"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT102",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Introduction",
+      "unit_conf": "high",
+      "explanation": "An algorithm specifies a finite sequence of steps to solve a problem; a flowchart depicts the logic graphically.",
       "source": "scope-expansion"
      }
     ]
@@ -9219,7 +9263,7 @@
   {
    "subject": "Data Structures and Algorithms",
    "subject_code": "BIT201",
-   "question_count": 98,
+   "question_count": 99,
    "questions": [
     {
      "id": 1,
@@ -11366,13 +11410,35 @@
       "unit_conf": "high",
       "explanation": "Binary search repeatedly discards half the remaining range based on ordering, so the sequence must be sorted.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 107,
+      "question": "What makes a stack an abstract data type rather than merely a particular data structure?",
+      "options": {
+       "A": "It requires elements to be stored in a fixed contiguous array",
+       "B": "It defines the exact memory addresses used by each element",
+       "C": "It specifies operations and behavior such as push and pop without requiring one implementation",
+       "D": "It is a data type that can only contain integers"
+      },
+      "answer": "C",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT201",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Background",
+      "unit_conf": "high",
+      "explanation": "An ADT defines a data type by its values and operations, abstracting away implementation; a stack may be implemented in different ways.",
+      "source": "scope-expansion"
      }
    ]
   },
   {
    "subject": "Database Management System",
    "subject_code": "BIT202",
-   "question_count": 99,
+   "question_count": 100,
    "questions": [
     {
      "id": 1,
@@ -13541,13 +13607,35 @@
       "unit_conf": "high",
       "explanation": "Document-oriented databases store document records, often with flexible and nested fields; relational tables use a tabular schema.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 120,
+      "question": "In database terminology, which statement distinguishes a schema from an instance?",
+      "options": {
+       "A": "A schema is the current data; an instance is the permanent table design",
+       "B": "A schema is a query result; an instance is a database user",
+       "C": "A schema describes physical disks only; an instance describes network protocols",
+       "D": "A schema describes the database structure; an instance is the data present at a particular time"
+      },
+      "answer": "D",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT202",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Concepts and architecture",
+      "unit_conf": "high",
+      "explanation": "The schema defines the database structure, while an instance is the contents of the database at a particular moment.",
+      "source": "scope-expansion"
      }
    ]
   },
   {
    "subject": "Operating Systems",
    "subject_code": "BIT204",
-   "question_count": 75,
+   "question_count": 76,
    "questions": [
     {
      "id": 1,
@@ -15192,13 +15280,35 @@
       "unit_conf": "high",
       "explanation": "Interrupt-driven I/O notifies the CPU to service device events; DMA transfers blocks between a device and memory with reduced CPU involvement.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 124,
+      "question": "Viewing the operating system as a resource manager emphasizes that it:",
+      "options": {
+       "A": "Allocates and coordinates processor, memory, storage, and I/O resources among programs",
+       "B": "Provides only a graphical interface for starting applications",
+       "C": "Converts every high-level program directly into machine code",
+       "D": "Stores user files without controlling access or execution"
+      },
+      "answer": "A",
+      "level": 0,
+      "type": "sibling",
+      "tag": "L0 - BIT204",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 1,
+      "unit_name": "1 Introduction and evolution",
+      "unit_conf": "high",
+      "explanation": "The resource-manager view emphasizes allocating and coordinating hardware resources among competing programs and users.",
+      "source": "scope-expansion"
      }
    ]
   },
   {
     "subject": "Web Technology",
     "subject_code": "BIT251",
-    "question_count": 128,
+    "question_count": 129,
    "questions": [
     {
      "id": 1,
@@ -18004,6 +18114,28 @@
       "unit_name": "10 Handling forms",
       "unit_conf": "high",
       "explanation": "PHP exposes fields submitted with the POST method through the $_POST superglobal; uploaded files are handled separately through $_FILES.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 193,
+      "question": "In PHP file handling, which function closes an open file stream?",
+      "options": {
+       "A": "fread()",
+       "B": "fclose()",
+       "C": "fwrite()",
+       "D": "fopen()"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT251",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 14,
+      "unit_name": "14 File handling",
+      "unit_conf": "high",
+      "explanation": "fclose() closes an open file stream; fopen() opens it, while fread() and fwrite() read and write data.",
       "source": "scope-expansion"
      }
     ]
@@ -26561,7 +26693,7 @@
    {
     "subject": "E-Commerce",
    "subject_code": "BIT403",
-   "question_count": 113,
+   "question_count": 115,
    "questions": [
     {
      "id": 1,
@@ -29040,13 +29172,57 @@
       "unit_conf": "high",
       "explanation": "Phishing commonly uses deceptive communications to trick users; pharming redirects users to fraudulent sites, often through manipulated name resolution.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 267,
+      "question": "Which description best fits an online stored-value payment system?",
+      "options": {
+       "A": "The customer pays using value held in an account or instrument funded in advance",
+       "B": "The merchant sends a card authorization request to the issuing bank for each purchase",
+       "C": "The customer pays by mailing a cheque after receiving a paper invoice",
+       "D": "The payment is completed by resolving the merchant's domain name"
+      },
+      "answer": "A",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT403",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Payment systems",
+      "unit_conf": "high",
+      "explanation": "Stored-value payment uses value held in an account or instrument, commonly funded before spending, rather than charging each purchase to a credit card.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 268,
+      "question": "Compared with a conventional online credit-card transaction, a mobile payment is distinguished primarily by:",
+      "options": {
+       "A": "Requiring every transaction to be paid with physical cash",
+       "B": "Using a mobile device or mobile platform to initiate or authorize the payment",
+       "C": "Avoiding any communication between the customer and payment provider",
+       "D": "Using DNS to transfer the purchase amount between banks"
+      },
+      "answer": "B",
+      "level": 1,
+      "type": "sibling",
+      "tag": "L1 - BIT403",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 4,
+      "unit_name": "4 Payment systems",
+      "unit_conf": "high",
+      "explanation": "Mobile payment describes the use of a mobile device or platform in initiating or authorizing payment; the underlying payment method can vary.",
+      "source": "scope-expansion"
      }
    ]
   },
   {
    "subject": "Computer Graphics",
    "subject_code": "BIT304",
-   "question_count": 59,
+   "question_count": 60,
    "questions": [
     {
      "id": 1,
@@ -30335,13 +30511,35 @@
       "unit_conf": "high",
       "explanation": "Add the translation vector componentwise: $(2-1,-1+4,3+2)=(1,3,5)$.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 96,
+      "question": "In OpenGL immediate-mode drawing, which pair of calls brackets the vertices of a primitive?",
+      "options": {
+       "A": "glClear() and glFlush()",
+       "B": "glViewport() and glMatrixMode()",
+       "C": "glEnable() and glDisable()",
+       "D": "glBegin() and glEnd()"
+      },
+      "answer": "D",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT304",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 10,
+      "unit_name": "10 OpenGL",
+      "unit_conf": "high",
+      "explanation": "In the basic OpenGL drawing interface covered here, glBegin() selects the primitive type and glEnd() closes the vertex specification.",
+      "source": "scope-expansion"
      }
    ]
   },
   {
    "subject": "Artificial Intelligence",
    "subject_code": "BIT252",
-   "question_count": 104,
+   "question_count": 105,
    "questions": [
     {
      "id": 2,
@@ -32620,13 +32818,35 @@
       "unit_conf": "high",
       "explanation": "Recurrent networks include feedback or state connections useful for sequences; feed-forward networks pass signals without cycles.",
       "source": "scope-expansion"
+     },
+     {
+      "id": 206,
+      "question": "In a rule-based expert system, what is the main role of the inference engine?",
+      "options": {
+       "A": "Store all domain facts and rules as the knowledge base",
+       "B": "Collect sensor readings from the external environment",
+       "C": "Apply rules to the knowledge base and available facts to derive conclusions",
+       "D": "Translate the system's source code into machine instructions"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - BIT252",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Expert systems",
+      "unit_conf": "high",
+      "explanation": "The inference engine applies the expert system's rules to known facts; the knowledge base stores domain knowledge.",
+      "source": "scope-expansion"
      }
    ]
   },
   {
    "subject": "Basic Mathematics: Calculus & Functions",
    "subject_code": "MTH104",
-   "question_count": 146,
+   "question_count": 147,
    "questions": [
     {
      "id": 1,
@@ -35822,6 +36042,28 @@
       "unit_name": "7 Techniques of integration",
       "unit_conf": "high",
       "explanation": "Integration by parts reverses the product rule: $\\int u\\,dv=uv-\\int v\\,du$.",
+      "source": "scope-expansion"
+     },
+     {
+      "id": 139,
+      "question": "Numerical integration is used when an integral is estimated by:",
+      "options": {
+       "A": "Finding an exact antiderivative and proving it is unique",
+       "B": "Differentiating the integrand at every point in its domain",
+       "C": "Combining function values at selected points to approximate the definite integral",
+       "D": "Replacing the integration limits with roots of the integrand"
+      },
+      "answer": "C",
+      "level": 1,
+      "type": "recall",
+      "tag": "L1 - MTH104",
+      "regeneratable": false,
+      "shuffle_safe": true,
+      "giveaway_risk": false,
+      "unit": 7,
+      "unit_name": "7 Techniques of integration",
+      "unit_conf": "high",
+      "explanation": "Numerical integration approximates a definite integral using function values at selected points, often when an exact antiderivative is unavailable or inconvenient.",
       "source": "scope-expansion"
      }
    ]
