@@ -1906,13 +1906,52 @@ function isLongCodeTraceQuestion(q) {
 }
 
 function normalSessionEligible(q) {
-  return !!q && !isColdQuestion(q) && !isQuestionQuarantined(q) && !isLongCodeTraceQuestion(q);
+  return !!q && !isColdQuestion(q) && !isQuestionQuarantined(q) &&
+    !isQuestionOutOfScope(q) && !isLongCodeTraceQuestion(q);
 }
 
 function isQuestionQuarantined(q) {
   if (!q) return false;
   const record = V && V[qk(q)];
   return !!q.quarantined || !!(record && record._quarantined);
+}
+
+function isQuestionTooHard(q) {
+  const override = q && QOV && QOV[qk(q)];
+  return !!(override && typeof override === 'object' && override.tooHard);
+}
+
+function isQuestionOutOfScope(q) {
+  const override = q && QOV && QOV[qk(q)];
+  return !!(override && typeof override === 'object' && override.outOfScope);
+}
+
+function questionPracticeTier(q) {
+  if (!q || isQuestionOutOfScope(q)) return Infinity;
+  if (isQuestionTooHard(q)) return 4;
+  return Math.max(0, Math.min(3, effLevel(q)));
+}
+
+function preferredPracticeQuestions(pool) {
+  return preferredQuestionTier((pool || []).filter(q => q && normalSessionEligible(q)));
+}
+
+function preferredQuestionTier(pool) {
+  const candidates = (pool || []).filter(q => q && !isQuestionOutOfScope(q));
+  if (!candidates.length) return [];
+  const bestTier = Math.min(...candidates.map(questionPracticeTier));
+  return candidates.filter(q => questionPracticeTier(q) === bestTier);
+}
+
+function setQuestionDifficultyFlag(n, flag) {
+  if (flag !== 'tooHard' && flag !== 'outOfScope') return;
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
+  if (!rawQ) return;
+  const override = qovEntryFor(rawQ);
+  override[flag] = !override[flag];
+  save();
+  if (flag === 'outOfScope' && override.outOfScope) next();
+  else show();
 }
 
 function isQuickQuestion(q) {
@@ -2091,9 +2130,20 @@ function recordLevelValue(rec) {
 function recordPointValue(rec) {
   if (!rec || rec.ok !== true) return 0;
   if (rec.cf === 1) return 0;
-  if (rec.cf === 2) return 0.5;
-  if (rec.cf === 3) return 1;
-  return 0.5;
+  const confidenceCredit = rec.cf === 2 ? 0.5 : (rec.cf === 3 ? 1 : 0.5);
+  return confidenceCredit * recordDifficultyWeight(rec);
+}
+
+function recordIsOutOfScope(rec) {
+  if (!rec || rec.oos === true) return true;
+  return isQuestionOutOfScope(findQuestionByRecord(rec));
+}
+
+function recordDifficultyWeight(rec) {
+  if (!rec || recordIsOutOfScope(rec)) return 0;
+  if (rec.hard === true || isQuestionTooHard(findQuestionByRecord(rec))) return 0.25;
+  const level = Math.max(0, Math.min(3, recordLevelValue(rec)));
+  return [1, 0.75, 0.5, 0.25][level];
 }
 
 function pruneSessionQuestions() {
@@ -2694,7 +2744,7 @@ function hasPracticeAttempt(q, latest) {
 function currentPracticeQuestions(status) {
   const latest = latestPracticeRecordMap();
   const doneToday = questionsAnsweredToday();
-  return bankQuestionPool().filter(q => {
+  const questions = bankQuestionPool().filter(q => {
     if (!q || !normalSessionEligible(q) || wasAnsweredToday(q, doneToday)) return false;
     const r = latestPracticeRecordFor(q, latest);
     if (!r) return false;
@@ -2702,6 +2752,7 @@ function currentPracticeQuestions(status) {
     if (status === 's') return !r.ok && r.ch === -1;
     return false;
   });
+  return preferredPracticeQuestions(questions);
 }
 
 function sessionKeyForQuestion(q) {
@@ -2827,9 +2878,14 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
   }
 }
 
-function dueKeys(quickOnly = false) {
+function dueKeys(quickOnly = false, availableOnly = false) {
   const t = today();
-  const pool = bankQuestionPool().filter(q => (!quickOnly || effQuick(q)) && normalSessionEligible(q));
+  const doneToday = availableOnly ? questionsAnsweredToday() : null;
+  const pool = bankQuestionPool().filter(q =>
+    (!quickOnly || effQuick(q)) &&
+    normalSessionEligible(q) &&
+    (!doneToday || !wasAnsweredToday(q, doneToday))
+  );
 
   const byIdentity = new Map();
   function addDue(q, key, prio, fromActive) {
@@ -2837,7 +2893,7 @@ function dueKeys(quickOnly = false) {
     const id = questionUid(q) || qk(q) || String(key);
     const prev = byIdentity.get(id);
     if (!prev || (fromActive && !prev.fromActive) || (fromActive === prev.fromActive && prio > prev.prio)) {
-      byIdentity.set(id, { n: key, prio, fromActive: !!fromActive });
+      byIdentity.set(id, { n: key, prio, fromActive: !!fromActive, q });
     }
   }
 
@@ -2856,7 +2912,7 @@ function dueKeys(quickOnly = false) {
         if (lastH && lastH.cf === 2) prio += 5000;
         else prio += 2000;
       }
-      const lvl = q.level != null ? q.level : 1;
+      const lvl = effLevel(q);
       prio += (3 - lvl) * 100;
       prio += Math.min(50, (v.missCount || 0) * 10);
 
@@ -2873,7 +2929,11 @@ function dueKeys(quickOnly = false) {
     if (v && v.d <= t) addDue(e, i + ':' + j, 1500, false);
   }));
 
+  const preferredIds = new Set(preferredPracticeQuestions(
+    [...byIdentity.values()].map(item => item.q)
+  ).map(q => questionUid(q) || qk(q)));
   return [...byIdentity.values()]
+    .filter(item => preferredIds.has(questionUid(item.q) || qk(item.q)))
     .sort((a, b) => b.prio - a.prio)
     .map(item => item.n);
 }
@@ -5271,10 +5331,10 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     return !doneTodayKeys.has(uid) && !doneTodayKeys.has(k);
   };
 
-  const pool = basePool.filter(isAvailableToday);
+  const pool = preferredPracticeQuestions(basePool.filter(isAvailableToday));
   if (!pool.length) return [];
 
-  const due = dueKeys(quickOnly).filter(candidateKey => {
+  const due = dueKeys(quickOnly, true).filter(candidateKey => {
     const q = byN(candidateKey);
     return q && isAvailableToday(q);
   });
@@ -5463,7 +5523,7 @@ function isProvisionalSubject(subject) {
 function firstPracticeAttempts() {
   const map = new Map();
   (L || []).forEach(rec => {
-    if (!rec || rec.mock === 1) return;
+    if (!rec || rec.mock === 1 || recordIsOutOfScope(rec)) return;
     const key = recordIdentity(rec);
     if (!key) return;
     const prev = map.get(key);
@@ -5473,18 +5533,28 @@ function firstPracticeAttempts() {
 }
 
 function scoreRecords(records) {
-  const attempts = records.length;
+  const scoredRecords = records.filter(rec => rec && !recordIsOutOfScope(rec));
+  const attempts = scoredRecords.length;
+  const weightedAttempts = scoredRecords.reduce((sum, rec) => sum + recordDifficultyWeight(rec), 0);
   let points = 0;
-  records.forEach(rec => { points += recordPointValue(rec); });
-  const score = attempts ? (points + 7.5) / (attempts + 10) : 0;
-  return { attempts, points, score, raw: rawAccuracy(records), provisional: attempts < 15 };
+  scoredRecords.forEach(rec => { points += recordPointValue(rec); });
+  const score = weightedAttempts ? (points + 7.5) / (weightedAttempts + 10) : 0;
+  return {
+    attempts,
+    weightedAttempts,
+    points,
+    score,
+    raw: rawAccuracy(scoredRecords),
+    provisional: weightedAttempts < 15
+  };
 }
 
 function rawAccuracy(records) {
-  if (!records.length) return 0;
+  const scoredRecords = (records || []).filter(rec => rec && !recordIsOutOfScope(rec));
+  if (!scoredRecords.length) return 0;
   let ok = 0;
-  records.forEach(rec => { if (rec.ok) ok++; });
-  return ok / records.length;
+  scoredRecords.forEach(rec => { if (rec.ok) ok++; });
+  return ok / scoredRecords.length;
 }
 
 // Estimate readiness from first practice attempts; mock results and repeated attempts are handled separately.
@@ -5519,7 +5589,7 @@ function readinessStats() {
       ...scored,
       subject,
       raw: rawAccuracy(records),
-      mastered: records.length >= 5 && rawAccuracy(records) >= 0.85
+      mastered: scored.weightedAttempts >= 5 && scored.raw >= 0.85
     };
   });
 
@@ -5857,6 +5927,16 @@ function pickCoverageQuestions(pool, limit, snapshot, opts = {}) {
     if (unit) questions.push({ q, identity, unit });
     else unmapped.push({ q, identity });
   });
+  const allCandidates = [...questions, ...unmapped];
+  if (allCandidates.length) {
+    const preferredTier = Math.min(...allCandidates.map(item => questionPracticeTier(item.q)));
+    for (let i = questions.length - 1; i >= 0; i--) {
+      if (questionPracticeTier(questions[i].q) !== preferredTier) questions.splice(i, 1);
+    }
+    for (let i = unmapped.length - 1; i >= 0; i--) {
+      if (questionPracticeTier(unmapped[i].q) !== preferredTier) unmapped.splice(i, 1);
+    }
+  }
   if (!questions.length && (!opts.includeUnmapped || !unmapped.length)) return [];
 
   const rankItems = items => items.sort((a, b) => {
@@ -6028,10 +6108,11 @@ function renderReadinessMeter(coverageSnapshot) {
   const rowBySubject = new Map(Object.values(stats.subjects).map(r => [canonSubj(r.subject), {
     k: r.subject,
     tot: r.attempts,
+    weightedAttempts: r.weightedAttempts,
     acc: r.score,
     raw: r.raw,
     target: r.target,
-    isCalibrated: r.attempts >= 15,
+    isCalibrated: r.weightedAttempts >= 15,
     assessed: true
   }]));
   bankSubjects().forEach(subject => {
@@ -6039,6 +6120,7 @@ function renderReadinessMeter(coverageSnapshot) {
       rowBySubject.set(subject, {
         k: subject,
         tot: 0,
+        weightedAttempts: 0,
         acc: null,
         raw: null,
         target: subjectTarget(subject),
@@ -6081,11 +6163,11 @@ function renderReadinessMeter(coverageSnapshot) {
     <div class="row" style="justify-content:space-between;align-items:center">
       <h2 style="margin:0">📊 Practice Readiness</h2>
       <div class="row" style="gap:6px">
-        ${overall.provisional ? `<span class="chip c-sk">Provisional · ${overall.attempts}/15 evidence</span>` : `<span class="chip c-ok">Calibrated · ${overall.attempts} attempts</span>`}
+        ${overall.provisional ? `<span class="chip c-sk">Provisional · ${overall.weightedAttempts.toFixed(1)}/15 weighted evidence</span>` : `<span class="chip c-ok">Calibrated · ${overall.weightedAttempts.toFixed(1)} weighted evidence</span>`}
         ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
       </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded. Unit coverage measures breadth; Due Review and Mistakes are retention, not breadth.</p>
+    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; Too hard 25%); Out of scope is excluded. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded. Unit coverage measures breadth; Due Review and Mistakes are retention, not breadth.</p>
 
     <div class="readiness-container">
       <div class="readiness-ring-wrap">
@@ -6104,7 +6186,7 @@ function renderReadinessMeter(coverageSnapshot) {
           <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">${markGap >= 0 ? 'Ahead: <b>+' + markGap + ' marks</b>' : 'Gap: <b>' + markGap + ' marks</b>'}</span>
         </div>
         <div class="row sm mu" style="gap:10px;flex-wrap:wrap">
-          <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions</span>
+          <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions (${overall.weightedAttempts.toFixed(1)} weighted evidence)</span>
           <span>✅ Raw first-attempt: <b>${Math.round(overall.raw * 100)}%</b></span>
           <span>🎯 L0 mastered: <b>${l0Mastered}/${l0Tracked}</b> subjects</span>
           <span>🧭 Units touched: <b>${unitCoverage.touchedUnits}/${unitCoverage.totalUnits}</b></span>
@@ -6126,7 +6208,7 @@ function renderReadinessMeter(coverageSnapshot) {
         const cov = unitCoverage.subjects[canonSubj(r.k)];
         const covText = cov ? `${cov.touchedUnits}/${cov.unitCount} units` : '';
         let dotClass = 'dot-gray';
-        let statusText = r.assessed ? `Calibrating (${r.tot}/15)` : 'Not assessed';
+        let statusText = r.assessed ? `Calibrating (${r.weightedAttempts.toFixed(1)}/15 weighted)` : 'Not assessed';
         if (r.isCalibrated) {
           if (r.acc >= r.target) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
           else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
@@ -6200,7 +6282,7 @@ function selectSubjectDrillQuestions(subjectName, requestedCount, includeAnswere
   );
   const eligible = subjectBank.filter(q => normalSessionEligible(q));
   const answeredTodayCount = eligible.filter(q => wasAnsweredToday(q, doneToday)).length;
-  const pool = eligible.filter(q => includeAnsweredToday || !wasAnsweredToday(q, doneToday)).filter(q => {
+  const pool = preferredPracticeQuestions(eligible.filter(q => includeAnsweredToday || !wasAnsweredToday(q, doneToday))).filter(q => {
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -6240,7 +6322,7 @@ function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
     return;
   }
   if (!result.pool.length) {
-    alert(`No eligible questions are available for ${subjectName} right now. ${result.bankCount - result.eligibleCount} question(s) are cold, quarantined, or code-trace restricted.`);
+    alert(`No eligible questions are available for ${subjectName} right now. ${result.bankCount - result.eligibleCount} question(s) are cold, quarantined, out of scope, or code-trace restricted.`);
     return;
   }
   if (!result.selected.length) {
@@ -6403,6 +6485,9 @@ function home(preserveScroll = false) {
   const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice)).length;
   const freshButtonText = `✨ Practice Unseen Questions (${freshCount} available)`;
   const coldQuestionCount = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q)).length;
+  const outOfScopeQuestionCount = bankQuestionPool().filter(q =>
+    isQuestionOutOfScope(q) && !isQuestionDeleted(q) && !isQuestionQuarantined(q)
+  ).length;
   const coverage = calculateUnitCoverage();
   const drillSubjects = bankSubjects();
   const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
@@ -6581,6 +6666,7 @@ function home(preserveScroll = false) {
             <button class="sm" onclick="startMistakes()" ${wr.length ? '' : 'disabled'}>Retry mistakes (capped at 5)</button>
             <button class="sm" onclick="startUnattemptedSession()" ${freshCount ? '' : 'disabled'}>Unattempted (${freshCount})</button>
             <button class="sm" onclick="startSkippedSession()" ${sk.length ? '' : 'disabled'}>Skipped (${sk.length})</button>
+            ${outOfScopeQuestionCount ? `<button class="sm" onclick="startOutOfScopeReview()">Review out of scope (${outOfScopeQuestionCount})</button>` : ''}
           </div>
 
           <div class="row" style="margin-top:12px">
@@ -6620,7 +6706,7 @@ function startToday() {
     const eligible = bankQuestionPool().filter(q => normalSessionEligible(q)).length;
     alert(eligible
       ? 'You have answered all eligible practice questions today. No same-day repeats were added; try again tomorrow.'
-      : 'No normal-session questions are available. Cold-marked and long code-trace questions are excluded.');
+      : 'No normal-session questions are available. Cold-marked, out-of-scope, quarantined, and long code-trace questions are excluded.');
     return;
   }
   const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
@@ -6663,6 +6749,7 @@ function buildRevisionSession(limit = 12) {
         : 1;
       return {
         key: item.key,
+        q: item.q,
         due: due.has(key),
         missed: currentMisses.has(key) || (V[key].missCount || 0) > 0,
         subjectAccuracy,
@@ -6670,7 +6757,14 @@ function buildRevisionSession(limit = 12) {
         lastAttempt: history[history.length - 1].t || 0
       };
     })
-    .filter(Boolean)
+    .filter(Boolean);
+  const preferredIds = new Set(preferredPracticeQuestions(
+    candidates.map(item => item.q)
+  ).map(q => questionUid(q) || qk(q)));
+  candidates.splice(0, candidates.length, ...candidates.filter(item =>
+    preferredIds.has(questionUid(item.q) || qk(item.q))
+  ));
+  candidates
     .sort((a, b) =>
       Number(b.due) - Number(a.due) ||
       Number(b.missed) - Number(a.missed) ||
@@ -6693,14 +6787,14 @@ function startCommuteQuick() {
 
 function startQuickMode() {
   const doneToday = questionsAnsweredToday();
-  const pool = bankQuestionPool().filter(q =>
+  const pool = preferredPracticeQuestions(bankQuestionPool().filter(q =>
     q && effQuick(q) && normalSessionEligible(q) && !wasAnsweredToday(q, doneToday)
-  );
+  ));
   if (!pool.length) { alert('No quick questions are left for today. Try again tomorrow or start a full practice session.'); return; }
   const keyOf = q => questionUid(q) || qk(q);
   const latestPractice = latestPracticeRecordMap();
   const dueOrder = new Map();
-  dueKeys(true).forEach((key, index) => {
+  dueKeys(true, true).forEach((key, index) => {
     const q = byN(key);
     if (q) dueOrder.set(keyOf(q), index);
   });
@@ -6903,14 +6997,15 @@ function genPipelineCyclesQuestion() {
 
 function codeTracePool() {
   const seen = new Set();
-  return bankQuestionPool().filter(q => {
-    if (!q || isQuestionDeleted(q) || isQuestionQuarantined(q) || isColdQuestion(q)) return false;
+  const candidates = bankQuestionPool().filter(q => {
+    if (!q || isQuestionDeleted(q) || isQuestionQuarantined(q) || isColdQuestion(q) || isQuestionOutOfScope(q)) return false;
     if (!isCodeSnippetQuestion(q)) return false;
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+  return preferredQuestionTier(candidates);
 }
 
 function codeTraceDueQuestions() {
@@ -6923,8 +7018,8 @@ function codeTraceDueQuestions() {
 
 function startCalcTraceSession() {
   const seen = new Set();
-  const candidates = bankQuestionPool().filter(q => {
-    if (!q || isQuestionDeleted(q) || isQuestionQuarantined(q) || isColdQuestion(q)) return false;
+  const candidates = preferredQuestionTier(bankQuestionPool().filter(q => {
+    if (!q || isQuestionDeleted(q) || isQuestionQuarantined(q) || isColdQuestion(q) || isQuestionOutOfScope(q)) return false;
     if (isCodeSnippetQuestion(q)) return false; // Code traces strictly stay in Code Trace drill!
     const type = String(q.type || '').toLowerCase();
     if (!(q.calc || q.needs_paper || type === 'calc')) return false;
@@ -6932,7 +7027,7 @@ function startCalcTraceSession() {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }));
   if (!candidates.length) {
     alert('No calculation questions are available in the loaded bank. Try tapping Reload Default Bank in Settings.');
     return;
@@ -7017,9 +7112,9 @@ function startMistakesBySubject(subjectName){
 function startUnattemptedSession() {
   const doneToday = questionsAnsweredToday();
   const latestPractice = latestPracticeRecordMap();
-  const pool = bankQuestionPool().filter(q =>
+  const pool = preferredPracticeQuestions(bankQuestionPool().filter(q =>
     q && normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice) && !wasAnsweredToday(q, doneToday)
-  );
+  ));
   if (!pool.length) { alert('No unattempted questions are left for today. Try the Due Review or a full mock.'); return; }
   const targetQ = Math.max(10, Math.round((todayMins || 15) * 60 / 50));
   const pick = pickCoverageQuestions(pool, targetQ, calculateUnitCoverage(), { maxPerUnit: 2, doneToday, includeUnmapped: true });
@@ -7031,6 +7126,19 @@ function startSkippedSession() {
   const sk = currentPracticeQuestions('s').map(sessionKeyForQuestion);
   if (!sk.length) { alert('No skipped questions are left for today.'); return; }
   start(sk.slice(0, 20));
+}
+
+function startOutOfScopeReview() {
+  const questions = bankQuestionPool().filter(q =>
+    q && isQuestionOutOfScope(q) && !isQuestionDeleted(q) && !isQuestionQuarantined(q)
+  );
+  if (!questions.length) {
+    showToast('No out-of-scope questions are available to review.');
+    return;
+  }
+  clearDrillDeck();
+  DRILL_D = questions.map((q, index) => ({ ...q, n: DRILL_N_BASE + index }));
+  start(DRILL_D.map(q => q.n));
 }
 
 function editExamDate() {
@@ -7175,7 +7283,13 @@ function show() {
             <option value="2" ${curLvl === 2 ? 'selected' : ''}>L2 · Exact</option>
             <option value="3" ${curLvl === 3 ? 'selected' : ''}>L3 · Advanced</option>
           </select>
-          ${!MK ? `<button class="sm" id="wellmade-btn" style="padding:2px 8px;font-size:11px;${isWellMade ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleWellMade(${rawQ.n})" title="Well-made questions are protected from AI regeneration and appear more often in practice">
+            ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isQuestionTooHard(rawQ) ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="setQuestionDifficultyFlag(${rawQ.n}, 'tooHard')" title="Give this question lower priority and lower score weight">
+              ${isQuestionTooHard(rawQ) ? '🧱 Too hard · lower weight' : '🧱 Too hard'}
+            </button>
+            <button class="sm" style="padding:2px 8px;font-size:11px;${isQuestionOutOfScope(rawQ) ? 'background:#fff1f2;color:#be123c;border-color:#fda4af' : 'color:var(--mu);border-color:var(--bd)'}" onclick="setQuestionDifficultyFlag(${rawQ.n}, 'outOfScope')" title="Exclude from normal practice and readiness; marking skips this question">
+              ${isQuestionOutOfScope(rawQ) ? '🚫 Out of scope · restore' : '🚫 Out of scope'}
+            </button>` : ''}
+            ${!MK ? `<button class="sm" id="wellmade-btn" style="padding:2px 8px;font-size:11px;${isWellMade ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleWellMade(${rawQ.n})" title="Well-made questions are protected from AI regeneration and appear more often in practice">
             ${isWellMade ? '⭐ Well made' : '☆ Mark well made'}
           </button>` : ''}
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
@@ -7648,6 +7762,8 @@ function pick(i, cfOverride) {
       ch: origPickedIndex,
       ok,
       cf: confidence,
+      hard: isQuestionTooHard(rawQ),
+      oos: isQuestionOutOfScope(rawQ),
       tm: Math.round(timeTakenMs / 1000),
       set: S,
       variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
@@ -8607,7 +8723,7 @@ function mockPool(rawPool) {
   const seen = new Set();
   const out = [];
   (rawPool || []).forEach(q => {
-    if (!q || isQuestionQuarantined(q)) return;
+    if (!q || isQuestionQuarantined(q) || isQuestionOutOfScope(q)) return;
     const id = questionUid(q) || qk(q);
     if (!id || seen.has(id)) return;
     seen.add(id);
