@@ -945,6 +945,8 @@ let defaultBankLoadError = '';
 let todayMins = 15;
 let showMoreMenu = false;
 let bgGenQueue = [];
+let backgroundQuestionAiQueue = [];
+let backgroundQuestionAiInProgress = false;
 let bgGenStatusText = '';
 let variantRefreshDone = 0;
 let variantRefreshSkipped = 0;
@@ -1904,7 +1906,13 @@ function isLongCodeTraceQuestion(q) {
 }
 
 function normalSessionEligible(q) {
-  return !!q && !isColdQuestion(q) && !isLongCodeTraceQuestion(q);
+  return !!q && !isColdQuestion(q) && !isQuestionQuarantined(q) && !isLongCodeTraceQuestion(q);
+}
+
+function isQuestionQuarantined(q) {
+  if (!q) return false;
+  const record = V && V[qk(q)];
+  return !!q.quarantined || !!(record && record._quarantined);
 }
 
 function isQuickQuestion(q) {
@@ -3865,52 +3873,70 @@ function setQuestionColdState(q, cold) {
   }
 }
 
-async function tryColdQuestionSibling(q, opts = {}) {
-  const taskKey = questionUid(q) || qk(q);
-  const wasCold = isColdQuestion(q);
-  window._coldSiblingTasks = window._coldSiblingTasks || new Set();
-  if (window._coldSiblingTasks.has(taskKey)) return false;
-  window._coldSiblingTasks.add(taskKey);
-  const button = opts.batch ? null : document.getElementById('cold-btn');
-  if (button) {
-    button.disabled = true;
-    button.textContent = '⏳ Checking for a sibling...';
+function enqueueBackgroundQuestionAi(kind, q, sourceOverride = null) {
+  if (!q || !GEM_KEY) return false;
+  const uid = questionUid(q) || qk(q);
+  const key = `${kind}:${uid}`;
+  const active = window._backgroundQuestionAiKeys || (window._backgroundQuestionAiKeys = new Set());
+  if (active.has(key)) return false;
+  if (kind === 'correction') {
+    backgroundQuestionAiQueue = backgroundQuestionAiQueue.filter(job => {
+      if (job.kind !== 'sibling' || job.key.slice('sibling:'.length) !== uid) return true;
+      active.delete(job.key);
+      return false;
+    });
   }
+  active.add(key);
+  backgroundQuestionAiQueue.push({ kind, q, sourceOverride, key });
+  save();
+  setTimeout(drainBackgroundQuestionAiQueue, 0);
+  return true;
+}
+
+function clearQuestionQuarantine(q) {
+  const k = qk(q);
+  if (V[k]) delete V[k]._quarantined;
+  const uid = questionUid(q);
+  const copies = [
+    ...(D || []),
+    ...(DRILL_D || []),
+    ...(MOCK_D || []),
+    ...((BANKS || []).flatMap(bank => Array.isArray(bank.q) ? bank.q : [])),
+    ...((A || []).flatMap(attempt => Array.isArray(attempt.errs) ? attempt.errs : []))
+  ];
+  copies.forEach(copy => {
+    if (copy && questionUid(copy) === uid) delete copy.quarantined;
+  });
+}
+
+async function drainBackgroundQuestionAiQueue() {
+  if (backgroundQuestionAiInProgress || !backgroundQuestionAiQueue.length) return;
+  backgroundQuestionAiInProgress = true;
+  const job = backgroundQuestionAiQueue.shift();
   try {
-    if (!wasCold) {
-      setQuestionColdState(q, true);
+    if (!GEM_KEY || isQuestionDeleted(job.q)) return;
+    if (job.kind === 'sibling') {
+      if (!isColdQuestion(job.q) || isQuestionQuarantined(job.q) || effWellMade(job.q)) return;
+      await rewriteQuestionWithGemini(job.q, { background: true });
+      if (!isQuestionQuarantined(job.q)) setQuestionColdState(job.q, false);
+      save();
+    } else if (job.kind === 'correction') {
+      if (!isQuestionQuarantined(job.q)) return;
+      await rewriteQuestionWithGemini(job.q, {
+        background: true,
+        correction: true,
+        sourceOverride: job.sourceOverride
+      });
+      clearQuestionQuarantine(job.q);
       save();
     }
-    if (effWellMade(q)) {
-      showToast('This question is marked Well made; it remains cold and unchanged.', 'warn');
-      return false;
-    }
-    if (!GEM_KEY) {
-      showToast('No Gemini API key is configured; this question remains cold.', 'warn');
-      return false;
-    }
-    await rewriteQuestionWithGemini(q, { background: false });
-    setQuestionColdState(q, false);
-    save();
-    if (!opts.batch && CURRENT_Q && CURRENT_Q.origQ && questionUid(CURRENT_Q.origQ) === questionUid(q)) {
-      sessionHistory[P] = null;
-      show();
-    }
-    return true;
   } catch (err) {
-    console.warn('Cold-question sibling generation failed; keeping the question cold:', err);
-    if (!wasCold) {
-      setQuestionColdState(q, true);
-      save();
-    }
-    if (!opts.batch) showToast('No verified sibling was produced. The question remains cold.', 'warn');
-    return false;
+    console.warn(`Background ${job.kind} failed; the question remains ${job.kind === 'sibling' ? 'cold' : 'quarantined'}:`, err);
   } finally {
-    window._coldSiblingTasks.delete(taskKey);
-    if (button && button.isConnected) {
-      button.disabled = false;
-      updateColdButtonUI(q);
-    }
+    const active = window._backgroundQuestionAiKeys;
+    if (active) active.delete(job.key);
+    backgroundQuestionAiInProgress = false;
+    if (backgroundQuestionAiQueue.length) setTimeout(drainBackgroundQuestionAiQueue, 350);
   }
 }
 
@@ -3924,7 +3950,10 @@ function toggleColdQuestion() {
     updateColdButtonUI(rawQ);
     return;
   }
-  tryColdQuestionSibling(rawQ);
+  setQuestionColdState(rawQ, true);
+  save();
+  updateColdButtonUI(rawQ);
+  enqueueBackgroundQuestionAi('sibling', rawQ);
 }
 
 async function generateSiblingsForColdQuestions() {
@@ -3939,32 +3968,30 @@ async function generateSiblingsForColdQuestions() {
   }
   if (!confirm(`Try to create a verified sibling microconcept for each of ${coldQuestions.length} cold question(s)? This can use up to 3 Gemini calls per question. Each original stays cold unless its sibling passes validation.`)) return;
 
-  const button = document.getElementById('cold-sibling-batch-btn');
-  if (button) {
-    button.disabled = true;
-    button.textContent = `Generating siblings (0/${coldQuestions.length})...`;
-  }
-  let replaced = 0;
-  for (let i = 0; i < coldQuestions.length; i++) {
-    if (button) button.textContent = `Generating siblings (${i + 1}/${coldQuestions.length})...`;
-    if (await tryColdQuestionSibling(coldQuestions[i], { batch: true })) replaced++;
-  }
-  save();
-  showToast(`${replaced} sibling(s) added; ${coldQuestions.length - replaced} question(s) remain cold.`, replaced === coldQuestions.length ? 'ok' : 'warn');
-  home(true);
+  let queued = 0;
+  coldQuestions.forEach(q => { if (enqueueBackgroundQuestionAi('sibling', q)) queued++; });
+  showToast(`${queued} cold-question sibling task(s) queued. Failed or unavailable generations will stay cold.`);
 }
 
 function quarantineCurrentQuestion() {
-  if (!confirm('Quarantine this question/variant? It will be marked as questionable and excluded from future study sets.')) return;
+  if (!confirm('Flag this question as possibly wrong and request a background AI correction? It will stay out of practice unless the correction is validated.')) return;
   const rawQ = byN(Q[P]);
   if (!rawQ) return;
   const k = qk(rawQ);
   V[k] = V[k] || {};
   V[k]._quarantined = true;
   rawQ.quarantined = true;
-  delete V[k]._variant;
+  const shown = CURRENT_Q && CURRENT_Q.origQ && questionUid(CURRENT_Q.origQ) === questionUid(rawQ)
+    ? {
+      q: CURRENT_Q.q,
+      o: CURRENT_Q.displayOpts,
+      a: CURRENT_Q.displayA,
+      e: CURRENT_Q.e,
+      code: CURRENT_Q.code
+    }
+    : null;
   save();
-  alert('Question quarantined.');
+  enqueueBackgroundQuestionAi('correction', rawQ, shown);
   next();
 }
 
@@ -5576,7 +5603,7 @@ function calculateUnitCoverage() {
     if (q.qid) byUid.set(q.qid, q);
     const key = qk(q);
     if (key) byQk.set(key, q);
-    if (isQuestionDeleted(q) || q.quarantined) return;
+    if (isQuestionDeleted(q) || isQuestionQuarantined(q)) return;
     const subject = subjects[canonSubj(q.s)];
     const unit = questionScopeUnit(q);
     const topicId = String(q.topic_id || '').trim();
@@ -5822,7 +5849,7 @@ function pickCoverageQuestions(pool, limit, snapshot, opts = {}) {
   const unmapped = [];
   const seen = new Set();
   (pool || []).forEach(q => {
-    if (!q || !normalSessionEligible(q) || isQuestionDeleted(q) || q.quarantined) return;
+    if (!q || !normalSessionEligible(q) || isQuestionDeleted(q)) return;
     const identity = questionUid(q) || qk(q);
     if (seen.has(identity) || excluded.has(identity) || wasAnsweredToday(q, doneToday)) return;
     seen.add(identity);
@@ -5998,24 +6025,35 @@ function renderReadinessMeter(coverageSnapshot) {
   const studiedTotal = Math.max(studiedQuestionKeys.length, overall.attempts);
   const lockedPct = studiedTotal ? Math.round(lockedCount / studiedTotal * 100) : 0;
 
-  const rows = Object.values(stats.subjects)
-    .map(r => ({
-      k: r.subject,
-      tot: r.attempts,
-      acc: r.score,
-      raw: r.raw,
-      target: r.target,
-      isCalibrated: r.attempts >= 15
-    }))
+  const rowBySubject = new Map(Object.values(stats.subjects).map(r => [canonSubj(r.subject), {
+    k: r.subject,
+    tot: r.attempts,
+    acc: r.score,
+    raw: r.raw,
+    target: r.target,
+    isCalibrated: r.attempts >= 15,
+    assessed: true
+  }]));
+  bankSubjects().forEach(subject => {
+    if (!rowBySubject.has(subject)) {
+      rowBySubject.set(subject, {
+        k: subject,
+        tot: 0,
+        acc: null,
+        raw: null,
+        target: subjectTarget(subject),
+        isCalibrated: false,
+        assessed: false
+      });
+    }
+  });
+  const rows = [...rowBySubject.values()]
     .sort((a, b) => {
       const tierPriority = r => TIER_A_SUBJECTS.has(canonSubj(r.k)) ? 0 : 1;
-      const priority = r => {
-        if (r.isCalibrated && r.acc <= 0.40) return 1;
-        if (r.isCalibrated && r.acc < r.target) return 2;
-        if (!r.isCalibrated) return 3;
-        return 4;
-      };
-      return tierPriority(a) - tierPriority(b) || priority(a) - priority(b) || a.acc - b.acc || b.tot - a.tot;
+      const gap = r => r.assessed ? Math.max(0, r.target - r.acc) : 1;
+      return tierPriority(a) - tierPriority(b) || gap(b) - gap(a) ||
+        (a.assessed === b.assessed ? 0 : a.assessed ? 1 : -1) ||
+        (a.assessed && b.assessed ? a.acc - b.acc : 0) || b.tot - a.tot;
     });
 
   const l0Rows = Object.values(stats.l0);
@@ -6088,7 +6126,7 @@ function renderReadinessMeter(coverageSnapshot) {
         const cov = unitCoverage.subjects[canonSubj(r.k)];
         const covText = cov ? `${cov.touchedUnits}/${cov.unitCount} units` : '';
         let dotClass = 'dot-gray';
-        let statusText = `Calibrating (${r.tot}/15)`;
+        let statusText = r.assessed ? `Calibrating (${r.tot}/15)` : 'Not assessed';
         if (r.isCalibrated) {
           if (r.acc >= r.target) { dotClass = 'dot-green'; statusText = `${Math.round(r.acc * 100)}% · Solid`; }
           else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
@@ -6104,7 +6142,7 @@ function renderReadinessMeter(coverageSnapshot) {
             <div class="row sm" style="align-items:center;font-size:12px;margin-top:2px">
               <span class="status-dot ${dotClass}"></span>
               <b>${statusText}</b>
-              <span class="mu" style="margin-left:auto">${covText ? covText + ' · ' : ''}${r.tot} att · ${fixCount}d · ${Math.round((typeof r.acc==='number'?r.acc:0)*100)}%</span>
+              <span class="mu" style="margin-left:auto">${covText ? covText + ' · ' : ''}${r.tot} att · ${fixCount}d · ${r.assessed ? Math.round(r.acc * 100) + '%' : 'not assessed'}</span>
             </div>
           </div>
         `;
@@ -6153,14 +6191,17 @@ function bankSubjects() {
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
-function selectSubjectDrillQuestions(subjectName, requestedCount) {
+function selectSubjectDrillQuestions(subjectName, requestedCount, includeAnsweredToday = false) {
   const norm = canonSubj(subjectName);
   const seen = new Set();
   const doneToday = questionsAnsweredToday();
-  const pool = bankQuestionPool().filter(q => {
-    if (!q || canonSubj(q.s) !== norm) return false;
-    if (q.quarantined || !normalSessionEligible(q) || wasAnsweredToday(q, doneToday)) return false;
-    const key = qk(q);
+  const subjectBank = bankQuestionPool().filter(q =>
+    q && canonSubj(q.s) === norm && !isQuestionDeleted(q)
+  );
+  const eligible = subjectBank.filter(q => normalSessionEligible(q));
+  const answeredTodayCount = eligible.filter(q => wasAnsweredToday(q, doneToday)).length;
+  const pool = eligible.filter(q => includeAnsweredToday || !wasAnsweredToday(q, doneToday)).filter(q => {
+    const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -6173,14 +6214,33 @@ function selectSubjectDrillQuestions(subjectName, requestedCount) {
     return unit == null ? null : `${canonSubj(q.s)}::${unit}`;
   }).filter(Boolean));
   const maxPerUnit = Math.max(2, Math.ceil(count / Math.max(1, unitKeys.size)));
-  const selected = pickCoverageQuestions(pool, count, calculateUnitCoverage(), { maxPerUnit, doneToday, includeUnmapped: true });
-  return { pool, selected, total: pool.length };
+  const selected = pickCoverageQuestions(pool, count, calculateUnitCoverage(), {
+    maxPerUnit,
+    doneToday: includeAnsweredToday ? new Set() : doneToday,
+    includeUnmapped: true
+  });
+  return {
+    pool,
+    selected,
+    total: pool.length,
+    bankCount: subjectBank.length,
+    eligibleCount: eligible.length,
+    answeredTodayCount
+  };
 }
 
 function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
-  const result = selectSubjectDrillQuestions(subjectName, requestedCount);
+  let result = selectSubjectDrillQuestions(subjectName, requestedCount);
+  if (!result.pool.length && result.answeredTodayCount > 0) {
+    if (!confirm(`You have answered all ${result.answeredTodayCount} eligible ${subjectName} question(s) today. Repeat them now?`)) return;
+    result = selectSubjectDrillQuestions(subjectName, requestedCount, true);
+  }
+  if (!result.bankCount) {
+    alert(`No bank questions are available for ${subjectName}.`);
+    return;
+  }
   if (!result.pool.length) {
-    alert('No questions found for subject: ' + subjectName);
+    alert(`No eligible questions are available for ${subjectName} right now. ${result.bankCount - result.eligibleCount} question(s) are cold, quarantined, or code-trace restricted.`);
     return;
   }
   if (!result.selected.length) {
@@ -6203,7 +6263,7 @@ function startSyllabusUnitDrill(subjectName, unitNumber, topicId) {
     q &&
     canonSubj(q.s) === subject &&
     questionScopeUnit(q) === Number(unitNumber) &&
-    !q.quarantined &&
+    !isQuestionQuarantined(q) &&
     normalSessionEligible(q) &&
     !isQuestionDeleted(q) &&
     !wasAnsweredToday(q, doneToday)
@@ -6844,7 +6904,7 @@ function genPipelineCyclesQuestion() {
 function codeTracePool() {
   const seen = new Set();
   return bankQuestionPool().filter(q => {
-    if (!q || isQuestionDeleted(q) || q.quarantined || isColdQuestion(q)) return false;
+    if (!q || isQuestionDeleted(q) || isQuestionQuarantined(q) || isColdQuestion(q)) return false;
     if (!isCodeSnippetQuestion(q)) return false;
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
@@ -6864,7 +6924,7 @@ function codeTraceDueQuestions() {
 function startCalcTraceSession() {
   const seen = new Set();
   const candidates = bankQuestionPool().filter(q => {
-    if (!q || isQuestionDeleted(q) || q.quarantined || isColdQuestion(q)) return false;
+    if (!q || isQuestionDeleted(q) || isQuestionQuarantined(q) || isColdQuestion(q)) return false;
     if (isCodeSnippetQuestion(q)) return false; // Code traces strictly stay in Code Trace drill!
     const type = String(q.type || '').toLowerCase();
     if (!(q.calc || q.needs_paper || type === 'calc')) return false;
@@ -8116,8 +8176,9 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
     const vRec = V[k] = V[k] || {};
     const pastValues = Array.isArray(vRec._pastValues) ? vRec._pastValues : [];
     const previousVariantStem = vRec._variant && vRec._variant.q ? [vRec._variant.q] : [];
-    const avoid = [...pastValues, ...previousVariantStem].filter(Boolean);
+    const avoid = opts.correction ? [] : [...pastValues, ...previousVariantStem].filter(Boolean);
 
+    const sourceQuestion = opts.sourceOverride || targetQ;
     const source = {
       subject: targetQ.s,
       unit: targetQ.u || targetQ.unit || '',
@@ -8125,22 +8186,28 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
       topic_id: targetQ.topic_id || '',
       tag: targetQ.t || targetQ.tag || '',
       type: targetQ.type || '',
-      stem: targetQ.q,
-      code: targetQ.code || [],
-      options: targetQ.o,
-      answer: targetQ.a,
-      why: targetQ.e || '',
+      stem: sourceQuestion.q,
+      code: sourceQuestion.code || targetQ.code || [],
+      options: sourceQuestion.o || targetQ.o,
+      answer: sourceQuestion.a == null ? targetQ.a : sourceQuestion.a,
+      why: sourceQuestion.e || targetQ.e || '',
       avoid,
-      is_cold_marked: isColdQuestion(targetQ)
+      is_cold_marked: isColdQuestion(targetQ) && !opts.correction
     };
 
-    const isCold = isColdQuestion(targetQ);
+    const isCorrection = opts.correction === true;
+    const isCold = isColdQuestion(targetQ) && !isCorrection;
     const coldRule = isCold
       ? ' SPECIAL RULE: This is a replacement for a question the student marked too easy. Keep the same broad concept and exact subject/unit/topic, but test a clearly DIFFERENT microconcept within that subunit. Do not paraphrase, reuse the same fact, or merely change numbers/scenario. If no genuinely useful sibling microconcept exists, say so in sibling_reason and the validator should reject it.'
       : '';
-    const promptB = 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. State source_microconcept and microconcept separately, and explain the relationship in sibling_reason. For factual, definitional, or programming-concept questions, target a different property, comparison, consequence, or application, not just a rewording. For calculation, trace, or code questions, test a different operation or principle, not merely different numbers or a scenario swap. If the unit offers no meaningful sibling, say so rather than inventing an unrelated question.' + coldRule + ' Rules: 1. Keep the same subject, unit, topic_id, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}';
+    const promptB = isCorrection
+      ? 'You are an expert exam writer reviewing a question flagged as possibly incorrect. Correct factual, mathematical, coding, answer-key, or explanation errors while preserving the original learning objective and difficulty. Do not introduce an unrelated concept. If the source is already correct, return a corrected equivalent question with the same intended answer. Solve it independently and return a clear explanation. '
+      : 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. State source_microconcept and microconcept separately, and explain the relationship in sibling_reason. For factual, definitional, or programming-concept questions, target a different property, comparison, consequence, or application, not just a rewording. For calculation, trace, or code questions, test a different operation or principle, not merely different numbers or a scenario swap. If the unit offers no meaningful sibling, say so rather than inventing an unrelated question.';
+    const fullPrompt = isCorrection
+      ? promptB + ' Rules: Keep the same subject, unit, topic_id, learning objective, and difficulty. Correct the flagged error rather than avoiding or paraphrasing the source. Solve independently in "working"; ensure the answer and explanation agree. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}'
+      : promptB + coldRule + ' Rules: 1. Keep the same subject, unit, topic_id, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}';
 
-    const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL, 18000, true);
+    const genResult = await fetchGeminiWithFallback(fullPrompt + '\n\nSource Question:\n' + JSON.stringify(source), isCorrection ? 0.2 : 0.8, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
     const generatedOptions = Array.isArray(v.options)
       ? v.options.slice()
@@ -8207,7 +8274,8 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
     const randomizedOpts = origIndices.map(idx => generatedOptions[idx]);
     const newAnswerIdx = origIndices.indexOf(generatedAnswer);
 
-    if (opts.background && (isQuestionDeleted(targetQ) || effWellMade(targetQ))) {
+    if (opts.background && (isQuestionDeleted(targetQ) || effWellMade(targetQ) ||
+        (isCorrection ? !isQuestionQuarantined(targetQ) : isQuestionQuarantined(targetQ)))) {
       throw new Error('Question is no longer eligible for background refresh.');
     }
     if (opts.background && MK) {
@@ -8539,7 +8607,7 @@ function mockPool(rawPool) {
   const seen = new Set();
   const out = [];
   (rawPool || []).forEach(q => {
-    if (!q || q.quarantined) return;
+    if (!q || isQuestionQuarantined(q)) return;
     const id = questionUid(q) || qk(q);
     if (!id || seen.has(id)) return;
     seen.add(id);
