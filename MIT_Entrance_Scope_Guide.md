@@ -1,6 +1,6 @@
 # MIT Entrance Master Guide (19 Subjects)
 
-**A complete, unified reference combining Exam Strategy and Active Recall Webs for all 19 Entrance Subjects.**
+**The single human-readable MIT entrance preparation guide**, bringing together the exam strategy, study plan, recall webs for all 19 subjects, and question-generation rules. The app uses the separate [structured syllabus](./mit_entrance_syllabus.json) for exact topic coverage and tracking. Exam format, scope, and weighting claims should be verified against current TU notices and official past papers.
 
 ---
 
@@ -10,9 +10,17 @@
   - [1. Scope and marks](#1-scope-and-marks)
   - [2. What the paper really is](#2-what-the-paper-really-is)
   - [3. Subject cheat lines (Tier A, Tier B)](#3-subject-cheat-lines)
+  - [4. Calc and trace bank](#4-calc-and-trace-bank)
+  - [5. Shaky keys and ambiguous questions](#5-shaky-keys-and-ambiguous-questions)
+  - [6. Method](#6-method-optimal-and-non-boring)
+  - [7. 60-day plan](#7-60-day-plan-light-version-about-1-h-55-min-a-day-mcq-focused)
+  - [8–10. Exam day, pitfalls, and verification](#8-exam-day)
+  - [11. From MCQs to real learning](#11-from-mcqs-to-real-learning-the-weak-subject-loop)
+  - [12–14. Interest breaks, milestones, and evidence](#12-interest-breaks-for-boring-stretches)
 - [Part II: Active Recall Web & Confusion Traps (A ≠ B)](#part-ii-active-recall-web--confusion-traps-a--b)
   - [16 Computing Subjects (BIT101–BIT403)](#1-introduction-to-it-bit101)
   - [3 Mathematics & Statistics Subjects (MTH104, MTH168, STA154)](#17-basic-mathematics-mth104)
+  - [Structured syllabus and concept IDs](./mit_entrance_syllabus.json)
 - [Appendix: Levels, Scope, Option-Quality & Variant Rules for AI Question Generation](#appendix-levels-scope-option-quality--variant-rules-for-ai-question-generation)
 - [Tool Adjustments (general)](#tool-adjustments-general-not-specific-to-this-guide)
 
@@ -206,7 +214,7 @@ MCQs alone are not enough. Practice tests beat re-reading, but multiple-choice h
 - **Math and calculation topics are different:** retrieval practice is not clearly proven for maths, so learn them with worked examples and then fresh variants (Appendix, Rule 9), not formula flashcards alone.
 
 **Weak-subject concept pass (25–30 min, replaces some MCQ time for Red and Amber subjects)**
-1. Pick one Red/Amber subject and 3–5 **L0** concepts from the Part II recall web.
+1. Pick one Red/Amber subject and 3–5 **L0** concepts from the structured syllabus JSON; use this guide's recall web for cues and explanations.
 2. **Blank-page recall:** write everything you remember about one concept from its cue, without looking.
 3. Compare with notes, patch the gaps, and add one "confused with" line for each A ≠ B pair.
 4. Finish with 5 MCQs on exactly those concepts, and log any miss.
@@ -274,7 +282,7 @@ Tags: **[M]** meta-analysis, **[S]** single study, **[D]** design judgment. Deta
 
 Oct 13, 2026 · @prakash
 
-Cue-only recall web for every non-trivial or confusable unit in the 16 syllabus subjects: read a cue, retrieve what you know, then check your notes. Every cue is a syllabus term or a direct sub-part of one; nothing from outside the listed units. Merged with the formal syllabus, so no separate syllabus is needed: every unit of every subject is covered here. A ≠ B marks a pair you must be able to tell apart; \[calc\] marks topics to practise by hand.
+Cue-only recall web for every non-trivial or confusable unit in the 16 computing subjects, plus hand-practice cues for the three mathematics and statistics subjects: read a cue, retrieve what you know, then check your notes. Every cue is a syllabus term or a direct sub-part of one; nothing from outside the listed units. The structured syllabus JSON is the canonical machine-readable topic inventory for app coverage; this guide is its human-readable companion. A ≠ B marks a pair you must be able to tell apart; \[calc\] marks topics to practise by hand.
 
 ## 1. Introduction to IT (BIT101)
 
@@ -928,10 +936,10 @@ The real paper is about **60–70% single-fact recall, 20–30% pick-the-sibling
 
 - **Banned (too easy):** anything a person with no CSIT background could guess; "What does CPU stand for?"; "Is a mouse an input or output device?"; any question where 3 of 4 options are absurd or unrelated.
 - **Banned (too hard):** derivations, multi-step proofs, long programs. Exact or advanced but still in-syllabus items are not banned; they are simply high-level and low-priority (Rule 3).
-- **Target:** a precise fact, a confusable pair from the recall web (the `A ≠ B` cues), or one small `[calc]` step.
+- **Target:** a precise fact, a confusable pair from the structured syllabus JSON (`confusable_with`, reflected by the recall web's A ≠ B cues), or one small `[calc]` step.
 
 ## Rule 2 — Strictly No Out-of-Scope Content
-Every question must map to one specific topic in the **Part II recall web** (every syllabus unit is in it).
+Every question must map to one specific topic in the **syllabus JSON (mit_entrance_syllabus.json)** (every syllabus unit is represented there).
 - Do not add topics, tools, frameworks or theory the web does not name, even if related or "commonly asked".
 - Do not escalate beyond what a unit lists (e.g. the DBMS unit stops at 4NF, so no 5NF question).
 - If unsure whether a concept is in scope, **exclude it**.

@@ -808,6 +808,8 @@ window.MathJax = {
  *   applyQuestionOverridesEverywhere(), editor and deletion helpers.
  * Scheduling/readiness: Spaced Repetition; sr(), buildTodaySession(),
  *   readinessStats(), milestoneSubjectSignals().
+ * MIT syllabus focus: mit_entrance_syllabus.json, calculateUnitCoverage(),
+ *   renderSyllabusStudyPlan(), explicit question topic_id mappings.
  * Flashcards: PHASE 5; card generation/linking, manager, review, and ratings.
  * Question UI/grading: Question Screen & Presentation; show(), pick(),
  *   typed/free-response handlers, done().
@@ -2001,6 +2003,7 @@ function applyQuestionOverride(q) {
   if (typeof edit.e === 'string') q.e = edit.e;
   if (typeof edit.s === 'string' && edit.s.trim()) q.s = edit.s;
   if (typeof edit.u === 'string') q.u = edit.u;
+  if (typeof edit.topic_id === 'string') q.topic_id = edit.topic_id;
   if (typeof edit.regeneratable === 'boolean') q.regeneratable = edit.regeneratable;
   q.quick = typeof edit.quick === 'boolean' ? edit.quick : isQuickQuestion(q);
   return q;
@@ -2261,8 +2264,8 @@ function parseMd(t) {
   let cur = null, sub = '', code = false, m;
   for (const l of t.slice(a, b).split('\n')) {
     if (m = l.match(/^### (.+)/)) { sub = canonSubj(m[1]); continue; }
-    if (m = l.match(/^\*\*Q(\d+)\.\*\*\s*(?:\*\(U\d+\)\*\s*)?(.*)/)) {
-      cur = { n: +m[1], s: sub, q: m[2], code: [], o: [] };
+    if (m = l.match(/^\*\*Q(\d+)\.\*\*\s*(?:\*\(U(\d+)\)\*\s*)?(.*)/)) {
+      cur = { n: +m[1], s: sub, unit: m[2] ? Number(m[2]) : null, q: m[3], code: [], o: [] };
       qs.push(cur); code = false; continue;
     }
     if (!cur) continue;
@@ -2323,6 +2326,7 @@ function parseJson(a) {
       id: x.id,
       s: canonSubj(x.subject || 'General'),
       u: x.unit || '',
+      unit: x.unit,
       t: x.tag || '',
       q: String(x.stem),
       code: x.code ? (Array.isArray(x.code) ? x.code : String(x.code).split('\n')) : [],
@@ -2332,6 +2336,9 @@ function parseJson(a) {
       quick: x.quick,
       regeneratable: typeof x.regeneratable === 'boolean' ? x.regeneratable : undefined,
       level: Number.isInteger(x.level) && x.level >= 0 && x.level <= 3 ? x.level : undefined,
+      unit: x.unit,
+      topic_id: typeof x.topic_id === 'string' ? x.topic_id.trim() : '',
+      unit_name: typeof x.unit_name === 'string' ? x.unit_name : '',
       calc: x.calc,
       needs_paper: x.needs_paper
     };
@@ -2370,6 +2377,7 @@ function parseBank(x) {
         giveaway_risk: !!q.giveaway_risk,
         unit: q.unit,
         unit_name: q.unit_name || '',
+        topic_id: typeof q.topic_id === 'string' ? q.topic_id.trim() : '',
         unit_conf: q.unit_conf || '',
         level: Number.isInteger(q.level) && q.level >= 0 && q.level <= 3 ? q.level : 1,
         calc: q.type === 'calc' || !!q.calc,
@@ -2468,6 +2476,7 @@ function canonSubj(s) {
   if (l.includes('artificial intel') || l.includes(' ai')) return 'Artificial Intelligence';
   if (l.includes('computer graph')) return 'Computer Graphics';
   if (l.includes('intro') && l.includes('it')) return 'Introduction to IT';
+  if (l.includes('basic math')) return 'Basic Mathematics: Calculus & Functions';
   if (l.includes('calculus') || l.includes('functions')) return 'Basic Mathematics: Calculus & Functions';
   if (l.includes('linear algebra') || l.includes('abstract algebra')) return 'Linear & Abstract Algebra';
   if (l.includes('statistics')) return 'Basic Statistics';
@@ -2516,7 +2525,8 @@ const SYLLABUS_UNIT_COUNTS = {
   'Systems Analysis & Design': 5,
   'E-Commerce': 7
 };
-const SYLLABUS_TOTAL_UNITS = Object.values(SYLLABUS_UNIT_COUNTS).reduce((sum, count) => sum + count, 0);
+let MIT_SYLLABUS = null;
+let syllabusLoadError = '';
 const MISSING_BANK_UNITS = [
   { subject: 'Introduction to IT', unit: 8, name: 'Application and impact of IT' },
   { subject: 'C Programming', unit: 3, name: 'Input/output functions' },
@@ -2526,10 +2536,85 @@ const MISSING_BANK_UNITS = [
 function questionScopeUnit(q) {
   if (!q) return null;
   const rawUnit = q.unit != null ? String(q.unit).trim() : '';
-  if (/^\d+$/.test(rawUnit)) return Number(rawUnit);
+  const rawMatch = rawUnit.match(/^(?:u(?:nit)?\s*)?(\d+)\b/i);
+  if (rawMatch) return Number(rawMatch[1]);
   const name = String(q.unit_name || '').trim();
   const match = name.match(/^(?:unit\s*)?(\d+)\b/i);
   return match ? Number(match[1]) : null;
+}
+
+function syllabusSubjectList() {
+  if (!MIT_SYLLABUS || !Array.isArray(MIT_SYLLABUS.subjects)) return [];
+  return MIT_SYLLABUS.subjects.map(subject => ({
+    ...subject,
+    canonicalName: canonSubj(subject.name)
+  }));
+}
+
+function syllabusTopicsForQuestion(q) {
+  const subject = syllabusSubjectList().find(item => item.canonicalName === canonSubj(q && q.s));
+  const unitNumber = questionScopeUnit(q);
+  const unit = subject && unitNumber != null ? subject.units[unitNumber - 1] : null;
+  return unit && Array.isArray(unit.topics) ? unit.topics : [];
+}
+
+function findSyllabusTopic(topicId) {
+  if (!topicId || !MIT_SYLLABUS) return null;
+  for (const subject of MIT_SYLLABUS.subjects || []) {
+    for (let unitIndex = 0; unitIndex < (subject.units || []).length; unitIndex++) {
+      const unit = subject.units[unitIndex];
+      const topic = (unit.topics || []).find(item => item.id === topicId);
+      if (topic) return { subject: canonSubj(subject.name), unit: unitIndex + 1, topic };
+    }
+  }
+  return null;
+}
+
+async function loadMitSyllabus() {
+  const response = await fetch('mit_entrance_syllabus.json', { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`Syllabus request failed (${response.status}).`);
+  const syllabus = await response.json();
+  if (!syllabus || !Array.isArray(syllabus.subjects)) throw new Error('Syllabus data is missing its subjects list.');
+
+  const subjectNames = new Set();
+  const topicIds = new Set();
+  let unitCount = 0;
+  for (const subject of syllabus.subjects) {
+    if (!subject || !subject.name || !Array.isArray(subject.units)) throw new Error('Syllabus contains an invalid subject or unit list.');
+    const canonicalName = canonSubj(subject.name);
+    if (subjectNames.has(canonicalName)) throw new Error(`Syllabus contains a duplicate subject: ${subject.name}.`);
+    subjectNames.add(canonicalName);
+    unitCount += subject.units.length;
+    for (const unit of subject.units) {
+      if (!unit || !unit.name || !Array.isArray(unit.topics)) throw new Error(`Syllabus contains an invalid unit in ${subject.name}.`);
+      for (const topic of unit.topics) {
+        if (!topic || !topic.id || !topic.name || topicIds.has(topic.id)) throw new Error(`Syllabus contains a missing or duplicate topic ID in ${subject.name}.`);
+        topicIds.add(topic.id);
+      }
+    }
+  }
+  if (syllabus.subjects.length !== 19 || unitCount !== 160 || !topicIds.size) {
+    throw new Error(`Unexpected syllabus inventory: ${syllabus.subjects.length} subjects, ${unitCount} units, ${topicIds.size} topics.`);
+  }
+
+  MIT_SYLLABUS = syllabus;
+  syllabusLoadError = '';
+  return syllabus;
+}
+
+function retryMitSyllabusLoad() {
+  syllabusLoadError = '';
+  loadMitSyllabus().then(() => {
+    refreshSyllabusHome();
+  }).catch(error => {
+    syllabusLoadError = error && error.message ? error.message : String(error);
+    console.error('MIT syllabus failed to load:', error);
+    refreshSyllabusHome();
+  });
+}
+
+function refreshSyllabusHome() {
+  if (view === 'home' && D && !loadMode && !$('#gk') && !$('#q-editor-overlay')) home(true);
 }
 const DAY_MS = 86400000;
 const localDateKey = (ts) => {
@@ -3417,6 +3502,25 @@ function openQuestionEditorForQuestion(q, opts = {}) {
     e: variant.e,
     code: variant.code
   }) : q;
+  const topicChoices = syllabusTopicsForQuestion(q);
+  const currentTopicId = String(q.topic_id || '').trim();
+  const currentTopicAvailable = topicChoices.some(topic => topic.id === currentTopicId);
+  const topicField = variantMode ? '' : `
+    <label for="qe-topic">Syllabus concept (optional)</label>
+    ${!MIT_SYLLABUS ? `
+      <div class="mu sm">Syllabus data is unavailable; existing mapping will be preserved. ${syllabusLoadError ? esc(syllabusLoadError) : ''}</div>
+      <button type="button" class="sm" onclick="retryMitSyllabusLoad()">Retry syllabus load</button>
+    ` : topicChoices.length ? `
+      <select id="qe-topic">
+        <option value="">Not mapped</option>
+        ${currentTopicId && !currentTopicAvailable ? `<option value="${esc(currentTopicId)}" selected>Current mapping · ${esc(currentTopicId)} (check alignment)</option>` : ''}
+        ${topicChoices.map(topic => `<option value="${esc(topic.id)}" ${topic.id === currentTopicId ? 'selected' : ''}>${esc(topic.id)} · L${Number.isInteger(topic.level) ? topic.level : '?'} · ${esc(topic.name)}</option>`).join('')}
+      </select>
+      <div class="mu sm">Choose an exact topic from this question's subject and unit. This enables concept-level progress.</div>
+    ` : `
+      <div class="mu sm">No topics match this question's subject and unit. Keep it unmapped; it remains available for regular practice.</div>
+    `}
+  `;
   window._qEditUid = questionUid(q);
   window._qEditVariant = variantMode;
   window._qEditSourceKey = sourceKey;
@@ -3470,6 +3574,7 @@ function openQuestionEditorForQuestion(q, opts = {}) {
           <input type="text" id="qe-unit" value="${esc(q.u || '')}" ${variantMode ? 'disabled title="Variant edits keep the source unit"' : ''}>
         </div>
       </div>
+      ${topicField}
       <label for="qe-exp">Explanation / why</label>
       <textarea id="qe-exp" rows="3">${esc(editQ.e || '')}</textarea>
       <div class="row" style="justify-content:space-between;margin-top:16px;gap:8px;flex-wrap:wrap">
@@ -3512,11 +3617,20 @@ function saveQuestionEditor() {
   const explanation = ((document.getElementById('qe-exp') || {}).value || '').trim();
   const subject = ((document.getElementById('qe-subject') || {}).value || '').trim();
   const unit = ((document.getElementById('qe-unit') || {}).value || '').trim();
+  const topicInput = document.getElementById('qe-topic');
+  const topicId = topicInput ? topicInput.value.trim() : String(target.topic_id || '').trim();
   const regenEl = document.getElementById('qe-regen');
   const regeneratable = regenEl ? !!regenEl.checked : effRegeneratable(target);
   if (!stem) { alert('The question stem cannot be empty.'); return; }
   if (options.some(o => !o)) { alert('All four options are required.'); return; }
   if (!(answer >= 0 && answer < 4)) { alert('Choose a valid correct option.'); return; }
+  if (topicId && MIT_SYLLABUS) {
+    const mappedTopic = findSyllabusTopic(topicId);
+    if (!mappedTopic || mappedTopic.subject !== canonSubj(subject || target.s) || mappedTopic.unit !== questionScopeUnit(target)) {
+      alert('Choose a syllabus topic that exactly matches this question’s subject and unit, or select “Not mapped.”');
+      return;
+    }
+  }
 
   const oldQk = qk(target);
 
@@ -3551,6 +3665,7 @@ function saveQuestionEditor() {
     e: explanation,
     s: subject ? canonSubj(subject) : target.s,
     u: unit,
+    topic_id: topicId,
     regeneratable,
     updatedAt: Date.now()
   };
@@ -5313,24 +5428,61 @@ function calculateUnitCoverage() {
   const now = Date.now();
   const sevenDays = 7 * 86400000;
   const subjects = {};
-  Object.entries(SYLLABUS_UNIT_COUNTS).forEach(([subject, unitCount]) => {
+  const syllabusSubjects = syllabusSubjectList();
+  const subjectDefinitions = syllabusSubjects.length
+    ? syllabusSubjects
+    : Object.entries(SYLLABUS_UNIT_COUNTS).map(([name, count]) => ({
+      name,
+      canonicalName: canonSubj(name),
+      units: Array.from({ length: count }, (_, index) => ({ name: `Unit ${index + 1}`, topics: [] }))
+    }));
+  const topicsById = new Map();
+  subjectDefinitions.forEach(subjectDefinition => {
+    const subject = subjectDefinition.canonicalName || canonSubj(subjectDefinition.name);
+    const unitDefinitions = Array.isArray(subjectDefinition.units) ? subjectDefinition.units : [];
+    const unitCount = unitDefinitions.length;
     const units = {};
     for (let unit = 1; unit <= unitCount; unit++) {
+      const definition = unitDefinitions[unit - 1] || {};
+      const topicList = (Array.isArray(definition.topics) ? definition.topics : []).map(topic => {
+        const entry = {
+          id: String(topic.id),
+          subject,
+          unit,
+          name: String(topic.name),
+          level: Number.isInteger(topic.level) ? topic.level : 3,
+          importance: Number(topic.importance) || 0,
+          weight: Number(topic.global_weight_pct) || 0,
+          type: String(topic.type || 'recall'),
+          skip: topic.skip === true,
+          note: String(topic.note || ''),
+          confusableWith: Array.isArray(topic.confusable_with) ? topic.confusable_with : [],
+          bankCount: 0,
+          attemptCount: 0,
+          knownCount: 0,
+          knownDays: new Set(),
+          recentConf3Miss: false,
+          solid: false
+        };
+        topicsById.set(entry.id, entry);
+        return entry;
+      });
       units[unit] = {
         subject,
         unit,
-        name: `Unit ${unit}`,
+        name: String(definition.name || `Unit ${unit}`),
         bankCount: 0,
         touchedCount: 0,
         knownCount: 0,
         knownDays: new Set(),
         recentConf3Miss: false,
-        solid: false
+        solid: false,
+        topicList
       };
     }
     subjects[subject] = { subject, unitCount, units, touchedUnits: 0, solidUnits: 0, bankSupportedUnits: 0 };
   });
-  MISSING_BANK_UNITS.forEach(item => {
+  if (!syllabusSubjects.length) MISSING_BANK_UNITS.forEach(item => {
     const subject = subjects[item.subject];
     const unit = subject && subject.units[item.unit];
     if (unit) unit.name = item.name;
@@ -5339,6 +5491,8 @@ function calculateUnitCoverage() {
   const byUid = new Map();
   const byQk = new Map();
   let unmappedQuestions = 0;
+  let unmappedTopicQuestions = 0;
+  let mappedTopicQuestions = 0;
   bankQuestionPool().forEach(q => {
     if (!q || typeof q !== 'object') return;
     const uid = questionUid(q);
@@ -5349,6 +5503,15 @@ function calculateUnitCoverage() {
     if (isQuestionDeleted(q) || q.quarantined) return;
     const subject = subjects[canonSubj(q.s)];
     const unit = questionScopeUnit(q);
+    const topicId = String(q.topic_id || '').trim();
+    const topic = topicId && topicsById.get(topicId);
+    const topicMatches = !!(topic && subject && topic.subject === subject.subject && topic.unit === unit);
+    if (topicMatches) {
+      topic.bankCount++;
+      mappedTopicQuestions++;
+    } else {
+      unmappedTopicQuestions++;
+    }
     if (!subject || unit == null || unit < 1 || unit > subject.unitCount) {
       unmappedQuestions++;
       return;
@@ -5372,19 +5535,37 @@ function calculateUnitCoverage() {
   };
 
   const latestByIdentity = new Map();
+  const latestTopicByIdentity = new Map();
   (L || []).forEach(rec => {
     if (!rec || rec.mock === 1) return;
     const found = recordUnit(rec);
     if (!found) return;
     const identity = questionUid(found.q) || qk(found.q);
     const prev = latestByIdentity.get(identity);
-    if (!prev || (rec.t || 0) >= (prev.rec.t || 0)) latestByIdentity.set(identity, { rec, entry: found.entry });
+    if (!prev || (rec.t || 0) >= (prev.rec.t || 0)) latestByIdentity.set(identity, { rec, entry: found.entry, q: found.q });
+    if (rec.variant !== true) {
+      const topic = topicsById.get(String(found.q.topic_id || '').trim());
+      if (topic && topic.subject === found.subject.subject && topic.unit === found.entry.unit) {
+        const topicPrev = latestTopicByIdentity.get(identity);
+        if (!topicPrev || (rec.t || 0) >= (topicPrev.rec.t || 0)) latestTopicByIdentity.set(identity, { rec, topic });
+      }
+    }
   });
-  latestByIdentity.forEach(({ rec, entry }) => {
+  latestByIdentity.forEach(({ rec, entry, q }) => {
     entry.touchedCount++;
     const conf = rec.cf != null ? rec.cf : (rec.conf != null ? rec.conf : null);
     const skipped = rec.skipped === true || rec.ch === -1;
-    if (rec.ok === true && !skipped && (conf == null || conf >= 2)) entry.knownCount++;
+    const known = rec.ok === true && !skipped && (conf == null || conf >= 2);
+    if (known) entry.knownCount++;
+  });
+  latestTopicByIdentity.forEach(({ rec, topic }) => {
+    topic.attemptCount++;
+    const conf = rec.cf != null ? rec.cf : (rec.conf != null ? rec.conf : null);
+    const skipped = rec.skipped === true || rec.ch === -1;
+    if (rec.ok === true && !skipped && conf != null && conf >= 2) {
+      topic.knownCount++;
+      topic.knownDays.add(localDateKey(rec.t || 0));
+    }
   });
   (L || []).forEach(rec => {
     if (!rec || rec.mock === 1) return;
@@ -5397,6 +5578,10 @@ function calculateUnitCoverage() {
     }
     if (!rec.ok && !skipped && conf === 3 && (now - (rec.t || 0)) < sevenDays) {
       found.entry.recentConf3Miss = true;
+      const topic = !rec.variant && topicsById.get(String(found.q.topic_id || '').trim());
+      if (topic && topic.subject === found.subject.subject && topic.unit === found.entry.unit) {
+        topic.recentConf3Miss = true;
+      }
     }
   });
 
@@ -5404,6 +5589,9 @@ function calculateUnitCoverage() {
     Object.values(subject.units).forEach(entry => {
       const threshold = Math.min(2, entry.bankCount);
       entry.solid = entry.bankCount > 0 && entry.knownCount >= threshold && entry.knownDays.size >= 2 && !entry.recentConf3Miss;
+      entry.topicList.forEach(topic => {
+        topic.solid = topic.bankCount >= 2 && topic.knownCount >= 2 && topic.knownDays.size >= 2 && !topic.recentConf3Miss;
+      });
     });
     subject.touchedUnits = Object.values(subject.units).filter(entry => entry.touchedCount > 0).length;
     subject.solidUnits = Object.values(subject.units).filter(entry => entry.solid).length;
@@ -5419,13 +5607,128 @@ function calculateUnitCoverage() {
   return {
     subjects,
     subjectList,
-    totalUnits: SYLLABUS_TOTAL_UNITS,
+    totalUnits: Object.values(subjects).reduce((sum, subject) => sum + subject.unitCount, 0),
+    totalTopics: topicsById.size,
+    taggedTopics: [...topicsById.values()].filter(topic => topic.bankCount > 0).length,
+    touchedTopics: [...topicsById.values()].filter(topic => topic.attemptCount > 0).length,
+    solidTopics: [...topicsById.values()].filter(topic => topic.solid).length,
+    mappedTopicQuestions,
+    unmappedTopicQuestions,
+    topics: topicsById,
     touchedUnits: subjectList.reduce((sum, subject) => sum + subject.touchedUnits, 0),
     solidUnits: subjectList.reduce((sum, subject) => sum + subject.solidUnits, 0),
     bankSupportedUnits: subjectList.reduce((sum, subject) => sum + subject.bankSupportedUnits, 0),
     missingBankUnits,
     unmappedQuestions
   };
+}
+
+function getSyllabusStudyRecommendations(snapshot, limit = 6) {
+  if (!snapshot || !snapshot.topics) return [];
+  const availableTopics = [...snapshot.topics.values()].filter(topic => {
+    const unit = snapshot.subjects[topic.subject] && snapshot.subjects[topic.subject].units[topic.unit];
+    return topic.bankCount > 0 || (unit && unit.bankCount > 0);
+  });
+  const priorityRank = topic => {
+    if (topic.recentConf3Miss) return 0;
+    if (topic.bankCount && topic.attemptCount && !topic.solid) return 1;
+    if (topic.bankCount && !topic.attemptCount) return 2;
+    const unit = snapshot.subjects[topic.subject] && snapshot.subjects[topic.subject].units[topic.unit];
+    if (!topic.bankCount && unit && unit.bankCount && !unit.touchedCount) return 3 + topic.level;
+    if (!topic.bankCount && unit && unit.bankCount) return 6 + topic.level;
+    return 9 + topic.level;
+  };
+  const ranked = availableTopics
+    .filter(topic => !topic.skip)
+    .sort((a, b) =>
+      priorityRank(a) - priorityRank(b) ||
+      b.importance - a.importance ||
+      b.weight - a.weight ||
+      a.subject.localeCompare(b.subject) ||
+      a.unit - b.unit
+    );
+  const selected = [];
+  const selectedTopics = new Set();
+  const selectedSubjects = new Set();
+  ranked.forEach(topic => {
+    if (selected.length >= limit || selectedSubjects.has(topic.subject)) return;
+    selected.push(topic);
+    selectedTopics.add(topic.id);
+    selectedSubjects.add(topic.subject);
+  });
+  const selectedUnits = new Set(selected.map(topic => `${topic.subject}::${topic.unit}`));
+  ranked.forEach(topic => {
+    if (selected.length >= limit || selectedTopics.has(topic.id)) return;
+    const key = `${topic.subject}::${topic.unit}`;
+    if (selectedUnits.has(key)) return;
+    selected.push(topic);
+    selectedTopics.add(topic.id);
+    selectedUnits.add(key);
+  });
+  ranked.forEach(topic => {
+    if (selected.length >= limit || selectedTopics.has(topic.id)) return;
+    selected.push(topic);
+    selectedTopics.add(topic.id);
+  });
+  return selected;
+}
+
+function renderSyllabusStudyPlan(snapshot) {
+  if (!MIT_SYLLABUS) {
+    const message = syllabusLoadError
+      ? `Syllabus data could not be loaded: ${esc(syllabusLoadError)}`
+      : 'Loading the structured MIT syllabus…';
+    return `<div class="card"><h2 style="margin-top:0">🧭 Syllabus Study Focus</h2><p class="mu">${message}</p>${syllabusLoadError ? '<button class="sm" onclick="retryMitSyllabusLoad()">Retry syllabus load</button>' : ''}</div>`;
+  }
+  const recommendations = getSyllabusStudyRecommendations(snapshot);
+  const readiness = snapshot.totalTopics
+    ? `${snapshot.touchedTopics}/${snapshot.totalTopics} topics practiced · ${snapshot.solidTopics} solid with spaced evidence`
+    : 'No syllabus topics are available.';
+  return `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h2 style="margin:0">🧭 Syllabus Study Focus</h2>
+        <a class="mu sm" href="mit_entrance_syllabus.json" target="_blank" rel="noopener">Browse full syllabus</a>
+      </div>
+      <p class="mu sm" style="margin:6px 0 10px">${readiness} · ${snapshot.taggedTopics}/${snapshot.totalTopics} topics have explicitly mapped bank questions · ${snapshot.mappedTopicQuestions} mapped MCQs.</p>
+      <p class="mu sm">Recommended next: core and high-priority concepts first, with confusable pairs and calculation practice where specified. “Solid” requires spaced, confident evidence—not just one correct answer. Guide weights are study priorities, not verified exam predictions.</p>
+      ${snapshot.unmappedTopicQuestions ? `<p class="mu sm">ℹ️ ${snapshot.unmappedTopicQuestions} bank question(s) lack a valid <code>topic_id</code>; they remain available for normal practice and unit coverage, but do not count as concept evidence.</p>` : ''}
+      ${recommendations.length ? `
+        <div style="display:grid;gap:8px;margin-top:12px">
+          ${recommendations.map(topic => {
+            const status = topic.recentConf3Miss
+              ? 'Recent confident miss'
+              : topic.solid
+                ? 'Solid · spaced evidence'
+                : topic.attemptCount
+                  ? `Practiced · ${topic.knownCount} confident correct`
+                  : topic.bankCount
+                    ? `${topic.bankCount} mapped question(s) available`
+                    : 'No topic-tagged questions; unit drill only';
+            const detail = [
+              `Level ${topic.level} · ${topic.type} · priority ${topic.importance}/10`,
+              topic.confusableWith.length ? `Distinguish: ${topic.confusableWith.join(' / ')}` : '',
+              topic.note
+            ].filter(Boolean).join(' · ');
+            const action = topic.bankCount ? 'Practice concept' : 'Practice unit';
+            return `
+              <div style="border:1px solid var(--bd);border-radius:12px;padding:10px 12px">
+                <div class="row" style="justify-content:space-between;align-items:flex-start">
+                  <div style="flex:1;min-width:190px">
+                    <b>${esc(topic.name)}</b>
+                    <div class="mu sm">${esc(topic.subject)} · U${topic.unit} · ${esc(status)}</div>
+                    <div class="mu sm">${esc(detail)}</div>
+                  </div>
+                  <button class="sm" onclick="startSyllabusUnitDrill(${esc(JSON.stringify(topic.subject))},${topic.unit},${esc(JSON.stringify(topic.id))})">${action}</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '<p class="mu">No in-scope, non-skipped topics are available to recommend.</p>'}
+      <p class="mu sm" style="margin-bottom:0">For exact concept tracking, add the matching syllabus topic ID as <code>topic_id</code> when authoring or importing questions. Existing questions and study history are not automatically guessed or rewritten.</p>
+    </div>
+  `;
 }
 
 function coverageUnitOfQuestion(snapshot, q) {
@@ -5817,6 +6120,45 @@ function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
   start(DRILL_D.map(q => q.n));
 }
 
+function startSyllabusUnitDrill(subjectName, unitNumber, topicId) {
+  const subject = canonSubj(subjectName);
+  const doneToday = questionsAnsweredToday();
+  const unitPool = bankQuestionPool().filter(q =>
+    q &&
+    canonSubj(q.s) === subject &&
+    questionScopeUnit(q) === Number(unitNumber) &&
+    !q.quarantined &&
+    normalSessionEligible(q) &&
+    !isQuestionDeleted(q) &&
+    !wasAnsweredToday(q, doneToday)
+  );
+  const topicPool = unitPool.filter(q => String(q.topic_id || '').trim() === String(topicId || '').trim());
+  const pool = topicPool.length ? topicPool : unitPool;
+  if (!pool.length) {
+    alert(`No eligible questions are available for ${subjectName}, Unit ${unitNumber}.`);
+    return;
+  }
+  const count = Math.min(15, pool.length);
+  const selected = pickCoverageQuestions(pool, count, calculateUnitCoverage(), {
+    maxPerUnit: count,
+    doneToday,
+    includeUnmapped: true
+  });
+  if (!selected.length) {
+    alert(`No unattempted questions are available for ${subjectName}, Unit ${unitNumber} today.`);
+    return;
+  }
+  clearDrillDeck();
+  DRILL_SUBJECT = subject;
+  DRILL_D = selected.map((q, index) => ({ ...q, n: DRILL_N_BASE + index }));
+  if (!topicPool.length) {
+    showToast('No questions are explicitly mapped to this concept yet. Starting a unit-level drill; concept mastery will not be inferred.');
+  } else {
+    showToast(`Starting focused practice for ${topicPool.length} question(s) mapped to this concept.`);
+  }
+  start(DRILL_D.map(q => q.n));
+}
+
 // Backup Nudge
 function renderBackupNudge() {
   const daysSince = lastBackup ? Math.floor((Date.now() - lastBackup) / 864e5) : 999;
@@ -6076,6 +6418,7 @@ function home(preserveScroll = false) {
     </div>
 
     ${renderReadinessMeter(coverage)}
+    ${renderSyllabusStudyPlan(coverage)}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
     <div class="card" style="margin-top:14px">
@@ -7128,7 +7471,8 @@ function pick(i, cfOverride) {
       ok,
       cf: confidence,
       tm: Math.round(timeTakenMs / 1000),
-      set: S
+      set: S,
+      variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
     };
     L.push(REC);
     sr(rawQ, ok, confidence, timeTakenMs);
@@ -7288,7 +7632,8 @@ function dontKnow() {
       ch: -1,
       ok: false,
       set: S,
-      skipped: true
+      skipped: true,
+      variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
     };
     L.push(REC);
     if (rawQ._k) mark(rawQ._k, 0, -1);
@@ -9244,6 +9589,7 @@ try {
 
 load();
 home();
+retryMitSyllabusLoad();
 if (window.CloudSync) {
   CloudSync.init();
   if (CloudSync.whenInitialSyncSettled) CloudSync.whenInitialSyncSettled(loadDefaultBank);

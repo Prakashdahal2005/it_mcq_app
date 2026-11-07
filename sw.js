@@ -1,9 +1,10 @@
-var CACHE_NAME = 'bitmcq-v23';
+var CACHE_NAME = 'bitmcq-v24';
 var STATIC_ASSETS = [
   './',
   './index.html',
   './cloud-sync.js',
   './question_bank.json',
+  './mit_entrance_syllabus.json',
   './manifest.json',
   './pwa-icon.png',
   './favicon.png'

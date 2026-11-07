@@ -582,6 +582,22 @@
           } else {
             conflicts.push({ sid: q._sid, bank: target.name, localQuestion: ex.q, remoteQuestion: q.q });
           }
+        } else {
+          var localTopicId = String(ex.topic_id || '').trim();
+          var remoteTopicId = String(q.topic_id || '').trim();
+          if (!localTopicId && remoteTopicId) {
+            ex.topic_id = remoteTopicId;
+          } else if (localTopicId && remoteTopicId && localTopicId !== remoteTopicId) {
+            if (options.preferRemoteQuestions) ex.topic_id = remoteTopicId;
+            else conflicts.push({
+              sid: q._sid,
+              bank: target.name,
+              localQuestion: ex.q,
+              remoteQuestion: q.q,
+              localTopicId: localTopicId,
+              remoteTopicId: remoteTopicId
+            });
+          }
         }
       });
     });

@@ -20,6 +20,7 @@ Search `index.html` for the named section or function; line numbers are intentio
 | Timed and weekly mocks | `weeklyMockStatus()`, `mock()`, `mockEnd()` | `WEEKLY_MOCK`, `persistMockState()` |
 | Bank import, backups, and exports | `Import & Bank Handling`, `Backup & Persistence`, `exportLog()` | `restore()`, `cloud-sync.js` |
 | Settings and AI configuration | `Settings`, `saveSettings()` | Gemini request helpers and local storage |
+| MIT syllabus and study coverage | `mit_entrance_syllabus.json`, `calculateUnitCoverage()`, `renderSyllabusStudyPlan()` | `parseBank()`, `parseJson()`, `cloud-sync.js`, `sw.js` |
 
 ## Safe-change rules
 
@@ -28,4 +29,6 @@ Search `index.html` for the named section or function; line numbers are intentio
 - Question and card deletion use tombstones; preserve those markers so synced devices do not resurrect deleted items.
 - Question copies can exist in the active set, banks, drills, mocks, and attempt history. Prefer stable question identity over array position or question number when updating them.
 - Keep quiz feedback, flashcard links, review scheduling, and session navigation consistent when changing a shared flow.
+- Topic-level coverage requires an exact syllabus `topic_id` on a question; never infer or backfill topic mappings from question text. Untagged questions must remain available for practice and unit-level coverage.
+- Keep the human-readable guides synchronized with `mit_entrance_syllabus.json`; syllabus weights and priorities are study guidance, not verified exam predictions.
 - Run the smallest relevant validation available. `package.json` defines `npm run dev` but no test, lint, or build script; do not claim a test suite ran if none is configured.

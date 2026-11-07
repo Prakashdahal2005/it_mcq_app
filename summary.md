@@ -9,7 +9,8 @@ Recall is a browser-based study app for the TU IOST MIT entrance exam. The inter
 - `cloud-sync.js` — client-side state normalization, merging, and optional cloud synchronization.
 - `api/state.js` — Vercel API endpoint for cloud state, backed by Upstash Redis.
 - `sw.js`, `manifest.json`, `favicon.png`, `pwa-icon.png` — progressive web app and offline assets.
-- `MIT_Entrance_Scope_Guide.md` — exam-scope and study reference; separate from the app's implementation.
+- `MIT_Entrance_Scope_Guide.md` — canonical human-readable guide with exam strategy, study plan, recall webs, and question-generation rules.
+- `mit_entrance_syllabus.json` — structured syllabus source for syllabus-driven coverage and explicit topic-level practice tracking in the app.
 - `package.json`, `package-lock.json` — Node tooling metadata and the Redis client dependency.
 
 ## State and synchronization
