@@ -1908,25 +1908,28 @@ function normalSessionEligible(q) {
 }
 
 function isQuickQuestion(q) {
-  if (typeof q.quick === 'boolean') return q.quick;
+  if (!q) return true;
   if (q.calc === true || q.needs_paper === true) return false;
   if (q.code && (Array.isArray(q.code) ? q.code.length > 0 : String(q.code).trim().length > 0)) return false;
   const tag = q.t || q.tag || '';
-  if (tag && /[CTP]/i.test(tag)) return false;
+  if (/\b(?:calculation|calculus|code|paper|trace)\b/i.test(tag)) return false;
   const stem = String(q.q || '');
   if (/\n/.test(stem)) return false;
   if (/```/.test(stem)) return false;
   if (looksLikeCode(stem)) return false;
   const s = (stem + ' ' + (q.s || '')).toLowerCase();
-  if (/\b(output|trace|evaluate|compute|derive|calculate|following code|following statement|snippet|dry run)\b/.test(s)) return false;
+  if (/\b(output|trace|evaluate|compute|derive|calculate|differentiate|derivative|integrate|integral|limit|following code|following statement|snippet|dry run)\b/.test(s)) return false;
+  if (/\b(?:increasing|decreasing)\s+on\b/.test(s)) return false;
   if (/\b(binary|hexadecimal|octal|2's complement|shannon|burst|pipe|bresenham|subnet|prefix expression|postfix|fib\(|kruskal|bst|dijkstra|prim|recursion|complexity|big[- ]o)\b/.test(s)) return false;
   if (/\d\s*[+\-*/%^&|]\s*\d/.test(stem)) return false;
+  if (typeof q.quick === 'boolean') return q.quick;
   return true;
 }
 
 // Manual override store: keyed by stable content key qk(q) -> { quick, level } or boolean
 function effQuick(q) {
   if (!q) return true;
+  if (!isQuickQuestion({ ...q, quick: undefined })) return false;
   const k = qk(q);
   if (QOV[k] && typeof QOV[k] === 'object' && 'quick' in QOV[k]) return QOV[k].quick;
   if (Object.prototype.hasOwnProperty.call(QOV, k) && typeof QOV[k] === 'boolean') return QOV[k];
@@ -3838,39 +3841,117 @@ function updateColdButtonUI(q) {
   if (!btn || !q) return;
   const cold = isColdQuestion(q);
   btn.textContent = cold ? '🧊 Cold (tap to restore)' : '🧊 Too easy';
-  btn.title = cold ? 'Restore normal scheduling for this question' : 'Mark as too easy/irrelevant — will appear very rarely';
+  btn.title = cold ? 'Restore normal scheduling for this question' : 'Generate a verified sibling microconcept; if generation fails, keep this question cold';
   btn.style.background = cold ? '#e8f4ff' : '';
   btn.style.color = cold ? '#1971c2' : '#555';
   btn.style.borderColor = cold ? '#74c0fc' : '#bbb';
+}
+
+function setQuestionColdState(q, cold) {
+  const n = q && q.n;
+  const uid = (typeof questionUid === 'function' ? questionUid(q) : null) || (typeof qk === 'function' ? qk(q) : null);
+  const value = { cold: !!cold, t: Date.now() };
+  if (uid) COLD_QS[uid] = value;
+  if (n != null) COLD_QS[n] = value;
+  const k = qk(q);
+  if (cold) {
+    V[k] = V[k] || {};
+    V[k].d = today() + 180;
+    V[k].stab = V[k].stab ? Math.max(V[k].stab, 180) : 180;
+    V[k]._coldSet = true;
+  } else if (V[k] && V[k]._coldSet) {
+    V[k].d = today();
+    delete V[k]._coldSet;
+  }
+}
+
+async function tryColdQuestionSibling(q, opts = {}) {
+  const taskKey = questionUid(q) || qk(q);
+  const wasCold = isColdQuestion(q);
+  window._coldSiblingTasks = window._coldSiblingTasks || new Set();
+  if (window._coldSiblingTasks.has(taskKey)) return false;
+  window._coldSiblingTasks.add(taskKey);
+  const button = opts.batch ? null : document.getElementById('cold-btn');
+  if (button) {
+    button.disabled = true;
+    button.textContent = '⏳ Checking for a sibling...';
+  }
+  try {
+    if (!wasCold) {
+      setQuestionColdState(q, true);
+      save();
+    }
+    if (effWellMade(q)) {
+      showToast('This question is marked Well made; it remains cold and unchanged.', 'warn');
+      return false;
+    }
+    if (!GEM_KEY) {
+      showToast('No Gemini API key is configured; this question remains cold.', 'warn');
+      return false;
+    }
+    await rewriteQuestionWithGemini(q, { background: false });
+    setQuestionColdState(q, false);
+    save();
+    if (!opts.batch && CURRENT_Q && CURRENT_Q.origQ && questionUid(CURRENT_Q.origQ) === questionUid(q)) {
+      sessionHistory[P] = null;
+      show();
+    }
+    return true;
+  } catch (err) {
+    console.warn('Cold-question sibling generation failed; keeping the question cold:', err);
+    if (!wasCold) {
+      setQuestionColdState(q, true);
+      save();
+    }
+    if (!opts.batch) showToast('No verified sibling was produced. The question remains cold.', 'warn');
+    return false;
+  } finally {
+    window._coldSiblingTasks.delete(taskKey);
+    if (button && button.isConnected) {
+      button.disabled = false;
+      updateColdButtonUI(q);
+    }
+  }
 }
 
 function toggleColdQuestion() {
   if (MK) return; // no cold-marking during mock exams
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
-  const n = rawQ.n;
-  const uid = (typeof questionUid === 'function' ? questionUid(rawQ) : null) || (typeof qk === 'function' ? qk(rawQ) : null);
   if (isColdQuestion(rawQ)) {
-    if (uid) COLD_QS[uid] = { cold: false, t: Date.now() };
-    if (n != null) COLD_QS[n] = { cold: false, t: Date.now() };
-    // Remove extended interval we set
-    const k = qk(rawQ);
-    if (V[k] && V[k]._coldSet) {
-      V[k].d = today(); // make it due normally again
-      delete V[k]._coldSet;
-    }
-  } else {
-    if (uid) COLD_QS[uid] = { cold: true, t: Date.now() };
-    if (n != null) COLD_QS[n] = { cold: true, t: Date.now() };
-    // Push due date far into the future (180 days)
-    const k = qk(rawQ);
-    V[k] = V[k] || {};
-    V[k].d = today() + 180;
-    V[k].stab = V[k].stab ? Math.max(V[k].stab, 180) : 180;
-    V[k]._coldSet = true;
+    setQuestionColdState(rawQ, false);
+    save();
+    updateColdButtonUI(rawQ);
+    return;
+  }
+  tryColdQuestionSibling(rawQ);
+}
+
+async function generateSiblingsForColdQuestions() {
+  if (!GEM_KEY) {
+    alert('A Gemini API key is required to generate sibling questions. Existing cold questions have not been changed.');
+    return;
+  }
+  const coldQuestions = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q));
+  if (!coldQuestions.length) {
+    showToast('No cold questions are available in the current banks.');
+    return;
+  }
+  if (!confirm(`Try to create a verified sibling microconcept for each of ${coldQuestions.length} cold question(s)? This can use up to 3 Gemini calls per question. Each original stays cold unless its sibling passes validation.`)) return;
+
+  const button = document.getElementById('cold-sibling-batch-btn');
+  if (button) {
+    button.disabled = true;
+    button.textContent = `Generating siblings (0/${coldQuestions.length})...`;
+  }
+  let replaced = 0;
+  for (let i = 0; i < coldQuestions.length; i++) {
+    if (button) button.textContent = `Generating siblings (${i + 1}/${coldQuestions.length})...`;
+    if (await tryColdQuestionSibling(coldQuestions[i], { batch: true })) replaced++;
   }
   save();
-  updateColdButtonUI(rawQ);
+  showToast(`${replaced} sibling(s) added; ${coldQuestions.length - replaced} question(s) remain cold.`, replaced === coldQuestions.length ? 'ok' : 'warn');
+  home(true);
 }
 
 function quarantineCurrentQuestion() {
@@ -4298,6 +4379,7 @@ async function addFlashcardForCurrent() {
       }
       if (typeof sessionHistory !== 'undefined' && sessionHistory && sessionHistory[P]) {
         sessionHistory[P].feedbackHtml = $('#fb') ? $('#fb').innerHTML : sessionHistory[P].feedbackHtml;
+        save();
       }
       viewLinkedFlashcardFromQuiz(targetCardId);
     } else {
@@ -5142,8 +5224,8 @@ function prepareQuestionForDisplay(rawQ) {
   };
 }
 
-// Probabilistic Spaced Session Construction (FSRS-scheduled, unbroken subject runs, easy L0 first item)
-// Compose an interleaved set from due, weak, fresh, and filler items without duplicating questions.
+// Probabilistic Spaced Session Construction (FSRS-scheduled, unbroken subject runs)
+// Compose a session from due reviews, weak subjects, and coverage without repeating today's questions.
 function buildTodaySession(minutes = 15, quickOnly = false) {
   const allBank = bankQuestionPool().filter(q => normalSessionEligible(q));
   if (!allBank.length && (!D || !D.length)) return [];
@@ -5162,39 +5244,14 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     return !doneTodayKeys.has(uid) && !doneTodayKeys.has(k);
   };
 
-  let pool = basePool.filter(isAvailableToday);
-  if (pool.length < Math.min(5, targetQ)) {
-    // Safety valve: never report "finished for today" while eligible questions exist.
-    pool = basePool;
-  }
+  const pool = basePool.filter(isAvailableToday);
   if (!pool.length) return [];
 
   const due = dueKeys(quickOnly).filter(candidateKey => {
     const q = byN(candidateKey);
     return q && isAvailableToday(q);
   });
-
-  // Easy first question: pick an L0 item with high historical accuracy (randomize top candidates)
-  const easyFirstCandidates = pool.filter(q => (effLevel(q) === 0 || q.level == null) && V[qk(q)]?.history?.some(h => h.ok));
-  let easyFirst = null;
-  if (easyFirstCandidates.length) {
-    easyFirstCandidates.sort((a, b) => {
-      const va = V[qk(a)]?.history || [];
-      const vb = V[qk(b)]?.history || [];
-      const accA = va.filter(h => h.ok).length / (va.length || 1);
-      const accB = vb.filter(h => h.ok).length / (vb.length || 1);
-      return accB - accA;
-    });
-    const pickCount = Math.min(3, easyFirstCandidates.length);
-    const chosen = easyFirstCandidates[Math.floor(Math.random() * pickCount)];
-    easyFirst = questionUid(chosen) || qk(chosen);
-  } else {
-    const l0Candidates = pool.filter(q => effLevel(q) === 0);
-    if (l0Candidates.length) {
-      const chosen = l0Candidates[Math.floor(Math.random() * l0Candidates.length)];
-      easyFirst = questionUid(chosen) || qk(chosen);
-    }
-  }
+  const latestPractice = latestPracticeRecordMap();
 
   const weakSubjects = new Set(
     milestoneSubjectSignals().filter(s => s.isWeak).map(s => s.k)
@@ -5202,7 +5259,12 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   const coverageSnapshot = calculateUnitCoverage();
   const coverageReserve = Math.min(targetQ - 1, Math.max(4, Math.round(targetQ * 0.4)));
   const weakCap = Math.max(2, Math.round(targetQ * 0.2));
-  const dueCap = Math.max(1, targetQ - coverageReserve - weakCap - (easyFirst ? 1 : 0));
+  const struggleCap = Math.max(2, Math.round(targetQ * 0.15));
+  const dueCap = Math.max(1, targetQ - coverageReserve - weakCap - struggleCap);
+  const dueIdentities = new Set(due.map(key => {
+    const q = byN(key);
+    return q ? (questionUid(q) || qk(q)) : null;
+  }).filter(Boolean));
 
   const session = [];
   const addedIdentities = new Set();
@@ -5215,8 +5277,6 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     session.push(identity);
     return true;
   }
-
-  if (easyFirst) add(easyFirst);
 
   // Due items (priority-sorted from dueKeys, max 3 leeches per session)
   let leechCountInSession = 0;
@@ -5234,8 +5294,18 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   }
 
   if (weakSubjects.size > 0) {
-    const weakPool = pool.filter(q => weakSubjects.has(cl(q.s)) && (effLevel(q) === 0 || effLevel(q) === 1));
-    weakPool.sort((a, b) => (effLevel(a) - effLevel(b)) || (Math.random() - 0.5));
+    const weakPool = pool.filter(q => {
+      if (!weakSubjects.has(cl(q.s)) || (effLevel(q) !== 0 && effLevel(q) !== 1)) return false;
+      const last = latestPracticeRecordFor(q, latestPractice);
+      return !last || !last.ok || (last.cf != null && last.cf < 3);
+    });
+    weakPool.sort((a, b) => {
+      const aLast = latestPracticeRecordFor(a, latestPractice);
+      const bLast = latestPracticeRecordFor(b, latestPractice);
+      const aStruggle = aLast && (!aLast.ok || (aLast.cf != null && aLast.cf < 3)) ? 0 : 1;
+      const bStruggle = bLast && (!bLast.ok || (bLast.cf != null && bLast.cf < 3)) ? 0 : 1;
+      return aStruggle - bStruggle || (effLevel(a) - effLevel(b)) || (Math.random() - 0.5);
+    });
     let weakAdded = 0;
     for (const q of weakPool) {
       if (weakAdded >= weakCap || session.length >= targetQ - coverageReserve) break;
@@ -5243,51 +5313,57 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
     }
   }
 
-  function weightedOrder(items) {
-    const remaining = items.slice();
-    const ordered = [];
-    while (remaining.length) {
-      let total = 0;
-      remaining.forEach(q => { total += effWellMade(q) ? 3 : 1; });
-      let pick = Math.random() * total;
-      let index = remaining.length - 1;
-      for (let i = 0; i < remaining.length; i++) {
-        pick -= effWellMade(remaining[i]) ? 3 : 1;
-        if (pick <= 0) { index = i; break; }
-      }
-      ordered.push(remaining.splice(index, 1)[0]);
-    }
-    return ordered;
+  const strugglePool = pool.filter(q => {
+    const identity = questionUid(q) || qk(q);
+    if (dueIdentities.has(identity)) return false;
+    const last = latestPracticeRecordFor(q, latestPractice);
+    return !!last && (!last.ok || (last.cf != null && last.cf < 3));
+  });
+  strugglePool.sort((a, b) => {
+    const aLast = latestPracticeRecordFor(a, latestPractice);
+    const bLast = latestPracticeRecordFor(b, latestPractice);
+    const aWrong = aLast && !aLast.ok ? 0 : 1;
+    const bWrong = bLast && !bLast.ok ? 0 : 1;
+    return aWrong - bWrong ||
+      ((aLast && aLast.cf != null ? aLast.cf : 3) - (bLast && bLast.cf != null ? bLast.cf : 3)) ||
+      ((bLast && bLast.t) || 0) - ((aLast && aLast.t) || 0);
+  });
+  let struggleAdded = 0;
+  for (const q of strugglePool) {
+    if (struggleAdded >= struggleCap || session.length >= targetQ - coverageReserve) break;
+    if (add(q)) struggleAdded++;
   }
 
-  // Coverage-first fill: least-covered units, one question per unit in this pass
+  // Prefer unseen questions for coverage before using previously mastered, non-due items.
   const coveragePool = pool.filter(q => !addedIdentities.has(questionUid(q) || qk(q)));
-  const coveragePicks = pickCoverageQuestions(coveragePool, Math.min(coverageReserve, targetQ - session.length), coverageSnapshot, {
+  const coverageSlots = Math.min(coverageReserve, targetQ - session.length);
+  const unseenCoveragePool = coveragePool.filter(q => !hasPracticeAttempt(q, latestPractice));
+  const coveragePicks = pickCoverageQuestions(unseenCoveragePool, coverageSlots, coverageSnapshot, {
     maxPerUnit: 1,
     exclude: addedIdentities
   });
   coveragePicks.forEach(q => add(q));
 
-  // Remaining filler (prefer lower levels first)
+  // If the pool is exhausted, prefer the longest-unseen review rather than a recent mastered item.
   const remainingAll = pool.filter(q => !addedIdentities.has(questionUid(q) || qk(q)));
-  remainingAll.sort((a, b) => (effLevel(a) - effLevel(b)) || (Math.random() - 0.5));
-  const orderedRemaining = weightedOrder(remainingAll);
-  for (const q of orderedRemaining) {
+  remainingAll.sort((a, b) => {
+    const aDue = dueIdentities.has(questionUid(a) || qk(a)) ? 0 : 1;
+    const bDue = dueIdentities.has(questionUid(b) || qk(b)) ? 0 : 1;
+    if (aDue !== bDue) return aDue - bDue;
+    const aLast = latestPracticeRecordFor(a, latestPractice);
+    const bLast = latestPracticeRecordFor(b, latestPractice);
+    const aUnseen = aLast ? 1 : 0;
+    const bUnseen = bLast ? 1 : 0;
+    if (aUnseen !== bUnseen) return aUnseen - bUnseen;
+    if (aLast && bLast && aLast.t !== bLast.t) return (aLast.t || 0) - (bLast.t || 0);
+    return (effLevel(a) - effLevel(b)) || (Math.random() - 0.5);
+  });
+  for (const q of remainingAll) {
     if (session.length >= targetQ) break;
     add(q);
   }
 
-  // Appendix Rule 12: Ensure unbroken subject runs, with easyFirst's subject run placed first
-  const blocked = groupQuestionBlocks(session);
-  if (easyFirst && blocked.includes(easyFirst)) {
-    const easyQ = byN(easyFirst);
-    const easySubj = easyQ ? cl(easyQ.s) : '';
-    const subjRun = blocked.filter(k => cl(byN(k)?.s) === easySubj);
-    const otherRuns = blocked.filter(k => cl(byN(k)?.s) !== easySubj);
-    const reorderedSubjRun = [easyFirst, ...subjRun.filter(k => k !== easyFirst)];
-    return [...reorderedSubjRun, ...otherRuns];
-  }
-  return blocked;
+  return groupQuestionBlocks(session);
 }
 
 // Honest Readiness Meter
@@ -6266,6 +6342,7 @@ function home(preserveScroll = false) {
   const latestPractice = latestPracticeRecordMap();
   const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice)).length;
   const freshButtonText = `✨ Practice Unseen Questions (${freshCount} available)`;
+  const coldQuestionCount = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q)).length;
   const coverage = calculateUnitCoverage();
   const drillSubjects = bankSubjects();
   const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
@@ -6391,8 +6468,15 @@ function home(preserveScroll = false) {
 
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startQuickMode()">
-        ⚡ Quick Questions Only (L0 Core First · Mobile Friendly)
+        ⚡ Quick Questions Only (Due + Unseen First · Mobile Friendly)
       </button>
+      <div class="mu sm" style="text-align:center;margin-top:4px">Due first · unseen next · then hesitant/older questions · no same-day repeats</div>
+      ${coldQuestionCount ? `
+      <button class="big-btn" id="cold-sibling-batch-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="generateSiblingsForColdQuestions()">
+        🧊 Try AI sibling replacements for ${coldQuestionCount} cold question(s)
+      </button>
+      <div class="mu sm" style="text-align:center;margin-top:4px">Each stays cold unless its different microconcept is validated.</div>
+      ` : ''}
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
       </button>
@@ -6475,10 +6559,12 @@ function startToday() {
   if (!qList.length) {
     const eligible = bankQuestionPool().filter(q => normalSessionEligible(q)).length;
     alert(eligible
-      ? 'No practice questions could be assembled right now. Try a subject drill or a mock.'
+      ? 'You have answered all eligible practice questions today. No same-day repeats were added; try again tomorrow.'
       : 'No normal-session questions are available. Cold-marked and long code-trace questions are excluded.');
     return;
   }
+  const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
+  if (qList.length < targetQ && !confirm(`Only ${qList.length} unanswered question(s) are available today. Start a shorter session? Questions answered today will not be repeated.`)) return;
   start(qList);
 }
 
@@ -6551,30 +6637,55 @@ function startQuickMode() {
     q && effQuick(q) && normalSessionEligible(q) && !wasAnsweredToday(q, doneToday)
   );
   if (!pool.length) { alert('No quick questions are left for today. Try again tomorrow or start a full practice session.'); return; }
-  pool.sort((a, b) => effLevel(a) - effLevel(b));
   const keyOf = q => questionUid(q) || qk(q);
   const latestPractice = latestPracticeRecordMap();
-  const un = pool.filter(q => !hasPracticeAttempt(q, latestPractice));
-  const due = pool.filter(q => {
-    const v = V[qk(q)];
-    if (!v) return false;
-    const dueDay = typeof v.d === 'number' ? v.d : v.due;
-    return typeof dueDay === 'number' && dueDay <= today();
+  const dueOrder = new Map();
+  dueKeys(true).forEach((key, index) => {
+    const q = byN(key);
+    if (q) dueOrder.set(keyOf(q), index);
   });
-  const unKeys = new Set(un.map(keyOf));
-  const dueKeysSet = new Set(due.map(keyOf));
-  const rest = pool.filter(q => !unKeys.has(keyOf(q)) && !dueKeysSet.has(keyOf(q)));
-  const seen = new Set();
-  const list = [...due, ...un, ...rest].filter(q => {
-    const key = keyOf(q);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  const due = pool.filter(q => dueOrder.has(keyOf(q)))
+    .sort((a, b) => dueOrder.get(keyOf(a)) - dueOrder.get(keyOf(b)));
+  const dueIds = new Set(due.map(keyOf));
+  const unseen = pool.filter(q => !dueIds.has(keyOf(q)) && !hasPracticeAttempt(q, latestPractice));
+  const unseenOrdered = pickCoverageQuestions(unseen, unseen.length, calculateUnitCoverage(), {
+    maxPerUnit: Math.max(1, unseen.length),
+    includeUnmapped: true,
+    doneToday
   });
+  const unseenIds = new Set(unseenOrdered.map(keyOf));
+  const struggled = pool.filter(q => {
+    if (dueIds.has(keyOf(q)) || unseenIds.has(keyOf(q))) return false;
+    const last = latestPracticeRecordFor(q, latestPractice);
+    return !!last && (!last.ok || (last.cf != null && last.cf < 3));
+  });
+  struggled.sort((a, b) => {
+    const aLast = latestPracticeRecordFor(a, latestPractice);
+    const bLast = latestPracticeRecordFor(b, latestPractice);
+    const aWrong = aLast && !aLast.ok ? 0 : 1;
+    const bWrong = bLast && !bLast.ok ? 0 : 1;
+    return aWrong - bWrong ||
+      ((aLast && aLast.cf != null ? aLast.cf : 3) - (bLast && bLast.cf != null ? bLast.cf : 3)) ||
+      ((bLast && bLast.t) || 0) - ((aLast && aLast.t) || 0);
+  });
+  const struggledIds = new Set(struggled.map(keyOf));
+  const remaining = pool.filter(q =>
+    !dueIds.has(keyOf(q)) && !unseenIds.has(keyOf(q)) && !struggledIds.has(keyOf(q))
+  );
+  remaining.sort((a, b) => {
+    const aLast = latestPracticeRecordFor(a, latestPractice);
+    const bLast = latestPracticeRecordFor(b, latestPractice);
+    return ((aLast && aLast.t) || 0) - ((bLast && bLast.t) || 0) ||
+      (effLevel(a) - effLevel(b)) ||
+      (Math.random() - 0.5);
+  });
+  const list = [...due, ...unseenOrdered, ...struggled, ...remaining];
   if (!list.length) { alert('No quick questions available.'); return; }
+  const targetQ = Math.max(10, Math.round((todayMins || 15) * 0.8));
+  if (list.length < targetQ && !confirm(`Only ${list.length} unanswered quick question(s) are available today. Start a shorter session? Questions answered today will not be repeated.`)) return;
   isQuick = true;
   try { localStorage.setItem('bitmcq_quick', 'true'); } catch(e){}
-  start(list.slice(0, Math.max(10, Math.round((todayMins || 15) * 0.8))).map(keyOf));
+  start(list.slice(0, targetQ).map(keyOf));
 }
 
 function startFreshSet() {
@@ -6897,6 +7008,11 @@ function navForward() {
 }
 
 // Question Screen & Presentation
+function isOptionDependentQuestion(q) {
+  const stem = String(q && q.q || '');
+  return /\b(?:which|what)\s+(?:one|of\s+(?:the\s+)?(?:following|these|options?|choices?)|option|choice)\b|\bwhich\s+is\s+(?:the\s+)?(?:correct|incorrect|true|false)\s+(?:option|choice)\b|\b(?:select|choose|identify)\s+(?:the\s+)?(?:correct|incorrect|true|false)\s+(?:option|choice|statement|answer)\b/i.test(stem);
+}
+
 // Render the current question and restore per-position answer/history; keep mock and practice paths distinct.
 function show() {
   view = 'q';
@@ -6956,6 +7072,8 @@ function show() {
   const hasVariant = !!activeVariant;
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
+  const choiceDependent = isOptionDependentQuestion(rawQ);
+  const useRecallFirst = isReview && !MK && recallFirst && !hist.locked && !choiceDependent;
   const curLvl = effLevel(rawQ);
   const isWellMade = effWellMade(rawQ);
 
@@ -7024,7 +7142,7 @@ function show() {
             </button>
           ` : ''}
           ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
-          ${!MK ? `<button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Mark as too easy/irrelevant — will appear very rarely">
+          ${!MK ? `<button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
           </button>` : ''}
           ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
@@ -7071,7 +7189,7 @@ function show() {
           </div>
           <div class="study-right-pane">
             <!-- Recall-First Block for Review Items -->
-            ${(isReview && !MK && recallFirst && !hist.locked) ? `
+            ${useRecallFirst ? `
               <div class="recall-container" id="recall-box" onclick="revealRecallOptions()">
                 <div class="recall-overlay" id="recall-prompt">
                   <span class="recall-pulse"></span>
@@ -7085,13 +7203,13 @@ function show() {
                 </div>
               </div>
             ` : `
-              ${isReview && !MK && !hist.locked ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
+              ${isReview && !MK && !hist.locked && !choiceDependent ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
               <div id="opts-container">
                 ${renderOptionsHtml(CURRENT_Q, hist)}
               </div>
             `}
 
-            ${(!MK && !hist.locked && !(isReview && recallFirst) && CURRENT_Q && CURRENT_Q.qType === 'fr') ? `
+            ${(!MK && !hist.locked && !useRecallFirst && CURRENT_Q && CURRENT_Q.qType === 'fr') ? `
               <div class="card" style="margin-top:10px;padding:10px 12px">
                 <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
                   <input id="free-answer" type="text" placeholder="Type your answer" style="flex:1;min-width:170px" onkeydown="if(event.key==='Enter'){event.preventDefault();submitFreeResponse();}">
@@ -7137,7 +7255,7 @@ function show() {
   typesetMath($('#app'));
   updateVariantQueueStatus();
 
-  if (isReview && !MK && recallFirst && !hist.locked) {
+  if (useRecallFirst) {
     recallWaiting = true;
   } else {
     recallWaiting = false;
@@ -8004,7 +8122,8 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
       subject: targetQ.s,
       unit: targetQ.u || targetQ.unit || '',
       unit_name: targetQ.unit_name || targetQ.t || '',
-      tag: targetQ.tag || '',
+      topic_id: targetQ.topic_id || '',
+      tag: targetQ.t || targetQ.tag || '',
       type: targetQ.type || '',
       stem: targetQ.q,
       code: targetQ.code || [],
@@ -8017,9 +8136,9 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
 
     const isCold = isColdQuestion(targetQ);
     const coldRule = isCold
-      ? ' SPECIAL RULE: The student marked the source question as "Too Easy / Cold". They have already mastered this basic definition/fact. You MUST NOT rephrase or ask the same fact. You MUST generate an ADJACENT DISCRIMINATING question or sibling concept in the same unit/topic (e.g. testing the counter-rule, boundary case, or opposite side of the confusion trap).'
+      ? ' SPECIAL RULE: This is a replacement for a question the student marked too easy. Keep the same broad concept and exact subject/unit/topic, but test a clearly DIFFERENT microconcept within that subunit. Do not paraphrase, reuse the same fact, or merely change numbers/scenario. If no genuinely useful sibling microconcept exists, say so in sibling_reason and the validator should reject it.'
       : '';
-    const promptB = 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. For calculation, trace, or code questions, change the numbers/values AND the scenario, and test a related operation from the same unit. For factual, definitional, or programming-concept questions, target a related property, comparison, consequence, or application instead of copying the same tested fact. If the unit offers no meaningful sibling skill, vary the scenario/application enough that the reasoning is not a reworded copy.' + coldRule + ' Rules: 1. Keep the same subject, unit/topic, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string"}';
+    const promptB = 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. State source_microconcept and microconcept separately, and explain the relationship in sibling_reason. For factual, definitional, or programming-concept questions, target a different property, comparison, consequence, or application, not just a rewording. For calculation, trace, or code questions, test a different operation or principle, not merely different numbers or a scenario swap. If the unit offers no meaningful sibling, say so rather than inventing an unrelated question.' + coldRule + ' Rules: 1. Keep the same subject, unit, topic_id, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}';
 
     const genResult = await fetchGeminiWithFallback(promptB + '\n\nSource Question:\n' + JSON.stringify(source), 0.8, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
@@ -8033,6 +8152,12 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
         generatedOptions.some(option => option == null || String(option).trim() === '') ||
         generatedAnswer < 0) {
       throw new Error('Gemini returned an invalid variant shape.');
+    }
+    if (isCold && (!String(v.source_microconcept || '').trim() ||
+        !String(v.microconcept || '').trim() ||
+        !String(v.sibling_reason || '').trim() ||
+        String(v.source_microconcept).trim().toLowerCase() === String(v.microconcept).trim().toLowerCase())) {
+      throw new Error('Gemini did not identify a distinct sibling microconcept.');
     }
 
     const blindPrompt = 'Solve this multiple choice question step by step without bias. Identify the single correct option index (0 for first, 1 for second, 2 for third, 3 for fourth; A-D is also accepted). Return ONLY valid JSON: {"answer":0,"why":"string"}';
@@ -8049,6 +8174,33 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
     const verifiedAnswer = normalizeVariantAnswer(blindResult.answer);
     if (verifiedAnswer !== generatedAnswer) {
       throw new Error(`Blind verification mismatch (generated ${generatedAnswer}, verifier ${blindResult.answer}).`);
+    }
+    if (isCold) {
+      const siblingPrompt = 'Independently review whether the proposed replacement is suitable. The original and replacement must keep the same subject and the same stated unit/topic, stay within the same broad concept, and test genuinely different microconcepts. A paraphrase, new wording, changed numbers, or changed scenario alone is NOT a different microconcept. If no defensible sibling exists, reject it. Return ONLY JSON: {"same_subject":true,"same_unit_topic":true,"same_broad_concept":true,"different_microconcept":true,"reason":"string"}';
+      const siblingRaw = await fetchGeminiWithFallback(
+        siblingPrompt + '\n\nSource and proposed sibling:\n' + JSON.stringify({
+          subject: source.subject,
+          unit: source.unit,
+          unit_name: source.unit_name,
+          topic_id: source.topic_id,
+          source_microconcept: v.source_microconcept,
+          source_stem: source.stem,
+          sibling_microconcept: v.microconcept,
+          sibling_stem: v.stem,
+          sibling_reason: v.sibling_reason
+        }),
+        0.1,
+        verifyPref,
+        15000,
+        true
+      );
+      const siblingReview = extractJson(siblingRaw.text);
+      if (!siblingReview || siblingReview.same_subject !== true ||
+          siblingReview.same_unit_topic !== true ||
+          siblingReview.same_broad_concept !== true ||
+          siblingReview.different_microconcept !== true) {
+        throw new Error(`The proposed question did not pass sibling validation: ${String(siblingReview && siblingReview.reason || 'not a clearly different microconcept')}`);
+      }
     }
 
     const origIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
@@ -8071,6 +8223,11 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
       a: newAnswerIdx,
       e: v.why || v.working || targetQ.e || '',
       code: Array.isArray(v.code) ? v.code.map(String) : [],
+      ...(isCold ? {
+        sourceMicroconcept: String(v.source_microconcept).trim(),
+        microconcept: String(v.microconcept).trim(),
+        siblingReason: String(v.sibling_reason).trim()
+      } : {}),
       verified: true,
       modelUsed: genResult.modelUsed,
       date: Date.now()
