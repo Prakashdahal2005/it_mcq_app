@@ -45,10 +45,11 @@
 - **Q1–20 = Math/Stats:** Calculus 9, Linear Algebra 6, Statistics 5. Math/Stats is ranked by marks per hour like every other block. The one real difference: it is a skill (small calculations by hand), not recall, so it is practised rather than memorised.
 - **75/100 target:** these per-subject targets add up to about 79 (computing ≈ 65 of 80, Math ≈ 14 of 20), a small buffer. Math has no special target: if any block lags, the others cover it (e.g. Math = 10 means computing must give 65/80).
 
-| Tier | Subjects | Aim |
-|---|---|---|
-| **A** (higher-yield, approachable under the exam scope) | IIT, DL, EC, MIS, CG, AI, SAD, SE, Web, MP | 85% (4.25/5) |
-| **B** (broader, or more trace/calculation-heavy) | C, OOP, DSA, DBMS, CN, OS, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | 75% (3.75/5 for the computing subjects) |
+| Tier | Subjects | Aim | Strategy & Character |
+|---|---|---|---|
+| **A** (pure recall & sibling pairs) | IIT, MIS, EC, SAD, SE, Web | 85% (4.25/5) | Jargon-elimination easily rules out 2 distractors; target near-perfect marks. |
+| **B** (strong recall core + small calc tail) | DBMS, CN, OS, DL, AI, CG, MP | 80% (4.0/5) | Foundations (SQL order, OSI, deadlocks) are as guessable as Tier A; only 1–2 calc/trace questions. |
+| **C** (trace & calculation-heavy) | C, OOP, DSA, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | 75% (3.75/5) | Skill-based; master core fingerprints so you never face a blind 25% guess. |
 
 ## 2. What the paper really is
 

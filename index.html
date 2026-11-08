@@ -730,6 +730,110 @@ input[type=text] { width: 100%; font: inherit; color: var(--tx); background: var
 /* Quiet Mode */
 body.quiet-mode .hide-quiet { display: none !important; }
 
+/* Celebration Modal */
+.celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 14px;
+  animation: celFadeIn 0.22s ease-out;
+}
+@keyframes celFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.celebration-card {
+  width: min(520px, 100%);
+  background: var(--card);
+  color: var(--tx);
+  border: 2px solid var(--ac);
+  border-radius: 20px;
+  padding: 28px 24px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: celSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes celSlideUp {
+  from { transform: translateY(18px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.cel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.cel-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 8px;
+  color: var(--tx);
+}
+.cel-subtitle {
+  font-size: 14px;
+  color: var(--mu);
+  margin-bottom: 16px;
+}
+.cel-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--bd);
+}
+@media (prefers-color-scheme: dark) {
+  .cel-metrics-grid { background: rgba(255, 255, 255, 0.03); }
+}
+.cel-metric-val {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ac);
+}
+.cel-metric-lbl {
+  font-size: 11px;
+  color: var(--mu);
+  margin-top: 2px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.cel-quote-box {
+  margin: 18px 0 22px;
+  padding: 12px 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 10px 10px 0;
+  font-size: 13px;
+  font-style: italic;
+  text-align: left;
+  color: var(--tx);
+  line-height: 1.45;
+}
+.cel-quote-author {
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--mu);
+  margin-top: 4px;
+  text-align: right;
+}
+
 /* Question editor + variant refresh status */
 .q-editor-overlay {
   position: fixed;
@@ -2304,7 +2408,6 @@ function updateWellMadeUI(q) {
 }
 
 function toggleWellMade(n) {
-  if (MK) return;
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
   if (!rawQ) return;
   setQuestionWellMade(rawQ, !effWellMade(rawQ));
@@ -2312,7 +2415,6 @@ function toggleWellMade(n) {
 }
 
 function toggleRegeneratable(n) {
-  if (MK) return;
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(n);
   if (!rawQ) return;
   setQuestionRegeneratable(rawQ, !effRegeneratable(rawQ));
@@ -3541,7 +3643,6 @@ function regenerateCurrentQuestion() {
 }
 
 function openQuestionEditor(n) {
-  if (MK) return;
   const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
   const q = rawQ || byN(n);
   if (!q) return;
@@ -3561,7 +3662,10 @@ function deleteQuestionByUid(uid) {
 
 // Edit by stable identity; saveQuestionEditor persists an override for every copy of this question.
 function openQuestionEditorForQuestion(q, opts = {}) {
-  if (!q || MK) return;
+  if (!q) return;
+  if (typeof MK !== 'undefined' && MK && typeof MK_PAUSED !== 'undefined' && !MK_PAUSED) {
+    togglePause();
+  }
   ensureQuestionUid(q);
   const sourceKey = qk(q);
   const variant = (V[sourceKey] && V[sourceKey]._variant) || q._variant || null;
@@ -3671,6 +3775,9 @@ function closeQuestionEditor() {
   window._qEditUid = '';
   window._qEditVariant = false;
   window._qEditSourceKey = '';
+  if (typeof MK !== 'undefined' && MK && typeof MK_PAUSED !== 'undefined' && MK_PAUSED) {
+    togglePause();
+  }
 }
 
 function saveQuestionEditor() {
@@ -3809,7 +3916,6 @@ function deleteQuestionFromEditor() {
 }
 
 function deleteQuestionByN(n) {
-  if (MK) return;
   const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
   const q = rawQ || byN(n);
   if (q) deleteQuestionByQ(q);
@@ -3817,7 +3923,7 @@ function deleteQuestionByN(n) {
 
 // Tombstone deletion so reloads and cloud merges cannot restore the question; linked flashcards remain independent.
 function deleteQuestionByQ(q) {
-  if (!q || MK) return;
+  if (!q) return;
   if (!confirm('Delete this MCQ? Linked flashcards will be kept and will show as missing their source. This cannot be undone from history.')) return;
   const uid = ensureQuestionUid(q);
   const oldQk = qk(q);
@@ -5501,23 +5607,126 @@ function agg() {
 
 const TIER_A_SUBJECTS = new Set([
   'Introduction to IT',
-  'Digital Logic',
-  'E-Commerce',
   'Management Information System',
-  'Computer Graphics',
-  'Artificial Intelligence',
+  'E-Commerce',
   'Systems Analysis & Design',
   'Software Engineering',
-  'Web Technology',
+  'Web Technology'
+]);
+
+const TIER_B_SUBJECTS = new Set([
+  'Database Management System',
+  'Network & Data Communications',
+  'Operating Systems',
+  'Digital Logic',
+  'Artificial Intelligence',
+  'Computer Graphics',
   'Microprocessor & Computer Architecture'
 ]);
 
+function subjectTier(subject) {
+  const c = canonSubj(subject);
+  if (TIER_A_SUBJECTS.has(c)) return 'A';
+  if (TIER_B_SUBJECTS.has(c)) return 'B';
+  return 'C';
+}
+
 function subjectTarget(subject) {
-  return TIER_A_SUBJECTS.has(canonSubj(subject)) ? 0.85 : 0.75;
+  const t = subjectTier(subject);
+  if (t === 'A') return 0.85;
+  if (t === 'B') return 0.80;
+  return 0.75;
 }
 
 function isProvisionalSubject(subject) {
-  return !TIER_A_SUBJECTS.has(canonSubj(subject));
+  return subjectTier(subject) === 'C';
+}
+
+const MOTIVATION_QUOTES = [
+  { q: "Breadth beats depth. Every clear concept turns 5 exam minutes into pure marks.", src: "Scope Strategy" },
+  { q: "One fact or one small step. You don't need derivations to top this exam — you need crisp discrimination.", src: "Exam Reality" },
+  { q: "In practice, investigate the question. In the exam, maximize marks.", src: "Golden Rule" },
+  { q: "The master has failed more times than the beginner has even tried. Every fixed error is banked marks.", src: "Method" },
+  { q: "Confidence matching accuracy is the true hallmark of the top percentile.", src: "Active Recall" },
+  { q: "Small calculations practiced by hand over weeks become effortless under 120-minute exam pressure.", src: "Math/Stats Principle" },
+  { q: "Distinguish A from B before seeing the options. When choices appear, the right answer shines instantly.", src: "Recall Web" }
+];
+
+function triggerCelebrationModal(info) {
+  if (QUIET_MODE) return;
+  const old = document.getElementById('cel-modal-overlay');
+  if (old) old.remove();
+
+  const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];
+  const quoteText = (info && info.quote) || randomQuote.q;
+  const quoteSrc = (info && info.quoteSrc) || randomQuote.src;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cel-modal-overlay';
+  overlay.className = 'celebration-overlay';
+  overlay.onclick = e => { if (e.target === overlay) closeCelebrationModal(); };
+
+  overlay.innerHTML = `
+    <div class="celebration-card" onclick="event.stopPropagation()">
+      <div class="cel-badge">🏆 Milestone Achieved</div>
+      <div class="cel-title">${esc((info && info.title) || 'Goal Reached!')}</div>
+      <div class="cel-subtitle">${esc((info && info.subtitle) || 'Your active recall and spaced practice are paying off.')}</div>
+      ${Array.isArray(info && info.metrics) && info.metrics.length ? `
+        <div class="cel-metrics-grid">
+          ${info.metrics.map(m => `
+            <div>
+              <div class="cel-metric-val">${esc(m.value)}</div>
+              <div class="cel-metric-lbl">${esc(m.label)}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      <div class="cel-quote-box">
+        "${esc(quoteText)}"
+        <div class="cel-quote-author">— ${esc(quoteSrc)}</div>
+      </div>
+      <button class="p big-btn" style="width:100%" onclick="closeCelebrationModal()">
+        Keep the Momentum Going → (Enter)
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const escHandler = e => {
+    if (e.key === 'Escape' || e.key === 'Enter') {
+      closeCelebrationModal();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+function closeCelebrationModal() {
+  const m = document.getElementById('cel-modal-overlay');
+  if (m) m.remove();
+}
+
+function checkSubjectTargetCelebration(subj, acc, target, attempts) {
+  if (QUIET_MODE || attempts < 8 || acc < target) return;
+  try {
+    const celebrated = JSON.parse(localStorage.getItem('bitmcq_celebrated_subjs') || '{}');
+    const canon = canonSubj(subj);
+    const key = `${canon}_${Math.round(target * 100)}`;
+    if (!celebrated[key]) {
+      celebrated[key] = Date.now();
+      localStorage.setItem('bitmcq_celebrated_subjs', JSON.stringify(celebrated));
+      const tier = subjectTier(subj);
+      triggerCelebrationModal({
+        title: `Tier ${tier} Target Reached!`,
+        subtitle: `${canon} has crossed its target of ${Math.round(target * 100)}% with ${Math.round(acc * 100)}% accuracy.`,
+        metrics: [
+          { label: 'Tier', value: `Tier ${tier}` },
+          { label: 'Score', value: `${Math.round(acc * 100)}%` },
+          { label: 'Target', value: `${Math.round(target * 100)}%` }
+        ]
+      });
+    }
+  } catch(e) {}
 }
 
 function firstPracticeAttempts() {
@@ -5846,6 +6055,155 @@ function getSyllabusStudyRecommendations(snapshot, limit = 6) {
   return selected;
 }
 
+function getConceptGapsList(limit = 5) {
+  if (typeof V === 'undefined' || !V) return [];
+  const candidates = [];
+  const pool = (typeof bankQuestionPool === 'function') ? bankQuestionPool() : (D || []);
+  const byIdentity = new Map();
+
+  pool.forEach(q => {
+    if (!q || isQuestionDeleted(q)) return;
+    const k = qk(q);
+    if (V[k] && Array.isArray(V[k].history) && V[k].history.length > 0) {
+      byIdentity.set(k, q);
+    }
+  });
+
+  byIdentity.forEach((q, k) => {
+    const v = V[k];
+    const hist = v.history;
+    const last = hist[hist.length - 1];
+    let score = 0;
+    let reason = '';
+    let type = '';
+
+    // Check if resolved: latest answer was correct with Confidence 3 (Sure)
+    const latestOkConf3 = last && last.ok && last.cf === 3;
+    const isLeech = (v.lapses || 0) >= 2 || (v.missCount || 0) >= 2;
+
+    // If latest attempt is confident and correct, check if leech is also recovered
+    if (latestOkConf3) {
+      if (!isLeech) return; // Completely resolved! Disappears from gaps.
+      // If it was a leech, check if last 2 attempts are confident correct
+      if (hist.length >= 2 && hist[hist.length - 2].ok && hist[hist.length - 2].cf === 3) {
+        return; // Leech also resolved! Disappears from gaps.
+      }
+    }
+
+    // 1. High-confidence miss (cf === 3, ok === false) - highest danger trap
+    const recentConf3Miss = last && !last.ok && last.cf === 3;
+    if (recentConf3Miss) {
+      score += 100;
+      reason = 'High-confidence trap (Missed at 3★)';
+      type = 'trap';
+    } else if (!last.ok) {
+      score += 70;
+      reason = 'Recent incorrect answer';
+      type = 'miss';
+    }
+
+    // 2. Leech / repeated lapses (still active)
+    if (isLeech && !latestOkConf3) {
+      score += 50 + (v.lapses || v.missCount) * 10;
+      if (!reason) {
+        reason = `Repeated mistake (${v.lapses || v.missCount} lapses)`;
+        type = 'leech';
+      }
+    }
+
+    // 3. Hesitant lucky guess (ok === true, cf <= 2)
+    if (last && last.ok && last.cf === 1) {
+      score += 40;
+      if (!reason) {
+        reason = 'Lucky guess (Low confidence · needs solidification)';
+        type = 'guess';
+      }
+    } else if (last && last.ok && last.cf === 2) {
+      score += 20;
+      if (!reason) {
+        reason = 'Unsure (Confidence 2 · verify concept)';
+        type = 'unsure';
+      }
+    }
+
+    // Prioritize Tier A and B subjects
+    const tier = subjectTier(q.s);
+    if (tier === 'A') score += 15;
+    else if (tier === 'B') score += 10;
+
+    if (score > 0) {
+      candidates.push({ q, k, v, score, reason, type, tier });
+    }
+  });
+
+  return candidates.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+function renderConceptGapsRescue(coverage) {
+  const gaps = getConceptGapsList(5);
+  if (!gaps.length) return '';
+
+  return `
+    <div class="card" style="margin-top:14px;border:1px solid rgba(239,68,68,0.25);background:var(--card)">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:6px">
+          <span>🧠 Concept Gaps &amp; Error Rescue</span>
+        </h2>
+        <span class="badge" style="background:rgba(239,68,68,0.12);color:var(--no);border:1px solid rgba(239,68,68,0.25);font-size:11px;font-weight:700">
+          ${gaps.length} Priority Concepts
+        </span>
+      </div>
+      <p class="mu sm" style="margin:0 0 12px">
+        Review the distinguishing rule and concept cue directly instead of grinding MCQs blindly. Solidify these before moving on.
+      </p>
+      <div style="display:grid;gap:10px">
+        ${gaps.map((item, idx) => {
+          const q = item.q;
+          const k = item.k;
+          const v = item.v;
+          const subj = canonSubj(q.s);
+          const clue = q.confusable_with
+            ? `Distinguish: ${Array.isArray(q.confusable_with) ? q.confusable_with.join(' / ') : q.confusable_with}`
+            : (q.e ? (String(q.e).slice(0, 120) + (String(q.e).length > 120 ? '…' : '')) : 'Recall rule: Focus on the discriminating criteria.');
+          const cardId = `gap-exp-${idx}`;
+          return `
+            <div style="border:1px solid var(--bd);border-radius:12px;padding:12px;background:rgba(0,0,0,0.015)">
+              <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="flex:1;min-width:180px">
+                  <div class="row" style="gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+                    <span class="milestone-tag" style="background:${item.tier==='A'?'var(--ac)':'#6366f1'}">Tier ${item.tier}</span>
+                    <span class="mu sm"><b>${esc(subj)}</b> · U${q.unit || q.u || 1}</span>
+                    <span class="sm" style="color:var(--no);font-weight:700;font-size:11px">⚠️ ${esc(item.reason)}</span>
+                  </div>
+                  <div style="font-weight:600;font-size:13px;margin:3px 0 6px">${esc(q.q)}</div>
+                  <div class="mu sm" style="font-size:12px;background:rgba(245,158,11,0.08);padding:6px 10px;border-radius:8px;border-left:3px solid #f59e0b">
+                    💡 <b>Concept Cue:</b> ${esc(clue)}
+                  </div>
+                  ${v.mnemonic ? `<div class="anchor-chip" style="margin-top:6px">🧠 Anchor: <i>"${esc(v.mnemonic)}"</i></div>` : ''}
+                </div>
+              </div>
+              <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">
+                <button class="sm" onclick="toggleGapExplanation('${cardId}')">📖 Review Solution</button>
+                <button class="sm" onclick="addFlashcardForCurrent()">🗂 Add to Flashcards</button>
+                <button class="sm p" onclick="startSyllabusUnitDrill(${esc(JSON.stringify(subj))}, ${q.unit || q.u || 1})">🎯 Practice Unit</button>
+              </div>
+              <div id="${cardId}" style="display:none;margin-top:8px;padding:10px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:12px">
+                <div><b>Correct Answer:</b> ${esc(q.options ? q.options[q.answer] || q.answer : (q.o ? q.o[q.a] : ''))}</div>
+                <div style="margin-top:4px" class="mu">${esc(q.e || q.explanation || 'Study the discrimination rule above.')}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function toggleGapExplanation(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 function renderSyllabusStudyPlan(snapshot) {
   if (!MIT_SYLLABUS) {
     const message = syllabusLoadError
@@ -5854,18 +6212,19 @@ function renderSyllabusStudyPlan(snapshot) {
     return `<div class="card"><h2 style="margin-top:0">🧭 Syllabus Study Focus</h2><p class="mu">${message}</p>${syllabusLoadError ? '<button class="sm" onclick="retryMitSyllabusLoad()">Retry syllabus load</button>' : ''}</div>`;
   }
   const recommendations = getSyllabusStudyRecommendations(snapshot);
-  const readiness = snapshot.totalTopics
-    ? `${snapshot.touchedTopics}/${snapshot.totalTopics} topics practiced · ${snapshot.solidTopics} solid with spaced evidence`
-    : 'No syllabus topics are available.';
+  const readiness = snapshot.taggedTopics > 0
+    ? `${snapshot.touchedTopics}/${snapshot.totalTopics} topics practiced · ${snapshot.solidTopics} solid with spaced evidence · ${snapshot.taggedTopics}/${snapshot.totalTopics} topics with mapped questions`
+    : `🧭 Unit Coverage: ${snapshot.touchedUnits}/${snapshot.totalUnits} units practiced (${snapshot.solidUnits} solid) · ${snapshot.bankSupportedUnits}/${snapshot.totalUnits} units with questions`;
+
   return `
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center">
         <h2 style="margin:0">🧭 Syllabus Study Focus</h2>
-        <a class="mu sm" href="mit_entrance_syllabus.json" target="_blank" rel="noopener">Browse full syllabus</a>
+        <a class="mu sm" href="mit_entrance_syllabus.json" target="_blank" rel="noopener">📋 Full Topic Syllabus (JSON)</a>
       </div>
-      <p class="mu sm" style="margin:6px 0 10px">${readiness} · ${snapshot.taggedTopics}/${snapshot.totalTopics} topics have explicitly mapped bank questions · ${snapshot.mappedTopicQuestions} mapped MCQs.</p>
+      <p class="mu sm" style="margin:6px 0 10px">${readiness}${snapshot.taggedTopics > 0 ? ` · ${snapshot.mappedTopicQuestions} mapped MCQs.` : ''}</p>
       <p class="mu sm">Recommended next: core and high-priority concepts first, with confusable pairs and calculation practice where specified. “Solid” requires spaced, confident evidence—not just one correct answer. Guide weights are study priorities, not verified exam predictions.</p>
-      ${snapshot.unmappedTopicQuestions ? `<p class="mu sm">ℹ️ ${snapshot.unmappedTopicQuestions} bank question(s) lack a valid <code>topic_id</code>; they remain available for normal practice and unit coverage, but do not count as concept evidence.</p>` : ''}
+      ${(snapshot.taggedTopics > 0 && snapshot.unmappedTopicQuestions) ? `<p class="mu sm">ℹ️ ${snapshot.unmappedTopicQuestions} bank question(s) lack a valid <code>topic_id</code>; they remain available for normal practice and unit coverage, but do not count as concept evidence.</p>` : ''}
       ${recommendations.length ? `
         <div style="display:grid;gap:8px;margin-top:12px">
           ${recommendations.map(topic => {
@@ -5877,7 +6236,7 @@ function renderSyllabusStudyPlan(snapshot) {
                   ? `Practiced · ${topic.knownCount} confident correct`
                   : topic.bankCount
                     ? `${topic.bankCount} mapped question(s) available`
-                    : 'No topic-tagged questions; unit drill only';
+                    : 'Unit drill available';
             const detail = [
               `Level ${topic.level} · ${topic.type} · priority ${topic.importance}/10`,
               topic.confusableWith.length ? `Distinguish: ${topic.confusableWith.join(' / ')}` : '',
@@ -5899,7 +6258,7 @@ function renderSyllabusStudyPlan(snapshot) {
           }).join('')}
         </div>
       ` : '<p class="mu">No in-scope, non-skipped topics are available to recommend.</p>'}
-      <p class="mu sm" style="margin-bottom:0">For exact concept tracking, add the matching syllabus topic ID as <code>topic_id</code> when authoring or importing questions. Existing questions and study history are not automatically guessed or rewritten.</p>
+      <p class="mu sm" style="margin-bottom:0">💡 <b>Study Strategy:</b> Distinguish confusable pairs and practice hand-calculations first for maximum marks-per-hour return.</p>
     </div>
   `;
 }
@@ -6131,7 +6490,10 @@ function renderReadinessMeter(coverageSnapshot) {
   });
   const rows = [...rowBySubject.values()]
     .sort((a, b) => {
-      const tierPriority = r => TIER_A_SUBJECTS.has(canonSubj(r.k)) ? 0 : 1;
+      const tierPriority = r => {
+        const t = subjectTier(r.k);
+        return t === 'A' ? 0 : (t === 'B' ? 1 : 2);
+      };
       const gap = r => r.assessed ? Math.max(0, r.target - r.acc) : 1;
       return tierPriority(a) - tierPriority(b) || gap(b) - gap(a) ||
         (a.assessed === b.assessed ? 0 : a.assessed ? 1 : -1) ||
@@ -6214,7 +6576,15 @@ function renderReadinessMeter(coverageSnapshot) {
           else if (r.acc <= 0.40) { dotClass = 'dot-red'; statusText = `${Math.round(r.acc * 100)}% · Need Fix`; }
           else { dotClass = 'dot-amber'; statusText = `${Math.round(r.acc * 100)}% · Building`; }
         }
-        const tierLabel = (function(){ try { const tk = (typeof TIER_A_SUBJECTS !== 'undefined' && TIER_A_SUBJECTS.has && TIER_A_SUBJECTS.has(canonSubj(r.k))) ? 'Tier A · 85%' : 'Tier B · 75%'; return tk; } catch(e){ return (typeof subjectTarget==='function' && subjectTarget(r.k)>=0.8)?'Tier A · 85%':'Tier B · 75%'; } })();
+        if (r.isCalibrated && r.assessed && r.acc >= r.target) {
+          checkSubjectTargetCelebration(r.k, r.acc, r.target, r.tot);
+        }
+        const tierLabel = (function(){
+          const t = subjectTier(r.k);
+          if (t === 'A') return 'Tier A · 85%';
+          if (t === 'B') return 'Tier B · 80%';
+          return 'Tier C · 75%';
+        })();
         return `
           <div class="subject-card" onclick="startSubjectDrillFromBank('${esc(r.k)}')">
             <div class="row" style="justify-content:space-between;align-items:center">
@@ -6647,6 +7017,7 @@ function home(preserveScroll = false) {
     </div>
 
     ${renderReadinessMeter(coverage)}
+    ${renderConceptGapsRescue(coverage)}
     ${renderSyllabusStudyPlan(coverage)}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
@@ -7177,8 +7548,8 @@ function navForward() {
 
 // Question Screen & Presentation
 function isOptionDependentQuestion(q) {
-  const stem = String(q && q.q || '');
-  return /\b(?:which|what)\s+(?:one|of\s+(?:the\s+)?(?:following|these|options?|choices?)|option|choice)\b|\bwhich\s+is\s+(?:the\s+)?(?:correct|incorrect|true|false)\s+(?:option|choice)\b|\b(?:select|choose|identify)\s+(?:the\s+)?(?:correct|incorrect|true|false)\s+(?:option|choice|statement|answer)\b/i.test(stem);
+  const stem = String(q && q.q || '').trim();
+  return /\b(?:which|what)\s+(?:one|of\s+(?:the\s+)?(?:following|these|options?|choices?)|option|choice|statement|pair|algorithm|protocol|layer|device|type|method)\b|\bwhich\s+(?:of\s+)?(?:is|are)\s+(?:the\s+)?(?:correct|incorrect|true|false|valid|invalid|not\s+true|not\s+false|best|most\s+appropriate)\b|\b(?:select|choose|identify|pick)\s+(?:the\s+)?(?:correct|incorrect|true|false|matching|odd\s+one|best)\s+(?:option|choice|statement|answer|pair)\b|\bwhich\s+statement\s+(?:is|about|regarding)\b|\bof\s+the\s+following\b|\ball\s+of\s+the\s+following\s+(?:are|is|except)\b/i.test(stem);
 }
 
 // Render the current question and restore per-position answer/history; keep mock and practice paths distinct.
@@ -7241,7 +7612,7 @@ function show() {
   const isShowingVariant = CURRENT_Q.isShowingVariant;
   const isQuick = effQuick(rawQ);
   const choiceDependent = isOptionDependentQuestion(rawQ);
-  const useRecallFirst = isReview && !MK && recallFirst && !hist.locked && !choiceDependent;
+  const useRecallFirst = !MK && recallFirst && !hist.locked && !choiceDependent;
   const curLvl = effLevel(rawQ);
   const isWellMade = effWellMade(rawQ);
 
@@ -7283,15 +7654,15 @@ function show() {
             <option value="2" ${curLvl === 2 ? 'selected' : ''}>L2 · Exact</option>
             <option value="3" ${curLvl === 3 ? 'selected' : ''}>L3 · Advanced</option>
           </select>
-            ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px;${isQuestionTooHard(rawQ) ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="setQuestionDifficultyFlag(${rawQ.n}, 'tooHard')" title="Give this question lower priority and lower score weight">
-              ${isQuestionTooHard(rawQ) ? '🧱 Too hard · lower weight' : '🧱 Too hard'}
-            </button>
-            <button class="sm" style="padding:2px 8px;font-size:11px;${isQuestionOutOfScope(rawQ) ? 'background:#fff1f2;color:#be123c;border-color:#fda4af' : 'color:var(--mu);border-color:var(--bd)'}" onclick="setQuestionDifficultyFlag(${rawQ.n}, 'outOfScope')" title="Exclude from normal practice and readiness; marking skips this question">
-              ${isQuestionOutOfScope(rawQ) ? '🚫 Out of scope · restore' : '🚫 Out of scope'}
-            </button>` : ''}
-            ${!MK ? `<button class="sm" id="wellmade-btn" style="padding:2px 8px;font-size:11px;${isWellMade ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleWellMade(${rawQ.n})" title="Well-made questions are protected from AI regeneration and appear more often in practice">
+          <button class="sm" style="padding:2px 8px;font-size:11px;${isQuestionTooHard(rawQ) ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="setQuestionDifficultyFlag(${rawQ.n}, 'tooHard')" title="Give this question lower priority and lower score weight">
+            ${isQuestionTooHard(rawQ) ? '🧱 Too hard · lower weight' : '🧱 Too hard'}
+          </button>
+          <button class="sm" style="padding:2px 8px;font-size:11px;${isQuestionOutOfScope(rawQ) ? 'background:#fff1f2;color:#be123c;border-color:#fda4af' : 'color:var(--mu);border-color:var(--bd)'}" onclick="setQuestionDifficultyFlag(${rawQ.n}, 'outOfScope')" title="Exclude from normal practice and readiness; marking skips this question">
+            ${isQuestionOutOfScope(rawQ) ? '🚫 Out of scope · restore' : '🚫 Out of scope'}
+          </button>
+          <button class="sm" id="wellmade-btn" style="padding:2px 8px;font-size:11px;${isWellMade ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleWellMade(${rawQ.n})" title="Well-made questions are protected from AI regeneration and appear more often in practice">
             ${isWellMade ? '⭐ Well made' : '☆ Mark well made'}
-          </button>` : ''}
+          </button>
           ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
           ${isShowingVariant && activeVariant && activeVariant.verified === false ? '<span class="badge-unverified" title="Generated single-pass without blind verify">unverified</span>' : ''}
         </div>
@@ -7305,7 +7676,7 @@ function show() {
       <div class="row" style="justify-content:space-between;margin-top:4px;align-items:center">
         <span class="mu">Question ${P + 1} of ${Q.length} · Q${rawQ.n} · ${esc(rawQ.s)}</span>
         <div class="row" style="gap:6px">
-          ${!MK && !isWellMade ? `
+          ${!isWellMade ? `
             <button class="sm" id="refresh-now-btn" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified variant within the same unit and topic">
               ✨ Refresh now
             </button>
@@ -7316,15 +7687,15 @@ function show() {
             </button>
           ` : ''}
           ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
-          ${!MK ? `<button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
+          <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
-          </button>` : ''}
-          ${!MK ? `<button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
+          </button>
+          <button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
             ✏️ Edit
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionByN(${rawQ.n})" title="Delete this MCQ everywhere; linked flashcards are kept">
             🗑 Delete
-          </button>` : ''}
+          </button>
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
             🚩 Looks wrong
           </button>
@@ -7362,22 +7733,24 @@ function show() {
             ${CURRENT_Q.code && CURRENT_Q.code.length ? `<pre id="q-code">${esc(CURRENT_Q.code.join('\n'))}</pre>` : ''}
           </div>
           <div class="study-right-pane">
-            <!-- Recall-First Block for Review Items -->
+            <!-- Recall-First Block -->
             ${useRecallFirst ? `
               <div class="recall-container" id="recall-box" onclick="revealRecallOptions()">
                 <div class="recall-overlay" id="recall-prompt">
                   <span class="recall-pulse"></span>
-                  <b>Recall-First: Think of the answer before looking at the choices.</b>
-                  <div class="mu" style="margin:8px 0">Reveal choices whenever you're ready. Press any key to skip.</div>
-                  <button class="p sm" onclick="event.stopPropagation();revealRecallOptions()">Show choices now</button>
-                  <button class="sm" onclick="event.stopPropagation();setRecallFirst(false)">Turn off recall-first</button>
+                  <b>🧠 Active Recall: Formulate the answer before seeing the choices.</b>
+                  <div class="mu sm" style="margin:8px 0">Active retrieval drives long-term retention. Click anywhere or press Space to reveal choices.</div>
+                  <div class="row" style="gap:6px;justify-content:center;margin-top:6px">
+                    <button class="p sm" onclick="event.stopPropagation();revealRecallOptions()">Show choices (Space)</button>
+                    <button class="sm" onclick="event.stopPropagation();setRecallFirst(false)" title="Turn off for this session">Turn off for this session</button>
+                  </div>
                 </div>
                 <div id="opts-container" class="recall-hidden">
                   ${renderOptionsHtml(CURRENT_Q, hist)}
                 </div>
               </div>
             ` : `
-              ${isReview && !MK && !hist.locked && !choiceDependent ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
+              ${!MK && !hist.locked && !choiceDependent && !recallFirst ? `<p><button class="sm" onclick="setRecallFirst(true)">Turn on recall-first</button></p>` : ''}
               <div id="opts-container">
                 ${renderOptionsHtml(CURRENT_Q, hist)}
               </div>

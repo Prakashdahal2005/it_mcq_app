@@ -53,11 +53,11 @@
    "subject_blocks": "each subject in one unbroken run per set"
   },
   "importance_scale": {
+   "1": "skip",
    "9-10": "core",
    "7-8": "high",
    "4-6": "medium",
-   "2-3": "low",
-   "1": "skip"
+   "2-3": "low"
   },
   "built_from": "subjects authored incrementally; ids auto-generated"
  },
@@ -203,9 +203,9 @@
        "level": 0,
        "id": "BIT101.U2.T1",
        "band": "high",
-       "share_in_unit_pct": 8.2,
+       "share_in_unit_pct": 7.9,
        "skip": false,
-       "global_weight_pct": 0.066
+       "global_weight_pct": 0.064
       },
       {
        "name": "Instruction format and instruction set",
@@ -214,9 +214,9 @@
        "level": 2,
        "id": "BIT101.U2.T2",
        "band": "medium",
-       "share_in_unit_pct": 4.1,
+       "share_in_unit_pct": 4,
        "skip": false,
-       "global_weight_pct": 0.033
+       "global_weight_pct": 0.032
       },
       {
        "name": "Instruction cycle (fetch-decode-execute)",
@@ -225,9 +225,9 @@
        "level": 1,
        "id": "BIT101.U2.T3",
        "band": "high",
-       "share_in_unit_pct": 7.1,
+       "share_in_unit_pct": 6.9,
        "skip": false,
-       "global_weight_pct": 0.057
+       "global_weight_pct": 0.056
       },
       {
        "name": "Microprocessor",
@@ -236,9 +236,9 @@
        "level": 2,
        "id": "BIT101.U2.T4",
        "band": "medium",
-       "share_in_unit_pct": 4.1,
+       "share_in_unit_pct": 4,
        "skip": false,
-       "global_weight_pct": 0.033
+       "global_weight_pct": 0.032
       },
       {
        "name": "Computer bus",
@@ -247,9 +247,9 @@
        "level": 1,
        "id": "BIT101.U2.T5",
        "band": "medium",
-       "share_in_unit_pct": 5.1,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.041
+       "global_weight_pct": 0.04
       },
       {
        "name": "Power supply and motherboard",
@@ -258,9 +258,9 @@
        "level": 2,
        "id": "BIT101.U2.T6",
        "band": "low",
-       "share_in_unit_pct": 3.1,
+       "share_in_unit_pct": 3,
        "skip": false,
-       "global_weight_pct": 0.025
+       "global_weight_pct": 0.024
       },
       {
        "name": "Expansion slots, ports and interfaces",
@@ -269,9 +269,9 @@
        "level": 2,
        "id": "BIT101.U2.T7",
        "band": "medium",
-       "share_in_unit_pct": 4.1,
+       "share_in_unit_pct": 4,
        "skip": false,
-       "global_weight_pct": 0.033
+       "global_weight_pct": 0.032
       },
       {
        "name": "Memory representation",
@@ -280,9 +280,9 @@
        "level": 2,
        "id": "BIT101.U2.T8",
        "band": "medium",
-       "share_in_unit_pct": 4.1,
+       "share_in_unit_pct": 4,
        "skip": false,
-       "global_weight_pct": 0.033
+       "global_weight_pct": 0.032
       },
       {
        "name": "Memory hierarchy (registers>cache>RAM>disk>tape)",
@@ -291,9 +291,9 @@
        "level": 0,
        "id": "BIT101.U2.T9",
        "band": "core",
-       "share_in_unit_pct": 9.2,
+       "share_in_unit_pct": 8.9,
        "skip": false,
-       "global_weight_pct": 0.074
+       "global_weight_pct": 0.072
       },
       {
        "name": "CPU registers",
@@ -302,9 +302,9 @@
        "level": 1,
        "id": "BIT101.U2.T10",
        "band": "medium",
-       "share_in_unit_pct": 5.1,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.041
+       "global_weight_pct": 0.04
       },
       {
        "name": "Cache memory",
@@ -313,9 +313,9 @@
        "level": 1,
        "id": "BIT101.U2.T11",
        "band": "medium",
-       "share_in_unit_pct": 6.1,
+       "share_in_unit_pct": 5.9,
        "skip": false,
-       "global_weight_pct": 0.049
+       "global_weight_pct": 0.047
       },
       {
        "name": "RAM vs ROM",
@@ -328,9 +328,9 @@
        "level": 0,
        "id": "BIT101.U2.T12",
        "band": "core",
-       "share_in_unit_pct": 9.2,
+       "share_in_unit_pct": 8.9,
        "skip": false,
-       "global_weight_pct": 0.074
+       "global_weight_pct": 0.072
       },
       {
        "name": "Magnetic tape vs magnetic disk",
@@ -343,9 +343,9 @@
        "level": 1,
        "id": "BIT101.U2.T13",
        "band": "medium",
-       "share_in_unit_pct": 6.1,
+       "share_in_unit_pct": 5.9,
        "skip": false,
-       "global_weight_pct": 0.049
+       "global_weight_pct": 0.047
       },
       {
        "name": "Optical disk, magneto-optical disk, flash",
@@ -354,9 +354,9 @@
        "level": 1,
        "id": "BIT101.U2.T14",
        "band": "medium",
-       "share_in_unit_pct": 5.1,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.041
+       "global_weight_pct": 0.04
       },
       {
        "name": "Sequential access vs direct access",
@@ -369,9 +369,9 @@
        "level": 1,
        "id": "BIT101.U2.T15",
        "band": "medium",
-       "share_in_unit_pct": 6.1,
+       "share_in_unit_pct": 5.9,
        "skip": false,
-       "global_weight_pct": 0.049
+       "global_weight_pct": 0.047
       },
       {
        "name": "Input devices vs output devices",
@@ -384,9 +384,9 @@
        "level": 1,
        "id": "BIT101.U2.T16",
        "band": "medium",
-       "share_in_unit_pct": 5.1,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.041
+       "global_weight_pct": 0.04
       },
       {
        "name": "Human data entry vs source data entry devices",
@@ -399,9 +399,9 @@
        "level": 1,
        "id": "BIT101.U2.T17",
        "band": "medium",
-       "share_in_unit_pct": 5.1,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.041
+       "global_weight_pct": 0.04
       },
       {
        "name": "I/O port and I/O system",
@@ -410,9 +410,20 @@
        "level": 2,
        "id": "BIT101.U2.T18",
        "band": "low",
-       "share_in_unit_pct": 3.1,
+       "share_in_unit_pct": 3,
        "skip": false,
-       "global_weight_pct": 0.025
+       "global_weight_pct": 0.024
+      },
+      {
+       "name": "Computer cabinet components (memory chips, processor, cables, storage devices)",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT101.U2.T19",
+       "band": "low",
+       "share_in_unit_pct": 3,
+       "skip": false,
+       "global_weight_pct": 0.024
       }
      ]
     },
@@ -436,9 +447,9 @@
        "level": 0,
        "id": "BIT101.U3.T1",
        "band": "core",
-       "share_in_unit_pct": 16.4,
+       "share_in_unit_pct": 15.5,
        "skip": false,
-       "global_weight_pct": 0.131
+       "global_weight_pct": 0.125
       },
       {
        "name": "Device drivers vs utility software",
@@ -451,9 +462,9 @@
        "level": 1,
        "id": "BIT101.U3.T2",
        "band": "medium",
-       "share_in_unit_pct": 10.9,
+       "share_in_unit_pct": 10.3,
        "skip": false,
-       "global_weight_pct": 0.088
+       "global_weight_pct": 0.083
       },
       {
        "name": "OS objectives and types",
@@ -462,9 +473,9 @@
        "level": 1,
        "id": "BIT101.U3.T3",
        "band": "medium",
-       "share_in_unit_pct": 10.9,
+       "share_in_unit_pct": 10.3,
        "skip": false,
-       "global_weight_pct": 0.088
+       "global_weight_pct": 0.083
       },
       {
        "name": "OS functions: process, memory, file, device management",
@@ -473,9 +484,9 @@
        "level": 1,
        "id": "BIT101.U3.T4",
        "band": "high",
-       "share_in_unit_pct": 12.7,
+       "share_in_unit_pct": 12.1,
        "skip": false,
-       "global_weight_pct": 0.102
+       "global_weight_pct": 0.097
       },
       {
        "name": "OS protection, security and user interface",
@@ -484,9 +495,9 @@
        "level": 2,
        "id": "BIT101.U3.T5",
        "band": "medium",
-       "share_in_unit_pct": 7.3,
+       "share_in_unit_pct": 6.9,
        "skip": false,
-       "global_weight_pct": 0.058
+       "global_weight_pct": 0.056
       },
       {
        "name": "Machine vs assembly vs high-level languages",
@@ -500,9 +511,9 @@
        "level": 1,
        "id": "BIT101.U3.T6",
        "band": "high",
-       "share_in_unit_pct": 12.7,
+       "share_in_unit_pct": 12.1,
        "skip": false,
-       "global_weight_pct": 0.102
+       "global_weight_pct": 0.097
       },
       {
        "name": "Assembler vs compiler vs interpreter",
@@ -516,9 +527,9 @@
        "level": 0,
        "id": "BIT101.U3.T7",
        "band": "core",
-       "share_in_unit_pct": 16.4,
+       "share_in_unit_pct": 15.5,
        "skip": false,
-       "global_weight_pct": 0.131
+       "global_weight_pct": 0.125
       },
       {
        "name": "Software licensing and open source software",
@@ -527,9 +538,9 @@
        "level": 1,
        "id": "BIT101.U3.T8",
        "band": "medium",
-       "share_in_unit_pct": 9.1,
+       "share_in_unit_pct": 8.6,
        "skip": false,
-       "global_weight_pct": 0.073
+       "global_weight_pct": 0.069
       },
       {
        "name": "Unix vs Windows (case study)",
@@ -539,9 +550,20 @@
        "note": "skip case studies",
        "id": "BIT101.U3.T9",
        "band": "low",
-       "share_in_unit_pct": 3.6,
+       "share_in_unit_pct": 3.4,
        "skip": false,
-       "global_weight_pct": 0.029
+       "global_weight_pct": 0.027
+      },
+      {
+       "name": "Examples of operating systems",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT101.U3.T10",
+       "band": "low",
+       "share_in_unit_pct": 5.2,
+       "skip": false,
+       "global_weight_pct": 0.042
       }
      ]
     },
@@ -583,7 +605,7 @@
        "level": 0,
        "id": "BIT101.U4.T3",
        "band": "core",
-       "share_in_unit_pct": 29.0,
+       "share_in_unit_pct": 29,
        "skip": false,
        "global_weight_pct": 0.181
       },
@@ -641,7 +663,7 @@
        "level": 1,
        "id": "BIT101.U5.T3",
        "band": "high",
-       "share_in_unit_pct": 9.0,
+       "share_in_unit_pct": 9,
        "skip": false,
        "global_weight_pct": 0.064
       },
@@ -652,7 +674,7 @@
        "level": 1,
        "id": "BIT101.U5.T4",
        "band": "high",
-       "share_in_unit_pct": 9.0,
+       "share_in_unit_pct": 9,
        "skip": false,
        "global_weight_pct": 0.064
       },
@@ -829,9 +851,9 @@
        "note": "Access is a DBMS",
        "id": "BIT101.U6.T1",
        "band": "high",
-       "share_in_unit_pct": 26.9,
+       "share_in_unit_pct": 25,
        "skip": false,
-       "global_weight_pct": 0.144
+       "global_weight_pct": 0.134
       },
       {
        "name": "Architectures",
@@ -840,9 +862,9 @@
        "level": 2,
        "id": "BIT101.U6.T2",
        "band": "medium",
-       "share_in_unit_pct": 15.4,
+       "share_in_unit_pct": 14.3,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.077
       },
       {
        "name": "Data models",
@@ -851,9 +873,9 @@
        "level": 1,
        "id": "BIT101.U6.T3",
        "band": "medium",
-       "share_in_unit_pct": 19.2,
+       "share_in_unit_pct": 17.9,
        "skip": false,
-       "global_weight_pct": 0.103
+       "global_weight_pct": 0.096
       },
       {
        "name": "Data warehousing vs data mining",
@@ -866,9 +888,9 @@
        "level": 1,
        "id": "BIT101.U6.T4",
        "band": "medium",
-       "share_in_unit_pct": 23.1,
+       "share_in_unit_pct": 21.4,
        "skip": false,
-       "global_weight_pct": 0.124
+       "global_weight_pct": 0.114
       },
       {
        "name": "Big data",
@@ -877,9 +899,20 @@
        "level": 2,
        "id": "BIT101.U6.T5",
        "band": "medium",
-       "share_in_unit_pct": 15.4,
+       "share_in_unit_pct": 14.3,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.077
+      },
+      {
+       "name": "Database applications",
+       "importance": 2,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT101.U6.T6",
+       "band": "low",
+       "share_in_unit_pct": 7.1,
+       "skip": false,
+       "global_weight_pct": 0.038
       }
      ]
     },
@@ -1080,7 +1113,7 @@
      "name": "Introduction",
      "importance": 3,
      "band": "low",
-     "share_in_subject_pct": 4.0,
+     "share_in_subject_pct": 4,
      "calc": false,
      "topics": [
       {
@@ -1150,7 +1183,7 @@
      "name": "Elements of C",
      "importance": 6,
      "band": "medium",
-     "share_in_subject_pct": 8.0,
+     "share_in_subject_pct": 8,
      "calc": false,
      "topics": [
       {
@@ -1171,7 +1204,7 @@
        "level": 1,
        "id": "BIT102.U2.T2",
        "band": "high",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.1
       },
@@ -1266,7 +1299,7 @@
        "level": 2,
        "id": "BIT102.U3.T3",
        "band": "medium",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.083
       }
@@ -1410,7 +1443,7 @@
      "name": "Control structures",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 12.0,
+     "share_in_subject_pct": 12,
      "calc": true,
      "topics": [
       {
@@ -1420,9 +1453,9 @@
        "level": 1,
        "id": "BIT102.U5.T1",
        "band": "medium",
-       "share_in_unit_pct": 11.8,
+       "share_in_unit_pct": 11.1,
        "skip": false,
-       "global_weight_pct": 0.071
+       "global_weight_pct": 0.067
       },
       {
        "name": "switch and case fall-through",
@@ -1431,9 +1464,9 @@
        "level": 0,
        "id": "BIT102.U5.T2",
        "band": "core",
-       "share_in_unit_pct": 17.6,
+       "share_in_unit_pct": 16.7,
        "skip": false,
-       "global_weight_pct": 0.106
+       "global_weight_pct": 0.1
       },
       {
        "name": "Conditional operator",
@@ -1442,9 +1475,9 @@
        "level": 2,
        "id": "BIT102.U5.T3",
        "band": "medium",
-       "share_in_unit_pct": 7.8,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.047
+       "global_weight_pct": 0.044
       },
       {
        "name": "for, while, do-while loops",
@@ -1453,9 +1486,9 @@
        "level": 0,
        "id": "BIT102.U5.T4",
        "band": "high",
-       "share_in_unit_pct": 15.7,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.094
+       "global_weight_pct": 0.089
       },
       {
        "name": "Nested loops",
@@ -1464,9 +1497,9 @@
        "level": 1,
        "id": "BIT102.U5.T5",
        "band": "high",
-       "share_in_unit_pct": 13.7,
+       "share_in_unit_pct": 13,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.078
       },
       {
        "name": "The odd loop (empty body, infinite loops)",
@@ -1475,9 +1508,9 @@
        "level": 1,
        "id": "BIT102.U5.T6",
        "band": "medium",
-       "share_in_unit_pct": 11.8,
+       "share_in_unit_pct": 11.1,
        "skip": false,
-       "global_weight_pct": 0.071
+       "global_weight_pct": 0.067
       },
       {
        "name": "break vs continue",
@@ -1490,9 +1523,9 @@
        "level": 0,
        "id": "BIT102.U5.T7",
        "band": "high",
-       "share_in_unit_pct": 15.7,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.094
+       "global_weight_pct": 0.089
       },
       {
        "name": "goto and labels",
@@ -1501,9 +1534,20 @@
        "level": 2,
        "id": "BIT102.U5.T8",
        "band": "low",
-       "share_in_unit_pct": 5.9,
+       "share_in_unit_pct": 5.6,
        "skip": false,
-       "global_weight_pct": 0.035
+       "global_weight_pct": 0.034
+      },
+      {
+       "name": "Intro to selection and iterative statements",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT102.U5.T9",
+       "band": "low",
+       "share_in_unit_pct": 5.6,
+       "skip": false,
+       "global_weight_pct": 0.034
       }
      ]
     },
@@ -1522,7 +1566,7 @@
        "level": 1,
        "id": "BIT102.U6.T1",
        "band": "high",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.107
       },
@@ -1581,7 +1625,7 @@
      "name": "Functions",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 12.0,
+     "share_in_subject_pct": 12,
      "calc": false,
      "topics": [
       {
@@ -1596,9 +1640,9 @@
        "level": 1,
        "id": "BIT102.U7.T1",
        "band": "high",
-       "share_in_unit_pct": 11.5,
+       "share_in_unit_pct": 10.6,
        "skip": false,
-       "global_weight_pct": 0.069
+       "global_weight_pct": 0.064
       },
       {
        "name": "Arguments and return statement",
@@ -1607,9 +1651,9 @@
        "level": 1,
        "id": "BIT102.U7.T2",
        "band": "medium",
-       "share_in_unit_pct": 9.8,
+       "share_in_unit_pct": 9.1,
        "skip": false,
-       "global_weight_pct": 0.059
+       "global_weight_pct": 0.055
       },
       {
        "name": "void as a parameter",
@@ -1618,9 +1662,9 @@
        "level": 2,
        "id": "BIT102.U7.T3",
        "band": "medium",
-       "share_in_unit_pct": 6.6,
+       "share_in_unit_pct": 6.1,
        "skip": false,
-       "global_weight_pct": 0.039
+       "global_weight_pct": 0.037
       },
       {
        "name": "Call by value vs call by reference",
@@ -1633,9 +1677,9 @@
        "level": 0,
        "id": "BIT102.U7.T4",
        "band": "core",
-       "share_in_unit_pct": 14.8,
+       "share_in_unit_pct": 13.6,
        "skip": false,
-       "global_weight_pct": 0.089
+       "global_weight_pct": 0.082
       },
       {
        "name": "Arrays as function parameters",
@@ -1644,9 +1688,9 @@
        "level": 1,
        "id": "BIT102.U7.T5",
        "band": "medium",
-       "share_in_unit_pct": 9.8,
+       "share_in_unit_pct": 9.1,
        "skip": false,
-       "global_weight_pct": 0.059
+       "global_weight_pct": 0.055
       },
       {
        "name": "Recursion",
@@ -1655,9 +1699,9 @@
        "level": 0,
        "id": "BIT102.U7.T6",
        "band": "high",
-       "share_in_unit_pct": 13.1,
+       "share_in_unit_pct": 12.1,
        "skip": false,
-       "global_weight_pct": 0.079
+       "global_weight_pct": 0.073
       },
       {
        "name": "Local vs external variables",
@@ -1670,9 +1714,9 @@
        "level": 1,
        "id": "BIT102.U7.T7",
        "band": "high",
-       "share_in_unit_pct": 11.5,
+       "share_in_unit_pct": 10.6,
        "skip": false,
-       "global_weight_pct": 0.069
+       "global_weight_pct": 0.064
       },
       {
        "name": "static vs register variables",
@@ -1685,9 +1729,9 @@
        "level": 1,
        "id": "BIT102.U7.T8",
        "band": "high",
-       "share_in_unit_pct": 11.5,
+       "share_in_unit_pct": 10.6,
        "skip": false,
-       "global_weight_pct": 0.069
+       "global_weight_pct": 0.064
       },
       {
        "name": "Header files",
@@ -1696,9 +1740,9 @@
        "level": 2,
        "id": "BIT102.U7.T9",
        "band": "low",
-       "share_in_unit_pct": 4.9,
+       "share_in_unit_pct": 4.5,
        "skip": false,
-       "global_weight_pct": 0.03
+       "global_weight_pct": 0.027
       },
       {
        "name": "Parameterizing main (argc, argv)",
@@ -1707,9 +1751,20 @@
        "level": 2,
        "id": "BIT102.U7.T10",
        "band": "medium",
-       "share_in_unit_pct": 6.6,
+       "share_in_unit_pct": 6.1,
        "skip": false,
-       "global_weight_pct": 0.039
+       "global_weight_pct": 0.037
+      },
+      {
+       "name": "Introduction and types of functions (library vs user-defined)",
+       "importance": 5,
+       "type": "recall",
+       "level": 1,
+       "id": "BIT102.U7.T11",
+       "band": "medium",
+       "share_in_unit_pct": 7.6,
+       "skip": false,
+       "global_weight_pct": 0.046
       }
      ]
     },
@@ -2024,7 +2079,7 @@
      "name": "File handling",
      "importance": 3,
      "band": "low",
-     "share_in_subject_pct": 4.0,
+     "share_in_subject_pct": 4,
      "calc": false,
      "note": "guide: skip file handling",
      "topics": [
@@ -2319,7 +2374,7 @@
      "name": "Simplification of Boolean functions",
      "importance": 8,
      "band": "high",
-     "share_in_subject_pct": 14.0,
+     "share_in_subject_pct": 14,
      "calc": true,
      "topics": [
       {
@@ -2351,7 +2406,7 @@
        "level": 0,
        "id": "BIT103.U3.T3",
        "band": "high",
-       "share_in_unit_pct": 19.0,
+       "share_in_unit_pct": 19,
        "skip": false,
        "global_weight_pct": 0.134
       },
@@ -2366,7 +2421,7 @@
        "level": 0,
        "id": "BIT103.U3.T4",
        "band": "high",
-       "share_in_unit_pct": 19.0,
+       "share_in_unit_pct": 19,
        "skip": false,
        "global_weight_pct": 0.134
       },
@@ -2381,7 +2436,7 @@
        "level": 0,
        "id": "BIT103.U3.T5",
        "band": "high",
-       "share_in_unit_pct": 19.0,
+       "share_in_unit_pct": 19,
        "skip": false,
        "global_weight_pct": 0.134
       },
@@ -2521,7 +2576,7 @@
        "note": "trap: edge vs level",
        "id": "BIT103.U5.T1",
        "band": "core",
-       "share_in_unit_pct": 17.0,
+       "share_in_unit_pct": 17,
        "skip": false,
        "global_weight_pct": 0.149
       },
@@ -2532,7 +2587,7 @@
        "level": 0,
        "id": "BIT103.U5.T2",
        "band": "core",
-       "share_in_unit_pct": 17.0,
+       "share_in_unit_pct": 17,
        "skip": false,
        "global_weight_pct": 0.149
       },
@@ -2851,9 +2906,9 @@
        "level": 1,
        "id": "BIT151.U2.T1",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 6.3,
        "skip": false,
-       "global_weight_pct": 0.064
+       "global_weight_pct": 0.06
       },
       {
        "name": "Pin configuration (40 pins)",
@@ -2863,9 +2918,9 @@
        "note": "8-bit data, 16-bit address, 64 KB",
        "id": "BIT151.U2.T2",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 6.3,
        "skip": false,
-       "global_weight_pct": 0.064
+       "global_weight_pct": 0.06
       },
       {
        "name": "Timing and control unit",
@@ -2874,9 +2929,9 @@
        "level": 2,
        "id": "BIT151.U2.T3",
        "band": "medium",
-       "share_in_unit_pct": 5.4,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.051
+       "global_weight_pct": 0.047
       },
       {
        "name": "Registers",
@@ -2885,9 +2940,9 @@
        "level": 1,
        "id": "BIT151.U2.T4",
        "band": "high",
-       "share_in_unit_pct": 9.5,
+       "share_in_unit_pct": 8.8,
        "skip": false,
-       "global_weight_pct": 0.089
+       "global_weight_pct": 0.083
       },
       {
        "name": "Data bus vs address bus",
@@ -2900,9 +2955,9 @@
        "level": 0,
        "id": "BIT151.U2.T5",
        "band": "core",
-       "share_in_unit_pct": 12.2,
+       "share_in_unit_pct": 11.3,
        "skip": false,
-       "global_weight_pct": 0.115
+       "global_weight_pct": 0.107
       },
       {
        "name": "Operation code vs operand",
@@ -2915,9 +2970,9 @@
        "level": 1,
        "id": "BIT151.U2.T6",
        "band": "medium",
-       "share_in_unit_pct": 8.1,
+       "share_in_unit_pct": 7.5,
        "skip": false,
-       "global_weight_pct": 0.076
+       "global_weight_pct": 0.071
       },
       {
        "name": "Addressing modes",
@@ -2926,9 +2981,9 @@
        "level": 1,
        "id": "BIT151.U2.T7",
        "band": "high",
-       "share_in_unit_pct": 9.5,
+       "share_in_unit_pct": 8.8,
        "skip": false,
-       "global_weight_pct": 0.089
+       "global_weight_pct": 0.083
       },
       {
        "name": "Interrupts: TRAP, RST 7.5/6.5/5.5, INTR and priority",
@@ -2938,9 +2993,9 @@
        "note": "TRAP>7.5>6.5>5.5>INTR",
        "id": "BIT151.U2.T8",
        "band": "core",
-       "share_in_unit_pct": 12.2,
+       "share_in_unit_pct": 11.3,
        "skip": false,
-       "global_weight_pct": 0.115
+       "global_weight_pct": 0.107
       },
       {
        "name": "Maskable vs non-maskable interrupts",
@@ -2953,9 +3008,9 @@
        "level": 0,
        "id": "BIT151.U2.T9",
        "band": "high",
-       "share_in_unit_pct": 10.8,
+       "share_in_unit_pct": 10,
        "skip": false,
-       "global_weight_pct": 0.102
+       "global_weight_pct": 0.095
       },
       {
        "name": "Flags (S Z AC P CY)",
@@ -2964,9 +3019,9 @@
        "level": 0,
        "id": "BIT151.U2.T10",
        "band": "core",
-       "share_in_unit_pct": 12.2,
+       "share_in_unit_pct": 11.3,
        "skip": false,
-       "global_weight_pct": 0.115
+       "global_weight_pct": 0.107
       },
       {
        "name": "Instruction and data flow inside 8085",
@@ -2975,9 +3030,9 @@
        "level": 2,
        "id": "BIT151.U2.T11",
        "band": "medium",
-       "share_in_unit_pct": 5.4,
+       "share_in_unit_pct": 5,
        "skip": false,
-       "global_weight_pct": 0.051
+       "global_weight_pct": 0.047
       },
       {
        "name": "Basic assembly programs",
@@ -2987,9 +3042,20 @@
        "note": "skip assembly programs",
        "id": "BIT151.U2.T12",
        "band": "skip",
-       "share_in_unit_pct": 1.4,
+       "share_in_unit_pct": 1.3,
        "skip": true,
-       "global_weight_pct": 0.013
+       "global_weight_pct": 0.012
+      },
+      {
+       "name": "Intel 8085 instruction set (data transfer, arithmetic, logical, branch, machine control)",
+       "importance": 6,
+       "type": "recall",
+       "level": 1,
+       "id": "BIT151.U2.T13",
+       "band": "medium",
+       "share_in_unit_pct": 7.5,
+       "skip": false,
+       "global_weight_pct": 0.071
       }
      ]
     },
@@ -3294,7 +3360,7 @@
        "level": 1,
        "id": "BIT151.U7.T2",
        "band": "high",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.151
       },
@@ -3305,7 +3371,7 @@
        "level": 1,
        "id": "BIT151.U7.T3",
        "band": "high",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.151
       },
@@ -3338,7 +3404,7 @@
      "name": "Pipelining",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 17.0,
+     "share_in_subject_pct": 17,
      "calc": true,
      "topics": [
       {
@@ -3484,9 +3550,9 @@
        "level": 1,
        "id": "BIT153.U2.T1",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.045
+       "global_weight_pct": 0.034
       },
       {
        "name": "I/O streams vs manipulators",
@@ -3499,9 +3565,9 @@
        "level": 1,
        "id": "BIT153.U2.T2",
        "band": "medium",
-       "share_in_unit_pct": 8.2,
+       "share_in_unit_pct": 6.3,
        "skip": false,
-       "global_weight_pct": 0.054
+       "global_weight_pct": 0.042
       },
       {
        "name": "Type conversion",
@@ -3510,9 +3576,9 @@
        "level": 1,
        "id": "BIT153.U2.T3",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.045
+       "global_weight_pct": 0.034
       },
       {
        "name": "Preprocessor directives",
@@ -3521,9 +3587,9 @@
        "level": 2,
        "id": "BIT153.U2.T4",
        "band": "low",
-       "share_in_unit_pct": 4.1,
+       "share_in_unit_pct": 3.1,
        "skip": false,
-       "global_weight_pct": 0.027
+       "global_weight_pct": 0.02
       },
       {
        "name": "new vs delete",
@@ -3536,9 +3602,9 @@
        "level": 1,
        "id": "BIT153.U2.T5",
        "band": "high",
-       "share_in_unit_pct": 9.6,
+       "share_in_unit_pct": 7.3,
        "skip": false,
-       "global_weight_pct": 0.063
+       "global_weight_pct": 0.048
       },
       {
        "name": "Function overloading",
@@ -3547,9 +3613,9 @@
        "level": 0,
        "id": "BIT153.U2.T6",
        "band": "high",
-       "share_in_unit_pct": 11.0,
+       "share_in_unit_pct": 8.3,
        "skip": false,
-       "global_weight_pct": 0.072
+       "global_weight_pct": 0.055
       },
       {
        "name": "Inline functions",
@@ -3558,9 +3624,9 @@
        "level": 1,
        "id": "BIT153.U2.T7",
        "band": "medium",
-       "share_in_unit_pct": 8.2,
+       "share_in_unit_pct": 6.3,
        "skip": false,
-       "global_weight_pct": 0.054
+       "global_weight_pct": 0.042
       },
       {
        "name": "Default arguments",
@@ -3569,9 +3635,9 @@
        "level": 1,
        "id": "BIT153.U2.T8",
        "band": "medium",
-       "share_in_unit_pct": 8.2,
+       "share_in_unit_pct": 6.3,
        "skip": false,
-       "global_weight_pct": 0.054
+       "global_weight_pct": 0.042
       },
       {
        "name": "Pass by reference vs return by reference",
@@ -3584,9 +3650,9 @@
        "level": 1,
        "id": "BIT153.U2.T9",
        "band": "high",
-       "share_in_unit_pct": 9.6,
+       "share_in_unit_pct": 7.3,
        "skip": false,
-       "global_weight_pct": 0.063
+       "global_weight_pct": 0.048
       },
       {
        "name": "Scope and storage class",
@@ -3595,9 +3661,9 @@
        "level": 1,
        "id": "BIT153.U2.T10",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.045
+       "global_weight_pct": 0.034
       },
       {
        "name": "Pointer operators",
@@ -3606,9 +3672,9 @@
        "level": 1,
        "id": "BIT153.U2.T11",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.045
+       "global_weight_pct": 0.034
       },
       {
        "name": "Pointers and arrays",
@@ -3617,9 +3683,9 @@
        "level": 1,
        "id": "BIT153.U2.T12",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.045
+       "global_weight_pct": 0.034
       },
       {
        "name": "Pointers and functions",
@@ -3628,9 +3694,64 @@
        "level": 1,
        "id": "BIT153.U2.T13",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.045
+       "global_weight_pct": 0.034
+      },
+      {
+       "name": "C++ program structure",
+       "importance": 5,
+       "type": "recall",
+       "level": 1,
+       "id": "BIT153.U2.T14",
+       "band": "medium",
+       "share_in_unit_pct": 5.2,
+       "skip": false,
+       "global_weight_pct": 0.034
+      },
+      {
+       "name": "Character set and tokens",
+       "importance": 4,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT153.U2.T15",
+       "band": "medium",
+       "share_in_unit_pct": 4.2,
+       "skip": false,
+       "global_weight_pct": 0.028
+      },
+      {
+       "name": "Data types (C++)",
+       "importance": 5,
+       "type": "recall",
+       "level": 1,
+       "id": "BIT153.U2.T16",
+       "band": "medium",
+       "share_in_unit_pct": 5.2,
+       "skip": false,
+       "global_weight_pct": 0.034
+      },
+      {
+       "name": "Control statements",
+       "importance": 4,
+       "type": "trace",
+       "level": 2,
+       "id": "BIT153.U2.T17",
+       "band": "medium",
+       "share_in_unit_pct": 4.2,
+       "skip": false,
+       "global_weight_pct": 0.028
+      },
+      {
+       "name": "Pointer variables: declaration and initialization",
+       "importance": 5,
+       "type": "recall",
+       "level": 1,
+       "id": "BIT153.U2.T18",
+       "band": "medium",
+       "share_in_unit_pct": 5.2,
+       "skip": false,
+       "global_weight_pct": 0.034
       }
      ]
     },
@@ -3831,7 +3952,7 @@
      "name": "Inheritance",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 17.0,
+     "share_in_subject_pct": 17,
      "calc": false,
      "topics": [
       {
@@ -3930,7 +4051,7 @@
      "name": "Virtual functions, polymorphism and other features",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 17.0,
+     "share_in_subject_pct": 17,
      "calc": false,
      "topics": [
       {
@@ -4014,7 +4135,7 @@
        "level": 1,
        "id": "BIT153.U6.T7",
        "band": "high",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.085
       },
@@ -4223,7 +4344,7 @@
        "level": 2,
        "id": "BIT201.U1.T3",
        "band": "low",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.043
       },
@@ -4249,7 +4370,7 @@
      "name": "Algorithms",
      "importance": 6,
      "band": "medium",
-     "share_in_subject_pct": 8.0,
+     "share_in_subject_pct": 8,
      "calc": true,
      "topics": [
       {
@@ -4306,7 +4427,7 @@
        "level": 0,
        "id": "BIT201.U3.T1",
        "band": "core",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.133
       },
@@ -4321,7 +4442,7 @@
        "level": 0,
        "id": "BIT201.U3.T2",
        "band": "high",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 16,
        "skip": false,
        "global_weight_pct": 0.107
       },
@@ -4332,7 +4453,7 @@
        "level": 1,
        "id": "BIT201.U3.T3",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.067
       },
@@ -4348,7 +4469,7 @@
        "level": 0,
        "id": "BIT201.U3.T4",
        "band": "core",
-       "share_in_unit_pct": 18.0,
+       "share_in_unit_pct": 18,
        "skip": false,
        "global_weight_pct": 0.12
       },
@@ -4359,7 +4480,7 @@
        "level": 0,
        "id": "BIT201.U3.T5",
        "band": "high",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 16,
        "skip": false,
        "global_weight_pct": 0.107
       },
@@ -4370,7 +4491,7 @@
        "level": 0,
        "id": "BIT201.U3.T6",
        "band": "core",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.133
       }
@@ -4435,7 +4556,7 @@
      "name": "Recursion",
      "importance": 6,
      "band": "medium",
-     "share_in_subject_pct": 8.0,
+     "share_in_subject_pct": 8,
      "calc": true,
      "topics": [
       {
@@ -4445,7 +4566,7 @@
        "level": 1,
        "id": "BIT201.U5.T1",
        "band": "medium",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.1
       },
@@ -4670,7 +4791,7 @@
      "name": "Sorting",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 12.0,
+     "share_in_subject_pct": 12,
      "calc": true,
      "topics": [
       {
@@ -4753,7 +4874,7 @@
      "name": "Searching",
      "importance": 6,
      "band": "medium",
-     "share_in_subject_pct": 8.0,
+     "share_in_subject_pct": 8,
      "calc": false,
      "topics": [
       {
@@ -4947,9 +5068,9 @@
        "level": 2,
        "id": "BIT202.U1.T1",
        "band": "medium",
-       "share_in_unit_pct": 8.0,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.047
+       "global_weight_pct": 0.044
       },
       {
        "name": "Benefits of databases",
@@ -4958,9 +5079,9 @@
        "level": 2,
        "id": "BIT202.U1.T2",
        "band": "medium",
-       "share_in_unit_pct": 8.0,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.047
+       "global_weight_pct": 0.044
       },
       {
        "name": "Data models vs schemas vs instances",
@@ -4974,9 +5095,9 @@
        "level": 0,
        "id": "BIT202.U1.T3",
        "band": "high",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.095
+       "global_weight_pct": 0.088
       },
       {
        "name": "Three-schema architecture",
@@ -4985,9 +5106,9 @@
        "level": 0,
        "id": "BIT202.U1.T4",
        "band": "high",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.095
+       "global_weight_pct": 0.088
       },
       {
        "name": "Data independence (logical vs physical)",
@@ -5000,9 +5121,9 @@
        "level": 0,
        "id": "BIT202.U1.T5",
        "band": "high",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.095
+       "global_weight_pct": 0.088
       },
       {
        "name": "Database languages and interfaces (DDL/DML/DCL/TCL)",
@@ -5011,9 +5132,9 @@
        "level": 0,
        "id": "BIT202.U1.T6",
        "band": "high",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.095
+       "global_weight_pct": 0.088
       },
       {
        "name": "Centralized vs client/server architecture",
@@ -5026,9 +5147,9 @@
        "level": 1,
        "id": "BIT202.U1.T7",
        "band": "medium",
-       "share_in_unit_pct": 12.0,
+       "share_in_unit_pct": 11.1,
        "skip": false,
-       "global_weight_pct": 0.071
+       "global_weight_pct": 0.066
       },
       {
        "name": "Classification of DBMSs",
@@ -5037,9 +5158,20 @@
        "level": 2,
        "id": "BIT202.U1.T8",
        "band": "medium",
-       "share_in_unit_pct": 8.0,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.047
+       "global_weight_pct": 0.044
+      },
+      {
+       "name": "Database system environment",
+       "importance": 4,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT202.U1.T9",
+       "band": "medium",
+       "share_in_unit_pct": 7.4,
+       "skip": false,
+       "global_weight_pct": 0.044
       }
      ]
     },
@@ -5062,9 +5194,9 @@
        "level": 1,
        "id": "BIT202.U2.T1",
        "band": "medium",
-       "share_in_unit_pct": 8.1,
+       "share_in_unit_pct": 7.8,
        "skip": false,
-       "global_weight_pct": 0.055
+       "global_weight_pct": 0.053
       },
       {
        "name": "Attributes (simple, composite, multivalued, derived)",
@@ -5073,9 +5205,9 @@
        "level": 1,
        "id": "BIT202.U2.T2",
        "band": "high",
-       "share_in_unit_pct": 9.5,
+       "share_in_unit_pct": 9.1,
        "skip": false,
-       "global_weight_pct": 0.064
+       "global_weight_pct": 0.062
       },
       {
        "name": "Keys",
@@ -5084,9 +5216,9 @@
        "level": 0,
        "id": "BIT202.U2.T3",
        "band": "core",
-       "share_in_unit_pct": 12.2,
+       "share_in_unit_pct": 11.7,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.08
       },
       {
        "name": "Relationship type vs relationship set",
@@ -5099,9 +5231,9 @@
        "level": 1,
        "id": "BIT202.U2.T4",
        "band": "medium",
-       "share_in_unit_pct": 8.1,
+       "share_in_unit_pct": 7.8,
        "skip": false,
-       "global_weight_pct": 0.055
+       "global_weight_pct": 0.053
       },
       {
        "name": "Roles and structural constraints",
@@ -5110,9 +5242,9 @@
        "level": 1,
        "id": "BIT202.U2.T5",
        "band": "medium",
-       "share_in_unit_pct": 8.1,
+       "share_in_unit_pct": 7.8,
        "skip": false,
-       "global_weight_pct": 0.055
+       "global_weight_pct": 0.053
       },
       {
        "name": "Weak entity type",
@@ -5121,9 +5253,9 @@
        "level": 1,
        "id": "BIT202.U2.T6",
        "band": "high",
-       "share_in_unit_pct": 9.5,
+       "share_in_unit_pct": 9.1,
        "skip": false,
-       "global_weight_pct": 0.064
+       "global_weight_pct": 0.062
       },
       {
        "name": "ER diagram notation",
@@ -5132,9 +5264,9 @@
        "level": 1,
        "id": "BIT202.U2.T7",
        "band": "medium",
-       "share_in_unit_pct": 8.1,
+       "share_in_unit_pct": 7.8,
        "skip": false,
-       "global_weight_pct": 0.055
+       "global_weight_pct": 0.053
       },
       {
        "name": "Design issues",
@@ -5143,7 +5275,7 @@
        "level": 2,
        "id": "BIT202.U2.T8",
        "band": "low",
-       "share_in_unit_pct": 4.1,
+       "share_in_unit_pct": 3.9,
        "skip": false,
        "global_weight_pct": 0.027
       },
@@ -5154,9 +5286,9 @@
        "level": 2,
        "id": "BIT202.U2.T9",
        "band": "medium",
-       "share_in_unit_pct": 5.4,
+       "share_in_unit_pct": 5.2,
        "skip": false,
-       "global_weight_pct": 0.037
+       "global_weight_pct": 0.035
       },
       {
        "name": "Superclass vs subclass and inheritance",
@@ -5169,9 +5301,9 @@
        "level": 1,
        "id": "BIT202.U2.T10",
        "band": "medium",
-       "share_in_unit_pct": 8.1,
+       "share_in_unit_pct": 7.8,
        "skip": false,
-       "global_weight_pct": 0.055
+       "global_weight_pct": 0.053
       },
       {
        "name": "Specialization vs generalization vs aggregation",
@@ -5185,9 +5317,9 @@
        "level": 0,
        "id": "BIT202.U2.T11",
        "band": "core",
-       "share_in_unit_pct": 12.2,
+       "share_in_unit_pct": 11.7,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.08
       },
       {
        "name": "Constraints on specialization and generalization",
@@ -5196,9 +5328,20 @@
        "level": 1,
        "id": "BIT202.U2.T12",
        "band": "medium",
-       "share_in_unit_pct": 6.8,
+       "share_in_unit_pct": 6.5,
        "skip": false,
-       "global_weight_pct": 0.046
+       "global_weight_pct": 0.044
+      },
+      {
+       "name": "Using high-level conceptual data models for design",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT202.U2.T13",
+       "band": "low",
+       "share_in_unit_pct": 3.9,
+       "skip": false,
+       "global_weight_pct": 0.027
       }
      ]
     },
@@ -5228,7 +5371,7 @@
        "level": 1,
        "id": "BIT202.U3.T2",
        "band": "high",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.136
       },
@@ -5565,7 +5708,7 @@
        "level": 1,
        "id": "BIT202.U7.T1",
        "band": "medium",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.102
       },
@@ -5580,7 +5723,7 @@
        "level": 0,
        "id": "BIT202.U7.T2",
        "band": "core",
-       "share_in_unit_pct": 36.0,
+       "share_in_unit_pct": 36,
        "skip": false,
        "global_weight_pct": 0.183
       },
@@ -5591,7 +5734,7 @@
        "level": 1,
        "id": "BIT202.U7.T3",
        "band": "high",
-       "share_in_unit_pct": 28.0,
+       "share_in_unit_pct": 28,
        "skip": false,
        "global_weight_pct": 0.142
       },
@@ -5602,7 +5745,7 @@
        "level": 2,
        "id": "BIT202.U7.T4",
        "band": "medium",
-       "share_in_unit_pct": 16.0,
+       "share_in_unit_pct": 16,
        "skip": false,
        "global_weight_pct": 0.081
       }
@@ -5650,7 +5793,7 @@
        "level": 3,
        "id": "BIT202.U8.T3",
        "band": "low",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.042
       }
@@ -5704,9 +5847,9 @@
        "level": 1,
        "id": "BIT204.U1.T1",
        "band": "high",
-       "share_in_unit_pct": 19.4,
+       "share_in_unit_pct": 17.9,
        "skip": false,
-       "global_weight_pct": 0.143
+       "global_weight_pct": 0.132
       },
       {
        "name": "Evolution: batch, multiprogramming, time-sharing, real-time",
@@ -5715,9 +5858,9 @@
        "level": 1,
        "id": "BIT204.U1.T2",
        "band": "high",
-       "share_in_unit_pct": 19.4,
+       "share_in_unit_pct": 17.9,
        "skip": false,
-       "global_weight_pct": 0.143
+       "global_weight_pct": 0.132
       },
       {
        "name": "Mainframe, handheld, embedded, smart-card, distributed, PC OS",
@@ -5726,9 +5869,9 @@
        "level": 2,
        "id": "BIT204.U1.T3",
        "band": "medium",
-       "share_in_unit_pct": 11.1,
+       "share_in_unit_pct": 10.3,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.076
       },
       {
        "name": "Booting",
@@ -5737,9 +5880,9 @@
        "level": 2,
        "id": "BIT204.U1.T4",
        "band": "medium",
-       "share_in_unit_pct": 11.1,
+       "share_in_unit_pct": 10.3,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.076
       },
       {
        "name": "System calls",
@@ -5748,9 +5891,9 @@
        "level": 1,
        "id": "BIT204.U1.T5",
        "band": "medium",
-       "share_in_unit_pct": 16.7,
+       "share_in_unit_pct": 15.4,
        "skip": false,
-       "global_weight_pct": 0.123
+       "global_weight_pct": 0.113
       },
       {
        "name": "Address spaces and files",
@@ -5759,9 +5902,9 @@
        "level": 2,
        "id": "BIT204.U1.T6",
        "band": "medium",
-       "share_in_unit_pct": 11.1,
+       "share_in_unit_pct": 10.3,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.076
       },
       {
        "name": "Client-server model",
@@ -5770,9 +5913,20 @@
        "level": 2,
        "id": "BIT204.U1.T7",
        "band": "medium",
-       "share_in_unit_pct": 11.1,
+       "share_in_unit_pct": 10.3,
        "skip": false,
-       "global_weight_pct": 0.082
+       "global_weight_pct": 0.076
+      },
+      {
+       "name": "Background of OS and hardware review",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT204.U1.T8",
+       "band": "low",
+       "share_in_unit_pct": 7.7,
+       "skip": false,
+       "global_weight_pct": 0.057
       }
      ]
     },
@@ -5806,7 +5960,7 @@
        "level": 1,
        "id": "BIT204.U2.T2",
        "band": "medium",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.184
       },
@@ -6028,7 +6182,7 @@
        "level": 1,
        "id": "BIT204.U3.T14",
        "band": "medium",
-       "share_in_unit_pct": 4.0,
+       "share_in_unit_pct": 4,
        "skip": false,
        "global_weight_pct": 0.059
       },
@@ -6775,7 +6929,7 @@
        "level": 0,
        "id": "BIT251/BIT301.U3.T4",
        "band": "core",
-       "share_in_unit_pct": 15.0,
+       "share_in_unit_pct": 15,
        "skip": false,
        "global_weight_pct": 0.084
       },
@@ -6801,7 +6955,7 @@
        "level": 1,
        "id": "BIT251/BIT301.U3.T6",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.056
       },
@@ -6850,7 +7004,7 @@
      "name": "[Client] JavaScript",
      "importance": 8,
      "band": "high",
-     "share_in_subject_pct": 10.0,
+     "share_in_subject_pct": 10,
      "calc": false,
      "topics": [
       {
@@ -7013,7 +7167,7 @@
      "name": "[Client] XML",
      "importance": 8,
      "band": "high",
-     "share_in_subject_pct": 10.0,
+     "share_in_subject_pct": 10,
      "calc": false,
      "topics": [
       {
@@ -7116,7 +7270,7 @@
      "name": "[PHP] PHP basics",
      "importance": 8,
      "band": "high",
-     "share_in_subject_pct": 10.0,
+     "share_in_subject_pct": 10,
      "calc": false,
      "topics": [
       {
@@ -7207,7 +7361,7 @@
        "level": 2,
        "id": "BIT251/BIT301.U7.T1",
        "band": "medium",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.062
       },
@@ -7218,7 +7372,7 @@
        "level": 1,
        "id": "BIT251/BIT301.U7.T2",
        "band": "medium",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.078
       },
@@ -7229,7 +7383,7 @@
        "level": 2,
        "id": "BIT251/BIT301.U7.T3",
        "band": "medium",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.062
       },
@@ -7244,7 +7398,7 @@
        "level": 2,
        "id": "BIT251/BIT301.U7.T4",
        "band": "medium",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.062
       },
@@ -7255,7 +7409,7 @@
        "level": 2,
        "id": "BIT251/BIT301.U7.T5",
        "band": "low",
-       "share_in_unit_pct": 15.0,
+       "share_in_unit_pct": 15,
        "skip": false,
        "global_weight_pct": 0.047
       }
@@ -7453,7 +7607,7 @@
        "note": "skip PHP DB",
        "id": "BIT251/BIT301.U11.T1",
        "band": "low",
-       "share_in_unit_pct": 50.0,
+       "share_in_unit_pct": 50,
        "skip": false,
        "global_weight_pct": 0.031
       },
@@ -7464,7 +7618,7 @@
        "level": 3,
        "id": "BIT251/BIT301.U11.T2",
        "band": "low",
-       "share_in_unit_pct": 50.0,
+       "share_in_unit_pct": 50,
        "skip": false,
        "global_weight_pct": 0.031
       }
@@ -7475,7 +7629,7 @@
      "name": "[PHP] Cookies, sessions and authentication",
      "importance": 8,
      "band": "high",
-     "share_in_subject_pct": 10.0,
+     "share_in_subject_pct": 10,
      "calc": false,
      "topics": [
       {
@@ -7838,7 +7992,7 @@
        "level": 2,
        "id": "BIT253.U2.T5",
        "band": "medium",
-       "share_in_unit_pct": 19.0,
+       "share_in_unit_pct": 19,
        "skip": false,
        "global_weight_pct": 0.106
       }
@@ -7849,7 +8003,7 @@
      "name": "Analysis",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 25.0,
+     "share_in_subject_pct": 25,
      "calc": false,
      "topics": [
       {
@@ -7875,7 +8029,7 @@
        "level": 0,
        "id": "BIT253.U3.T2",
        "band": "core",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.312
       },
@@ -8005,7 +8159,7 @@
      "name": "Implementation and maintenance",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 25.0,
+     "share_in_subject_pct": 25,
      "calc": false,
      "topics": [
       {
@@ -8703,7 +8857,7 @@
        "level": 0,
        "id": "BIT254.U5.T3",
        "band": "high",
-       "share_in_unit_pct": 17.0,
+       "share_in_unit_pct": 17,
        "skip": false,
        "global_weight_pct": 0.156
       },
@@ -8963,7 +9117,7 @@
        "level": 2,
        "id": "BIT302.U1.T2",
        "band": "medium",
-       "share_in_unit_pct": 50.0,
+       "share_in_unit_pct": 50,
        "skip": false,
        "global_weight_pct": 0.117
       },
@@ -8995,7 +9149,7 @@
        "level": 0,
        "id": "BIT302.U2.T1",
        "band": "high",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.156
       },
@@ -9039,7 +9193,7 @@
        "level": 0,
        "id": "BIT302.U2.T5",
        "band": "high",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.156
       }
@@ -9225,7 +9379,7 @@
        "level": 2,
        "id": "BIT302.U6.T1",
        "band": "medium",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.062
       },
@@ -9237,7 +9391,7 @@
        "note": "skip design patterns",
        "id": "BIT302.U6.T2",
        "band": "skip",
-       "share_in_unit_pct": 5.0,
+       "share_in_unit_pct": 5,
        "skip": true,
        "global_weight_pct": 0.016
       },
@@ -9248,7 +9402,7 @@
        "level": 2,
        "id": "BIT302.U6.T3",
        "band": "low",
-       "share_in_unit_pct": 15.0,
+       "share_in_unit_pct": 15,
        "skip": false,
        "global_weight_pct": 0.047
       },
@@ -9259,7 +9413,7 @@
        "level": 2,
        "id": "BIT302.U6.T4",
        "band": "medium",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.062
       },
@@ -9274,7 +9428,7 @@
        "level": 0,
        "id": "BIT302.U6.T5",
        "band": "high",
-       "share_in_unit_pct": 40.0,
+       "share_in_unit_pct": 40,
        "skip": false,
        "global_weight_pct": 0.125
       }
@@ -9493,7 +9647,7 @@
        "level": 0,
        "id": "BIT302.U10.T1",
        "band": "core",
-       "share_in_unit_pct": 100.0,
+       "share_in_unit_pct": 100,
        "skip": false,
        "global_weight_pct": 0.547
       }
@@ -9540,7 +9694,7 @@
        "level": 2,
        "id": "BIT353.U1.T1",
        "band": "low",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.048
       },
@@ -9620,9 +9774,9 @@
        "level": 1,
        "id": "BIT353.U2.T1",
        "band": "medium",
-       "share_in_unit_pct": 13.9,
+       "share_in_unit_pct": 12.8,
        "skip": false,
-       "global_weight_pct": 0.116
+       "global_weight_pct": 0.107
       },
       {
        "name": "TPS (operational) vs MIS (middle, routine) vs DSS (middle, non-routine) vs ESS (senior)",
@@ -9637,9 +9791,9 @@
        "level": 0,
        "id": "BIT353.U2.T2",
        "band": "core",
-       "share_in_unit_pct": 27.8,
+       "share_in_unit_pct": 25.6,
        "skip": false,
-       "global_weight_pct": 0.231
+       "global_weight_pct": 0.214
       },
       {
        "name": "Systems for linking the enterprise",
@@ -9648,9 +9802,9 @@
        "level": 1,
        "id": "BIT353.U2.T3",
        "band": "medium",
-       "share_in_unit_pct": 16.7,
+       "share_in_unit_pct": 15.4,
        "skip": false,
-       "global_weight_pct": 0.139
+       "global_weight_pct": 0.129
       },
       {
        "name": "E-business vs e-commerce vs e-government",
@@ -9664,9 +9818,9 @@
        "level": 1,
        "id": "BIT353.U2.T4",
        "band": "high",
-       "share_in_unit_pct": 19.4,
+       "share_in_unit_pct": 17.9,
        "skip": false,
-       "global_weight_pct": 0.162
+       "global_weight_pct": 0.149
       },
       {
        "name": "Collaboration vs social business",
@@ -9679,9 +9833,9 @@
        "level": 1,
        "id": "BIT353.U2.T5",
        "band": "medium",
-       "share_in_unit_pct": 13.9,
+       "share_in_unit_pct": 12.8,
        "skip": false,
-       "global_weight_pct": 0.116
+       "global_weight_pct": 0.107
       },
       {
        "name": "Information systems function in a business",
@@ -9690,9 +9844,20 @@
        "level": 2,
        "id": "BIT353.U2.T6",
        "band": "low",
-       "share_in_unit_pct": 8.3,
+       "share_in_unit_pct": 7.7,
        "skip": false,
-       "global_weight_pct": 0.069
+       "global_weight_pct": 0.064
+      },
+      {
+       "name": "Building a collaborative culture; tools for collaboration",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT353.U2.T7",
+       "band": "low",
+       "share_in_unit_pct": 7.7,
+       "skip": false,
+       "global_weight_pct": 0.064
       }
      ]
     },
@@ -9711,9 +9876,9 @@
        "level": 2,
        "id": "BIT353.U3.T1",
        "band": "medium",
-       "share_in_unit_pct": 10.5,
+       "share_in_unit_pct": 9.8,
        "skip": false,
-       "global_weight_pct": 0.088
+       "global_weight_pct": 0.082
       },
       {
        "name": "Economic impacts vs organizational and behavioral impacts",
@@ -9726,9 +9891,9 @@
        "level": 1,
        "id": "BIT353.U3.T2",
        "band": "medium",
-       "share_in_unit_pct": 15.8,
+       "share_in_unit_pct": 14.6,
        "skip": false,
-       "global_weight_pct": 0.132
+       "global_weight_pct": 0.122
       },
       {
        "name": "Porter's competitive forces model (5 forces)",
@@ -9737,9 +9902,9 @@
        "level": 0,
        "id": "BIT353.U3.T3",
        "band": "core",
-       "share_in_unit_pct": 26.3,
+       "share_in_unit_pct": 24.4,
        "skip": false,
-       "global_weight_pct": 0.219
+       "global_weight_pct": 0.204
       },
       {
        "name": "Dealing with forces using information systems",
@@ -9748,9 +9913,9 @@
        "level": 1,
        "id": "BIT353.U3.T4",
        "band": "medium",
-       "share_in_unit_pct": 15.8,
+       "share_in_unit_pct": 14.6,
        "skip": false,
-       "global_weight_pct": 0.132
+       "global_weight_pct": 0.122
       },
       {
        "name": "Business value chain model vs value web",
@@ -9763,9 +9928,9 @@
        "level": 0,
        "id": "BIT353.U3.T5",
        "band": "core",
-       "share_in_unit_pct": 23.7,
+       "share_in_unit_pct": 22,
        "skip": false,
-       "global_weight_pct": 0.197
+       "global_weight_pct": 0.184
       },
       {
        "name": "Challenges of strategic information systems",
@@ -9774,9 +9939,20 @@
        "level": 2,
        "id": "BIT353.U3.T6",
        "band": "low",
-       "share_in_unit_pct": 7.9,
+       "share_in_unit_pct": 7.3,
        "skip": false,
-       "global_weight_pct": 0.066
+       "global_weight_pct": 0.061
+      },
+      {
+       "name": "Internet's impact on organizations and competitive advantage",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT353.U3.T7",
+       "band": "low",
+       "share_in_unit_pct": 7.3,
+       "skip": false,
+       "global_weight_pct": 0.061
       }
      ]
     },
@@ -9795,9 +9971,9 @@
        "level": 1,
        "id": "BIT353.U4.T1",
        "band": "high",
-       "share_in_unit_pct": 15.2,
+       "share_in_unit_pct": 13,
        "skip": false,
-       "global_weight_pct": 0.127
+       "global_weight_pct": 0.109
       },
       {
        "name": "Key technology trends that raise ethical issues",
@@ -9806,9 +9982,9 @@
        "level": 2,
        "id": "BIT353.U4.T2",
        "band": "medium",
-       "share_in_unit_pct": 8.7,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.072
+       "global_weight_pct": 0.062
       },
       {
        "name": "Responsibility vs accountability vs liability",
@@ -9822,9 +9998,9 @@
        "level": 0,
        "id": "BIT353.U4.T3",
        "band": "high",
-       "share_in_unit_pct": 17.4,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.145
+       "global_weight_pct": 0.124
       },
       {
        "name": "Ethical analysis",
@@ -9833,9 +10009,9 @@
        "level": 2,
        "id": "BIT353.U4.T4",
        "band": "medium",
-       "share_in_unit_pct": 8.7,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.072
+       "global_weight_pct": 0.062
       },
       {
        "name": "6 candidate principles: Golden Rule, Kant, Descartes' rule of change, Utilitarian, Risk Aversion, Ethical No-Free-Lunch",
@@ -9844,9 +10020,9 @@
        "level": 0,
        "id": "BIT353.U4.T5",
        "band": "core",
-       "share_in_unit_pct": 21.7,
+       "share_in_unit_pct": 18.5,
        "skip": false,
-       "global_weight_pct": 0.181
+       "global_weight_pct": 0.154
       },
       {
        "name": "Professional codes of conduct",
@@ -9855,9 +10031,9 @@
        "level": 2,
        "id": "BIT353.U4.T6",
        "band": "medium",
-       "share_in_unit_pct": 8.7,
+       "share_in_unit_pct": 7.4,
        "skip": false,
-       "global_weight_pct": 0.072
+       "global_weight_pct": 0.062
       },
       {
        "name": "Information rights vs property rights",
@@ -9870,9 +10046,9 @@
        "level": 1,
        "id": "BIT353.U4.T7",
        "band": "medium",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 11.1,
        "skip": false,
-       "global_weight_pct": 0.109
+       "global_weight_pct": 0.093
       },
       {
        "name": "System quality and quality of life",
@@ -9881,9 +10057,31 @@
        "level": 2,
        "id": "BIT353.U4.T8",
        "band": "low",
-       "share_in_unit_pct": 6.5,
+       "share_in_unit_pct": 5.6,
        "skip": false,
-       "global_weight_pct": 0.054
+       "global_weight_pct": 0.047
+      },
+      {
+       "name": "Ethical, social and political issues model",
+       "importance": 5,
+       "type": "recall",
+       "level": 1,
+       "id": "BIT353.U4.T9",
+       "band": "medium",
+       "share_in_unit_pct": 9.3,
+       "skip": false,
+       "global_weight_pct": 0.078
+      },
+      {
+       "name": "Real-world ethical dilemmas",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT353.U4.T10",
+       "band": "low",
+       "share_in_unit_pct": 5.6,
+       "skip": false,
+       "global_weight_pct": 0.047
       }
      ]
     },
@@ -9940,7 +10138,7 @@
        "level": 2,
        "id": "BIT353.U5.T4",
        "band": "low",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.056
       },
@@ -10035,7 +10233,7 @@
        "level": 2,
        "id": "BIT353.U6.T4",
        "band": "low",
-       "share_in_unit_pct": 7.0,
+       "share_in_unit_pct": 7,
        "skip": false,
        "global_weight_pct": 0.058
       },
@@ -10094,9 +10292,9 @@
        "level": 0,
        "id": "BIT353.U7.T1",
        "band": "core",
-       "share_in_unit_pct": 29.0,
+       "share_in_unit_pct": 26.5,
        "skip": false,
-       "global_weight_pct": 0.215
+       "global_weight_pct": 0.196
       },
       {
        "name": "Decision-making process",
@@ -10105,9 +10303,9 @@
        "level": 1,
        "id": "BIT353.U7.T2",
        "band": "medium",
-       "share_in_unit_pct": 16.1,
+       "share_in_unit_pct": 14.7,
        "skip": false,
-       "global_weight_pct": 0.119
+       "global_weight_pct": 0.109
       },
       {
        "name": "Business intelligence vs business analytics",
@@ -10120,9 +10318,9 @@
        "level": 1,
        "id": "BIT353.U7.T3",
        "band": "medium",
-       "share_in_unit_pct": 19.4,
+       "share_in_unit_pct": 17.6,
        "skip": false,
-       "global_weight_pct": 0.143
+       "global_weight_pct": 0.13
       },
       {
        "name": "KPIs",
@@ -10131,9 +10329,9 @@
        "level": 2,
        "id": "BIT353.U7.T4",
        "band": "medium",
-       "share_in_unit_pct": 12.9,
+       "share_in_unit_pct": 11.8,
        "skip": false,
-       "global_weight_pct": 0.096
+       "global_weight_pct": 0.087
       },
       {
        "name": "Decision support for operational vs middle vs senior management",
@@ -10147,9 +10345,20 @@
        "level": 1,
        "id": "BIT353.U7.T5",
        "band": "high",
-       "share_in_unit_pct": 22.6,
+       "share_in_unit_pct": 20.6,
        "skip": false,
-       "global_weight_pct": 0.167
+       "global_weight_pct": 0.152
+      },
+      {
+       "name": "Business value of improved decision making",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT353.U7.T6",
+       "band": "low",
+       "share_in_unit_pct": 8.8,
+       "skip": false,
+       "global_weight_pct": 0.065
       }
      ]
     }
@@ -10203,9 +10412,9 @@
        "level": 1,
        "id": "BIT403.U1.T1",
        "band": "high",
-       "share_in_unit_pct": 13.2,
+       "share_in_unit_pct": 12.5,
        "skip": false,
-       "global_weight_pct": 0.123
+       "global_weight_pct": 0.116
       },
       {
        "name": "Seven unique features (ubiquity, global reach, universal standards, richness, interactivity, information density, personalization)",
@@ -10214,9 +10423,9 @@
        "level": 0,
        "id": "BIT403.U1.T2",
        "band": "core",
-       "share_in_unit_pct": 18.9,
+       "share_in_unit_pct": 17.9,
        "skip": false,
-       "global_weight_pct": 0.176
+       "global_weight_pct": 0.166
       },
       {
        "name": "B2C vs B2B vs C2B vs C2C",
@@ -10231,9 +10440,9 @@
        "level": 0,
        "id": "BIT403.U1.T3",
        "band": "core",
-       "share_in_unit_pct": 18.9,
+       "share_in_unit_pct": 17.9,
        "skip": false,
-       "global_weight_pct": 0.176
+       "global_weight_pct": 0.166
       },
       {
        "name": "Mobile vs social vs local e-commerce",
@@ -10247,9 +10456,9 @@
        "level": 1,
        "id": "BIT403.U1.T4",
        "band": "medium",
-       "share_in_unit_pct": 11.3,
+       "share_in_unit_pct": 10.7,
        "skip": false,
-       "global_weight_pct": 0.105
+       "global_weight_pct": 0.1
       },
       {
        "name": "Pure vs partial e-commerce",
@@ -10262,9 +10471,9 @@
        "level": 1,
        "id": "BIT403.U1.T5",
        "band": "medium",
-       "share_in_unit_pct": 11.3,
+       "share_in_unit_pct": 10.7,
        "skip": false,
-       "global_weight_pct": 0.105
+       "global_weight_pct": 0.1
       },
       {
        "name": "History: invention, consolidation, reinvention",
@@ -10273,9 +10482,9 @@
        "level": 2,
        "id": "BIT403.U1.T6",
        "band": "low",
-       "share_in_unit_pct": 5.7,
+       "share_in_unit_pct": 5.4,
        "skip": false,
-       "global_weight_pct": 0.053
+       "global_weight_pct": 0.05
       },
       {
        "name": "Technology vs business vs society perspectives",
@@ -10289,9 +10498,9 @@
        "level": 2,
        "id": "BIT403.U1.T7",
        "band": "medium",
-       "share_in_unit_pct": 7.5,
+       "share_in_unit_pct": 7.1,
        "skip": false,
-       "global_weight_pct": 0.07
+       "global_weight_pct": 0.066
       },
       {
        "name": "Challenges",
@@ -10300,9 +10509,9 @@
        "level": 2,
        "id": "BIT403.U1.T8",
        "band": "low",
-       "share_in_unit_pct": 5.7,
+       "share_in_unit_pct": 5.4,
        "skip": false,
-       "global_weight_pct": 0.053
+       "global_weight_pct": 0.05
       },
       {
        "name": "Status of e-commerce in Nepal",
@@ -10311,9 +10520,20 @@
        "level": 2,
        "id": "BIT403.U1.T9",
        "band": "medium",
-       "share_in_unit_pct": 7.5,
+       "share_in_unit_pct": 7.1,
        "skip": false,
-       "global_weight_pct": 0.07
+       "global_weight_pct": 0.066
+      },
+      {
+       "name": "Trends in e-commerce",
+       "importance": 3,
+       "type": "recall",
+       "level": 2,
+       "id": "BIT403.U1.T10",
+       "band": "low",
+       "share_in_unit_pct": 5.4,
+       "skip": false,
+       "global_weight_pct": 0.05
       }
      ]
     },
@@ -10322,7 +10542,7 @@
      "name": "Business models",
      "importance": 6,
      "band": "medium",
-     "share_in_subject_pct": 14.0,
+     "share_in_subject_pct": 14,
      "calc": false,
      "topics": [
       {
@@ -10645,7 +10865,7 @@
      "name": "Payment systems",
      "importance": 6,
      "band": "medium",
-     "share_in_subject_pct": 14.0,
+     "share_in_subject_pct": 14,
      "calc": false,
      "topics": [
       {
@@ -10725,7 +10945,7 @@
        "note": "skip SET steps",
        "id": "BIT403.U4.T6",
        "band": "skip",
-       "share_in_unit_pct": 3.0,
+       "share_in_unit_pct": 3,
        "skip": true,
        "global_weight_pct": 0.021
       },
@@ -10747,7 +10967,7 @@
        "level": 3,
        "id": "BIT403.U4.T8",
        "band": "skip",
-       "share_in_unit_pct": 3.0,
+       "share_in_unit_pct": 3,
        "skip": true,
        "global_weight_pct": 0.021
       }
@@ -10805,7 +11025,7 @@
        "level": 2,
        "id": "BIT403.U5.T4",
        "band": "low",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.061
       },
@@ -10831,7 +11051,7 @@
        "level": 2,
        "id": "BIT403.U5.T6",
        "band": "low",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.061
       }
@@ -11253,7 +11473,7 @@
        "level": 0,
        "id": "BIT304.U3.T1",
        "band": "core",
-       "share_in_unit_pct": 27.0,
+       "share_in_unit_pct": 27,
        "skip": false,
        "global_weight_pct": 0.19
       },
@@ -11561,7 +11781,7 @@
        "level": 1,
        "id": "BIT304.U7.T2",
        "band": "medium",
-       "share_in_unit_pct": 15.0,
+       "share_in_unit_pct": 15,
        "skip": false,
        "global_weight_pct": 0.094
       },
@@ -11587,7 +11807,7 @@
        "level": 2,
        "id": "BIT304.U7.T4",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.062
       },
@@ -11598,7 +11818,7 @@
        "level": 0,
        "id": "BIT304.U7.T5",
        "band": "high",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.125
       },
@@ -11609,7 +11829,7 @@
        "level": 2,
        "id": "BIT304.U7.T6",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.062
       }
@@ -11743,7 +11963,7 @@
        "level": 3,
        "id": "BIT304.U10.T1",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.016
       },
@@ -11754,7 +11974,7 @@
        "level": 3,
        "id": "BIT304.U10.T2",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.016
       },
@@ -11765,7 +11985,7 @@
        "level": 3,
        "id": "BIT304.U10.T3",
        "band": "low",
-       "share_in_unit_pct": 40.0,
+       "share_in_unit_pct": 40,
        "skip": false,
        "global_weight_pct": 0.031
       },
@@ -11776,7 +11996,7 @@
        "level": 3,
        "id": "BIT304.U10.T4",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.016
       }
@@ -12424,7 +12644,7 @@
        "level": 2,
        "id": "BIT252.U6.T2",
        "band": "low",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.102
       },
@@ -12467,7 +12687,7 @@
        "level": 1,
        "id": "BIT252.U7.T1",
        "band": "medium",
-       "share_in_unit_pct": 50.0,
+       "share_in_unit_pct": 50,
        "skip": false,
        "global_weight_pct": 0.196
       },
@@ -12478,7 +12698,7 @@
        "level": 2,
        "id": "BIT252.U7.T2",
        "band": "low",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.098
       },
@@ -12489,7 +12709,7 @@
        "level": 2,
        "id": "BIT252.U7.T3",
        "band": "low",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.098
       }
@@ -12598,9 +12818,9 @@
        "level": 1,
        "id": "MTH104.U1.T1",
        "band": "medium",
-       "share_in_unit_pct": 19.2,
+       "share_in_unit_pct": 18.5,
        "skip": false,
-       "global_weight_pct": 0.102
+       "global_weight_pct": 0.098
       },
       {
        "name": "Shifting vs scaling graphs",
@@ -12613,9 +12833,9 @@
        "level": 1,
        "id": "MTH104.U1.T2",
        "band": "medium",
-       "share_in_unit_pct": 19.2,
+       "share_in_unit_pct": 18.5,
        "skip": false,
-       "global_weight_pct": 0.102
+       "global_weight_pct": 0.098
       },
       {
        "name": "Trigonometric functions",
@@ -12624,9 +12844,9 @@
        "level": 1,
        "id": "MTH104.U1.T3",
        "band": "medium",
-       "share_in_unit_pct": 23.1,
+       "share_in_unit_pct": 22.2,
        "skip": false,
-       "global_weight_pct": 0.122
+       "global_weight_pct": 0.118
       },
       {
        "name": "Exponential vs inverse functions and logarithms",
@@ -12639,9 +12859,9 @@
        "level": 1,
        "id": "MTH104.U1.T4",
        "band": "medium",
-       "share_in_unit_pct": 23.1,
+       "share_in_unit_pct": 22.2,
        "skip": false,
-       "global_weight_pct": 0.122
+       "global_weight_pct": 0.118
       },
       {
        "name": "Rates of change vs tangents to curves",
@@ -12654,9 +12874,20 @@
        "level": 2,
        "id": "MTH104.U1.T5",
        "band": "medium",
-       "share_in_unit_pct": 15.4,
+       "share_in_unit_pct": 14.8,
        "skip": false,
-       "global_weight_pct": 0.081
+       "global_weight_pct": 0.079
+      },
+      {
+       "name": "Graphing with calculators and computers",
+       "importance": 1,
+       "type": "recall",
+       "level": 3,
+       "id": "MTH104.U1.T6",
+       "band": "skip",
+       "share_in_unit_pct": 3.7,
+       "skip": true,
+       "global_weight_pct": 0.02
       }
      ]
     },
@@ -12760,7 +12991,7 @@
        "level": 1,
        "id": "MTH104.U3.T1",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.132
       },
@@ -12771,7 +13002,7 @@
        "level": 1,
        "id": "MTH104.U3.T2",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.132
       },
@@ -12804,7 +13035,7 @@
        "level": 0,
        "id": "MTH104.U3.T5",
        "band": "core",
-       "share_in_unit_pct": 15.0,
+       "share_in_unit_pct": 15,
        "skip": false,
        "global_weight_pct": 0.199
       },
@@ -12826,7 +13057,7 @@
        "level": 1,
        "id": "MTH104.U3.T7",
        "band": "medium",
-       "share_in_unit_pct": 10.0,
+       "share_in_unit_pct": 10,
        "skip": false,
        "global_weight_pct": 0.132
       },
@@ -12892,7 +13123,7 @@
        "level": 1,
        "id": "MTH104.U4.T4",
        "band": "medium",
-       "share_in_unit_pct": 14.0,
+       "share_in_unit_pct": 14,
        "skip": false,
        "global_weight_pct": 0.166
       },
@@ -12914,7 +13145,7 @@
        "level": 1,
        "id": "MTH104.U4.T6",
        "band": "medium",
-       "share_in_unit_pct": 14.0,
+       "share_in_unit_pct": 14,
        "skip": false,
        "global_weight_pct": 0.166
       },
@@ -13033,7 +13264,7 @@
        "note": "skip volumes",
        "id": "MTH104.U6.T1",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.053
       },
@@ -13045,7 +13276,7 @@
        "note": "skip",
        "id": "MTH104.U6.T2",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.053
       },
@@ -13056,7 +13287,7 @@
        "level": 3,
        "id": "MTH104.U6.T3",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.053
       },
@@ -13067,7 +13298,7 @@
        "level": 3,
        "id": "MTH104.U6.T4",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.053
       },
@@ -13078,7 +13309,7 @@
        "level": 3,
        "id": "MTH104.U6.T5",
        "band": "skip",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": true,
        "global_weight_pct": 0.053
       }
@@ -13136,7 +13367,7 @@
        "level": 3,
        "id": "MTH104.U7.T4",
        "band": "skip",
-       "share_in_unit_pct": 3.0,
+       "share_in_unit_pct": 3,
        "skip": true,
        "global_weight_pct": 0.028
       },
@@ -13282,7 +13513,7 @@
        "level": 1,
        "id": "MTH104.U9.T3",
        "band": "high",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.137
       },
@@ -13324,7 +13555,7 @@
        "level": 1,
        "id": "MTH104.U9.T6",
        "band": "high",
-       "share_in_unit_pct": 13.0,
+       "share_in_unit_pct": 13,
        "skip": false,
        "global_weight_pct": 0.137
       },
@@ -13583,7 +13814,7 @@
        "level": 0,
        "id": "MTH168.U1.T5",
        "band": "high",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.214
       }
@@ -13738,7 +13969,7 @@
        "level": 0,
        "id": "MTH168.U4.T1",
        "band": "core",
-       "share_in_unit_pct": 45.0,
+       "share_in_unit_pct": 45,
        "skip": false,
        "global_weight_pct": 0.429
       },
@@ -13750,7 +13981,7 @@
        "note": "promote first",
        "id": "MTH168.U4.T2",
        "band": "high",
-       "share_in_unit_pct": 40.0,
+       "share_in_unit_pct": 40,
        "skip": false,
        "global_weight_pct": 0.381
       },
@@ -13761,7 +13992,7 @@
        "level": 2,
        "id": "MTH168.U4.T3",
        "band": "low",
-       "share_in_unit_pct": 15.0,
+       "share_in_unit_pct": 15,
        "skip": false,
        "global_weight_pct": 0.143
       }
@@ -13863,7 +14094,7 @@
        "level": 1,
        "id": "MTH168.U6.T1",
        "band": "medium",
-       "share_in_unit_pct": 40.0,
+       "share_in_unit_pct": 40,
        "skip": false,
        "global_weight_pct": 0.152
       },
@@ -13896,7 +14127,7 @@
        "level": 2,
        "id": "MTH168.U6.T4",
        "band": "low",
-       "share_in_unit_pct": 20.0,
+       "share_in_unit_pct": 20,
        "skip": false,
        "global_weight_pct": 0.076
       }
@@ -14329,7 +14560,7 @@
        "level": 0,
        "id": "STA154.U3.T2",
        "band": "core",
-       "share_in_unit_pct": 27.0,
+       "share_in_unit_pct": 27,
        "skip": false,
        "global_weight_pct": 0.204
       },
@@ -14513,7 +14744,7 @@
        "level": 0,
        "id": "STA154.U5.T4",
        "band": "high",
-       "share_in_unit_pct": 25.0,
+       "share_in_unit_pct": 25,
        "skip": false,
        "global_weight_pct": 0.189
       },
@@ -14539,7 +14770,7 @@
      "name": "Probability distributions",
      "importance": 9,
      "band": "core",
-     "share_in_subject_pct": 17.0,
+     "share_in_subject_pct": 17,
      "calc": true,
      "topics": [
       {
