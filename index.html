@@ -1025,9 +1025,11 @@ function isColdQuestion(q) {
     if (vu === true) return true;
     if (vu && typeof vu === 'object') return vu.cold !== false;
   }
-  const v = COLD_QS[q.n];
-  if (v === true) return true;
-  if (v && typeof v === 'object') return v.cold !== false;
+  if (q.n != null) {
+    const v = COLD_QS[q.n];
+    if (v === true) return true;
+    if (v && typeof v === 'object') return v.cold !== false;
+  }
   return false;
 }
 const DRILL_N_BASE = 1000000;
