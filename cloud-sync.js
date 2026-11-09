@@ -159,6 +159,7 @@
       CARD_TOMBSTONES: (s.CARD_TOMBSTONES && typeof s.CARD_TOMBSTONES === 'object' && !Array.isArray(s.CARD_TOMBSTONES)) ? s.CARD_TOMBSTONES : {},
       RESOURCE_MARKS: (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : {},
       FIX_DAYS: (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : {},
+      GAP_DONE_TODAY: (s.GAP_DONE_TODAY && typeof s.GAP_DONE_TODAY === 'object' && !Array.isArray(s.GAP_DONE_TODAY)) ? s.GAP_DONE_TODAY : {},
       DIAGNOSTIC_DONE: !!s.DIAGNOSTIC_DONE,
       QUIET_MODE: !!s.QUIET_MODE,
       PB_MOCK_SCORE: typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : 0,
@@ -497,6 +498,17 @@
     return out;
   }
 
+  function mergeGapDoneToday(a, b) {
+    var out = {};
+    Object.keys(a || {}).concat(Object.keys(b || {})).forEach(function (key) {
+      var dateA = typeof (a || {})[key] === 'string' ? (a || {})[key] : '';
+      var dateB = typeof (b || {})[key] === 'string' ? (b || {})[key] : '';
+      var latest = dateA >= dateB ? dateA : dateB;
+      if (key && /^\d{4}-\d{2}-\d{2}$/.test(latest)) out[key] = latest;
+    });
+    return out;
+  }
+
   function mergeWeeklyMock(a, b) {
     a = a || {};
     b = b || {};
@@ -659,6 +671,7 @@
       CODE_TRACE: mergeCodeTrace(local.CODE_TRACE, remote.CODE_TRACE),
       RESOURCE_MARKS: Object.assign({}, local.RESOURCE_MARKS || {}, remote.RESOURCE_MARKS || {}),
       FIX_DAYS: mergeFixDays(local.FIX_DAYS, remote.FIX_DAYS),
+      GAP_DONE_TODAY: mergeGapDoneToday(local.GAP_DONE_TODAY, remote.GAP_DONE_TODAY),
       DIAGNOSTIC_DONE: !!(local.DIAGNOSTIC_DONE || remote.DIAGNOSTIC_DONE),
       QUIET_MODE: local.QUIET_MODE !== undefined ? !!local.QUIET_MODE : !!remote.QUIET_MODE,
       PB_MOCK_SCORE: Math.max(local.PB_MOCK_SCORE || 0, remote.PB_MOCK_SCORE || 0),

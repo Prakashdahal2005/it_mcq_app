@@ -1004,6 +1004,14 @@ let CARDS = [];
 let CARD_TOMBSTONES = {};
 let RESOURCE_MARKS = {};
 let FIX_DAYS = {};
+let GAP_DONE_TODAY = {};
+function normalizeGapDoneToday(value) {
+  const todayKey = localDateKey();
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(Object.entries(source).filter(([key, date]) =>
+    key && date === todayKey
+  ));
+}
 let DIAGNOSTIC_DONE = false;
 let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
 let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
@@ -1080,7 +1088,7 @@ function save() {
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
       D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
-      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK,
+      CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, GAP_DONE_TODAY: normalizeGapDoneToday(GAP_DONE_TODAY), DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK,
       CODE_TRACE: normalizeCodeTrace(CODE_TRACE)
     }));
     localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
@@ -1162,6 +1170,7 @@ function load() {
       CARDS = filterCardsAgainstTombstones(CARDS);
       RESOURCE_MARKS = (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : (JSON.parse(localStorage.getItem('bitmcq_rmarks') || '{}'));
       FIX_DAYS = (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : (JSON.parse(localStorage.getItem('bitmcq_fix_days') || '{}'));
+      GAP_DONE_TODAY = normalizeGapDoneToday(s.GAP_DONE_TODAY);
       DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE || localStorage.getItem('bitmcq_diag_done') === '1';
       QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
       PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
@@ -3045,7 +3054,7 @@ function dueKeys(quickOnly = false, availableOnly = false) {
 function findQuestionByRawKey(key) {
   if (key == null) return null;
   const raw = String(key);
-  const byUid = raw.startsWith('qk:') || raw.startsWith('id:') || raw.startsWith('sid:');
+  const byUid = raw.startsWith('qk:') || raw.startsWith('id:') || raw.startsWith('sid:') || raw.startsWith('h:');
   const pools = [
     D || [],
     DRILL_D || [],
@@ -3055,7 +3064,7 @@ function findQuestionByRawKey(key) {
   for (const pool of pools) {
     for (const q of pool) {
       if (!q || typeof q !== 'object') continue;
-      if (byUid) {
+      if (byUid || q._sid === raw) {
         if (questionUid(q) === raw) return q;
       } else if (qk(q) === raw) {
         return q;
@@ -6062,10 +6071,13 @@ function getConceptGapsList(limit = 5) {
   const candidates = [];
   const pool = (typeof bankQuestionPool === 'function') ? bankQuestionPool() : (D || []);
   const byIdentity = new Map();
+  const todayKey = localDateKey();
 
   pool.forEach(q => {
     if (!q || isQuestionDeleted(q)) return;
     const k = qk(q);
+    const uid = questionUid(q) || k;
+    if (GAP_DONE_TODAY[uid] === todayKey) return;
     if (V[k] && Array.isArray(V[k].history) && V[k].history.length > 0) {
       byIdentity.set(k, q);
     }
@@ -6134,7 +6146,7 @@ function getConceptGapsList(limit = 5) {
     else if (tier === 'B') score += 10;
 
     if (score > 0) {
-      candidates.push({ q, k, v, score, reason, type, tier });
+      candidates.push({ q, k, uid: questionUid(q) || k, v, score, reason, type, tier });
     }
   });
 
@@ -6142,8 +6154,9 @@ function getConceptGapsList(limit = 5) {
 }
 
 function renderConceptGapsRescue(coverage) {
-  const gaps = getConceptGapsList(5);
+  const gaps = getConceptGapsList(Infinity);
   if (!gaps.length) return '';
+  const displayedGaps = gaps.slice(0, 5);
 
   return `
     <div class="card" style="margin-top:14px;border:1px solid rgba(239,68,68,0.25);background:var(--card)">
@@ -6152,14 +6165,15 @@ function renderConceptGapsRescue(coverage) {
           <span>🧠 Concept Gaps &amp; Error Rescue</span>
         </h2>
         <span class="badge" style="background:rgba(239,68,68,0.12);color:var(--no);border:1px solid rgba(239,68,68,0.25);font-size:11px;font-weight:700">
-          ${gaps.length} Priority Concepts
+          ${displayedGaps.length} of ${gaps.length} Priority Concepts
         </span>
       </div>
       <p class="mu sm" style="margin:0 0 12px">
-        Review the distinguishing rule and concept cue directly instead of grinding MCQs blindly. Solidify these before moving on.
+        Review the distinguishing rule and concept cue directly instead of grinding MCQs blindly. “Done for today” hides a gap until tomorrow without changing its mastery history.
       </p>
+      <button class="p sm" style="margin-bottom:10px" onclick="startConceptGapsRescue()">🚑 Start Rescue Session (${gaps.length} questions)</button>
       <div style="display:grid;gap:10px">
-        ${gaps.map((item, idx) => {
+        ${displayedGaps.map((item, idx) => {
           const q = item.q;
           const k = item.k;
           const v = item.v;
@@ -6188,6 +6202,7 @@ function renderConceptGapsRescue(coverage) {
                 <button class="sm" onclick="toggleGapExplanation('${cardId}')">📖 Review Solution</button>
                 <button class="sm" onclick="addFlashcardForCurrent()">🗂 Add to Flashcards</button>
                 <button class="sm p" onclick="startSyllabusUnitDrill(${esc(JSON.stringify(subj))}, ${q.unit || q.u || 1})">🎯 Practice Unit</button>
+                <button class="sm" onclick="markGapDoneForToday(${esc(JSON.stringify(item.uid))})">✓ Done for today</button>
               </div>
               <div id="${cardId}" style="display:none;margin-top:8px;padding:10px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:12px">
                 <div><b>Correct Answer:</b> ${esc(q.options ? q.options[q.answer] || q.answer : (q.o ? q.o[q.a] : ''))}</div>
@@ -6199,6 +6214,31 @@ function renderConceptGapsRescue(coverage) {
       </div>
     </div>
   `;
+}
+
+function markGapDoneForToday(uid) {
+  if (!uid) {
+    showToast('Could not mark this concept done: question identity is missing.', 'error');
+    return;
+  }
+  GAP_DONE_TODAY = normalizeGapDoneToday(GAP_DONE_TODAY);
+  GAP_DONE_TODAY[uid] = localDateKey();
+  if (!save()) {
+    delete GAP_DONE_TODAY[uid];
+    showToast('Could not save this for today. Please check browser storage and try again.', 'error');
+    return;
+  }
+  showToast('Marked done for today. Your answer history is unchanged.');
+  home(true);
+}
+
+function startConceptGapsRescue() {
+  const gaps = getConceptGapsList(Infinity);
+  if (!gaps.length) {
+    showToast('No active rescue concepts are available today.');
+    return;
+  }
+  start(gaps.map(item => item.uid));
 }
 
 function toggleGapExplanation(id) {
@@ -6289,7 +6329,7 @@ function pickCoverageQuestions(pool, limit, snapshot, opts = {}) {
     else unmapped.push({ q, identity });
   });
   const allCandidates = [...questions, ...unmapped];
-  if (allCandidates.length) {
+  if (allCandidates.length && !opts.allTiers) {
     const preferredTier = Math.min(...allCandidates.map(item => questionPracticeTier(item.q)));
     for (let i = questions.length - 1; i >= 0; i--) {
       if (questionPracticeTier(questions[i].q) !== preferredTier) questions.splice(i, 1);
@@ -6357,6 +6397,19 @@ function pickCoverageQuestions(pool, limit, snapshot, opts = {}) {
     }
   }
   return selected;
+}
+
+function getCoverageMissionQuestions(snapshot = calculateUnitCoverage()) {
+  const untouchedPool = bankQuestionPool().filter(q => {
+    if (!q || !normalSessionEligible(q) || isQuestionDeleted(q)) return false;
+    const unit = coverageUnitOfQuestion(snapshot, q);
+    return !!unit && unit.touchedCount === 0;
+  });
+  return pickCoverageQuestions(untouchedPool, Infinity, snapshot, {
+    maxPerUnit: 1,
+    includeUnmapped: false,
+    allTiers: true
+  });
 }
 
 function diagnosticSubjectStats() {
@@ -6861,6 +6914,7 @@ function home(preserveScroll = false) {
     isQuestionOutOfScope(q) && !isQuestionDeleted(q) && !isQuestionQuarantined(q)
   ).length;
   const coverage = calculateUnitCoverage();
+  const coverageMissionQuestions = getCoverageMissionQuestions(coverage);
   const drillSubjects = bankSubjects();
   const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
 
@@ -7007,10 +7061,10 @@ function home(preserveScroll = false) {
       </div>
       <div class="mu sm" style="text-align:center;margin-top:6px">Due and weak practice are capped so breadth gets a share of every session</div>
 
-      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCoverageMission()">
-        🧭 Coverage Mission · ${coverage.touchedUnits}/${coverage.totalUnits} units touched
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCoverageMission()" ${coverageMissionQuestions.length ? '' : 'disabled'}>
+        🧭 Coverage Mission · ${coverageMissionQuestions.length} untouched units
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">Least-covered units first · ${coverage.bankSupportedUnits}/${coverage.totalUnits} units have bank questions · ${coverage.missingBankUnits.length} bank gap(s)</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">One question per eligible untouched unit · ${coverage.bankSupportedUnits}/${coverage.totalUnits} units have bank questions · ${coverage.missingBankUnits.length} bank gap(s)</div>
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
         ${freshButtonText}
@@ -7232,10 +7286,9 @@ function startFreshSet() {
 }
 
 function startCoverageMission() {
-  const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
-  const pick = pickCoverageQuestions(bankQuestionPool(), targetQ, calculateUnitCoverage(), { maxPerUnit: 2, includeUnmapped: true });
+  const pick = getCoverageMissionQuestions(calculateUnitCoverage());
   if (!pick.length) {
-    alert('No coverage questions are available right now. Questions already answered today are excluded.');
+    alert('No eligible untouched units have questions available right now. Questions answered today and units without bank questions are excluded.');
     return;
   }
   start(pick.map(q => questionUid(q) || qk(q)));
@@ -10208,7 +10261,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
-  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, WEEKLY_MOCK: (WEEKLY_MOCK && typeof WEEKLY_MOCK === 'object') ? WEEKLY_MOCK : {}, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, CODE_TRACE: normalizeCodeTrace(CODE_TRACE), schemaVer: SCHEMA_VER }),
+  get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, GAP_DONE_TODAY: normalizeGapDoneToday(GAP_DONE_TODAY), DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, WEEKLY_MOCK: (WEEKLY_MOCK && typeof WEEKLY_MOCK === 'object') ? WEEKLY_MOCK : {}, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, CODE_TRACE: normalizeCodeTrace(CODE_TRACE), schemaVer: SCHEMA_VER }),
   apply: (s, opts = {}) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
     const currentView = typeof view !== 'undefined' ? view : 'home';
@@ -10238,6 +10291,7 @@ window.AppState = {
     CARDS = filterCardsAgainstTombstones(CARDS);
     RESOURCE_MARKS = (s.RESOURCE_MARKS && typeof s.RESOURCE_MARKS === 'object') ? s.RESOURCE_MARKS : (JSON.parse(localStorage.getItem('bitmcq_rmarks') || '{}'));
     FIX_DAYS = (s.FIX_DAYS && typeof s.FIX_DAYS === 'object') ? s.FIX_DAYS : {};
+    GAP_DONE_TODAY = normalizeGapDoneToday(s.GAP_DONE_TODAY);
     DIAGNOSTIC_DONE = !!s.DIAGNOSTIC_DONE;
     QUIET_MODE = s.QUIET_MODE !== undefined ? !!s.QUIET_MODE : (localStorage.getItem('bitmcq_quiet') === 'true');
     PB_MOCK_SCORE = typeof s.PB_MOCK_SCORE === 'number' ? s.PB_MOCK_SCORE : parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
