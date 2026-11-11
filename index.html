@@ -1058,6 +1058,7 @@ let defaultBankLoading = false;
 let defaultBankLoadError = '';
 let todayMins = 15;
 let showMoreMenu = false;
+let showStudyFocus = false;
 let bgGenQueue = [];
 let backgroundQuestionAiQueue = [];
 let backgroundQuestionAiInProgress = false;
@@ -6254,10 +6255,6 @@ function renderSyllabusStudyPlan(snapshot) {
     return `<div class="card"><h2 style="margin-top:0">🧭 Syllabus Study Focus</h2><p class="mu">${message}</p>${syllabusLoadError ? '<button class="sm" onclick="retryMitSyllabusLoad()">Retry syllabus load</button>' : ''}</div>`;
   }
   const recommendations = getSyllabusStudyRecommendations(snapshot);
-  const readiness = snapshot.taggedTopics > 0
-    ? `${snapshot.touchedTopics}/${snapshot.totalTopics} topics practiced · ${snapshot.solidTopics} solid with spaced evidence · ${snapshot.taggedTopics}/${snapshot.totalTopics} topics with mapped questions`
-    : `🧭 Unit Coverage: ${snapshot.touchedUnits}/${snapshot.totalUnits} units practiced (${snapshot.solidUnits} solid) · ${snapshot.bankSupportedUnits}/${snapshot.totalUnits} units with questions`;
-  const coverageMissionQuestions = getCoverageMissionQuestions(snapshot);
 
   return `
     <div class="card">
@@ -6265,21 +6262,7 @@ function renderSyllabusStudyPlan(snapshot) {
         <h2 style="margin:0">🧭 Syllabus Study Focus</h2>
         <a class="mu sm" href="mit_entrance_syllabus.json" target="_blank" rel="noopener">📋 Full Topic Syllabus (JSON)</a>
       </div>
-      <p class="mu sm" style="margin:6px 0 10px">${readiness}${snapshot.taggedTopics > 0 ? ` · ${snapshot.mappedTopicQuestions} mapped MCQs.` : ''}</p>
-      <p class="mu sm">Recommended next: core and high-priority concepts first, with confusable pairs and calculation practice where specified. “Solid” requires spaced, confident evidence—not just one correct answer. Guide weights are study priorities, not verified exam predictions.</p>
-      <div style="border:1px solid var(--bd);border-radius:12px;padding:12px;margin:12px 0">
-        <div class="row" style="justify-content:space-between;align-items:center;gap:8px">
-          <div>
-            <b>🧭 Syllabus Coverage Session</b>
-            <div class="mu sm">One eligible question from each untouched unit with bank questions. Already-touched units, units without eligible questions, and questions answered today are skipped.</div>
-          </div>
-          <button class="p sm" onclick="startCoverageMission()" ${coverageMissionQuestions.length ? '' : 'disabled'}>
-            Start session · ${coverageMissionQuestions.length}
-          </button>
-        </div>
-        <p class="mu sm" style="margin:8px 0 0">This is a breadth pass: answering marks a unit practiced, not mastered, and it does not revisit topic gaps in already-touched units. Topic recommendations without an exact <code>topic_id</code> mapping can only start a unit-level drill; those concepts remain open until mapped MCQs provide topic evidence. “Units with bank questions” counts active questions mapped to a syllabus unit; “unmapped questions” need corrected subject/unit metadata and will not disappear just by practicing them.</p>
-      </div>
-      ${(snapshot.taggedTopics > 0 && snapshot.unmappedTopicQuestions) ? `<p class="mu sm">ℹ️ ${snapshot.unmappedTopicQuestions} bank question(s) lack a valid <code>topic_id</code>; they remain available for normal practice and unit coverage, but do not count as concept evidence.</p>` : ''}
+      <p class="mu sm">Recommended concepts are based on mapped syllabus evidence where available. Unit-level drills are labeled as such and do not imply topic mastery. Guide weights are study priorities, not verified exam predictions.</p>
       ${recommendations.length ? `
         <div style="display:grid;gap:8px;margin-top:12px">
           ${recommendations.map(topic => {
@@ -6518,11 +6501,10 @@ function syncStatusChip() {
   return `<button class="chip ${cls}" style="cursor:pointer" onclick="openSettings()" title="${esc(st.message || label)}">${label}</button>`;
 }
 
-function renderReadinessMeter(coverageSnapshot) {
+function renderReadinessMeter() {
   if (!(D && D.length) && !bankQuestionPool().length) return '';
   const TARGET_MARK = Number(localStorage.getItem('bitmcq_target_mark')) || 80;
   const stats = readinessStats();
-  const unitCoverage = coverageSnapshot || calculateUnitCoverage();
   const overall = stats.overall;
   const projectedMark = Math.round(overall.score * 1000) / 10;
   const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
@@ -6574,14 +6556,6 @@ function renderReadinessMeter(coverageSnapshot) {
 
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
   const unattemptedInDeck = [...activeDeckSubjs].filter(s => !stats.subjects[s]);
-  const nextUntouched = [];
-  unitCoverage.subjectList.forEach(subject => {
-    Object.values(subject.units).forEach(entry => {
-      if (entry.bankCount > 0 && entry.touchedCount === 0) nextUntouched.push(entry);
-    });
-  });
-  const nextUntouchedPreview = nextUntouched.slice(0, 6);
-  const missingBankPreview = unitCoverage.missingBankUnits.slice(0, 6);
 
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
@@ -6597,7 +6571,7 @@ function renderReadinessMeter(coverageSnapshot) {
         ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
       </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; Too hard 25%); Out of scope is excluded. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded. Unit coverage measures breadth; Due Review and Mistakes are retention, not breadth.</p>
+    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; Too hard 25%); Out of scope is excluded. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded.</p>
 
     <div class="readiness-container">
       <div class="readiness-ring-wrap">
@@ -6619,10 +6593,6 @@ function renderReadinessMeter(coverageSnapshot) {
           <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions (${overall.weightedAttempts.toFixed(1)} weighted evidence)</span>
           <span>✅ Raw first-attempt: <b>${Math.round(overall.raw * 100)}%</b></span>
           <span>🎯 L0 mastered: <b>${l0Mastered}/${l0Tracked}</b> subjects</span>
-          <span>🧭 Units touched: <b>${unitCoverage.touchedUnits}/${unitCoverage.totalUnits}</b></span>
-          <span>🛡️ Solid units: <b>${unitCoverage.solidUnits}/${unitCoverage.totalUnits}</b></span>
-          <span title="Syllabus units with at least one active bank question mapped to a recognized subject and numeric unit. This measures question availability, not study completion.">🏦 Units with bank questions: <b>${unitCoverage.bankSupportedUnits}/${unitCoverage.totalUnits}</b></span>
-          ${unitCoverage.unmappedQuestions ? `<span title="Active bank questions whose subject or numeric unit does not match a syllabus unit. They do not count toward unit coverage.">⚠️ Unmapped questions: <b>${unitCoverage.unmappedQuestions}</b></span>` : ''}
         </div>
       </div>
     </div>
@@ -6635,8 +6605,6 @@ function renderReadinessMeter(coverageSnapshot) {
     <div class="subject-card-grid">
       ${rows.map(r => {
         const fixCount = (FIX_DAYS[r.k] || []).length;
-        const cov = unitCoverage.subjects[canonSubj(r.k)];
-        const covText = cov ? `${cov.touchedUnits}/${cov.unitCount} units` : '';
         let dotClass = 'dot-gray';
         let statusText = r.assessed ? `Calibrating (${r.weightedAttempts.toFixed(1)}/15 weighted)` : 'Not assessed';
         if (r.isCalibrated) {
@@ -6662,16 +6630,13 @@ function renderReadinessMeter(coverageSnapshot) {
             <div class="row sm" style="align-items:center;font-size:12px;margin-top:2px">
               <span class="status-dot ${dotClass}"></span>
               <b>${statusText}</b>
-              <span class="mu" style="margin-left:auto">${covText ? covText + ' · ' : ''}${r.tot} att · ${fixCount}d · ${r.assessed ? Math.round(r.acc * 100) + '%' : 'not assessed'}</span>
+              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d · ${r.assessed ? Math.round(r.acc * 100) + '%' : 'not assessed'}</span>
             </div>
           </div>
         `;
       }).join('')}
     </div>
     ${unattemptedInDeck.length ? `<p class="mu sm" style="margin-top:14px">📚 <b>Not yet attempted in active deck:</b> ${unattemptedInDeck.map(s => esc(s)).join(' · ')}</p>` : ''}
-    ${nextUntouchedPreview.length ? `<p class="mu sm" style="margin-top:8px">🧭 <b>Next untouched units:</b> ${nextUntouchedPreview.map(entry => esc(`${entry.subject} U${entry.unit} ${entry.name}`)).join(' · ')}</p>` : ''}
-    ${missingBankPreview.length ? `<p class="mu sm" style="margin-top:8px">🏦 <b>No bank questions yet:</b> ${missingBankPreview.map(entry => esc(`${entry.subject} U${entry.unit} ${entry.name}`)).join(' · ')}</p>` : ''}
-    ${unitCoverage.unmappedQuestions ? `<p class="mu sm" style="margin-top:8px">⚠️ <b>${unitCoverage.unmappedQuestions} active bank questions have no recognized subject-and-unit mapping.</b> They are excluded from unit coverage; practicing them will not change this count. Correct their subject/unit metadata to include them.</p>` : ''}
   </div>
   `;
 }
@@ -6857,6 +6822,17 @@ function toggleMoreMenu() {
   }
 }
 
+function toggleStudyFocus() {
+  showStudyFocus = !showStudyFocus;
+  home(true);
+  if (showStudyFocus) {
+    setTimeout(() => {
+      const panel = $('#study-focus-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  }
+}
+
 // Home View
 function home(preserveScroll = false) {
   if (!preserveScroll) {
@@ -6926,8 +6902,7 @@ function home(preserveScroll = false) {
   const outOfScopeQuestionCount = bankQuestionPool().filter(q =>
     isQuestionOutOfScope(q) && !isQuestionDeleted(q) && !isQuestionQuarantined(q)
   ).length;
-  const coverage = calculateUnitCoverage();
-  const coverageMissionQuestions = getCoverageMissionQuestions(coverage);
+  const conceptGapCount = getConceptGapsList(Infinity).length;
   const drillSubjects = bankSubjects();
   const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
 
@@ -7008,12 +6983,11 @@ function home(preserveScroll = false) {
       <div class="row" style="justify-content:space-between">
         <div>
           <h2 style="margin:0 0 4px">🎯 Today's Mission</h2>
-          <div class="mu">Interleaved · easy first, capped due review, weak subjects, then least-covered units</div>
+          <div class="mu">Interleaved · easy first, capped due review, weak subjects, and fresh questions</div>
         </div>
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
           <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
-          <span class="chip">🧭 Units: <b>${coverage.touchedUnits}/${coverage.totalUnits}</b></span>
           ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession()">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
@@ -7072,12 +7046,16 @@ function home(preserveScroll = false) {
           🧑‍💻 Code Trace Drill · 10–15 Q
         </button>
       </div>
-      <div class="mu sm" style="text-align:center;margin-top:6px">Due and weak practice are capped so breadth gets a share of every session</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">Due and weak practice are capped to leave room for broader question practice</div>
 
-      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCoverageMission()" ${coverageMissionQuestions.length ? '' : 'disabled'}>
-        🧭 Coverage Mission · ${coverageMissionQuestions.length} questions
-      </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">One eligible question per untouched unit · ${coverage.bankSupportedUnits}/${coverage.totalUnits} units have bank questions · ${coverage.missingBankUnits.length} units have no bank questions</div>
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="big-btn" style="flex:1;min-width:210px;background:var(--card);border:2px solid var(--bd)" onclick="toggleStudyFocus()">
+          🧭 ${showStudyFocus ? 'Hide' : 'Open'} Study Focus
+        </button>
+        <button class="big-btn" style="flex:1;min-width:210px;background:var(--card);border:2px solid var(--bd)" onclick="startConceptGapsRescue()" ${conceptGapCount ? '' : 'disabled'}>
+          🚑 Error Rescue · ${conceptGapCount} active
+        </button>
+      </div>
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
         ${freshButtonText}
@@ -7085,9 +7063,8 @@ function home(preserveScroll = false) {
       <div class="mu sm" style="text-align:center;margin-top:6px">${freshCount} unattempted questions across all 19 subjects</div>
     </div>
 
-    ${renderReadinessMeter(coverage)}
-    ${renderConceptGapsRescue(coverage)}
-    ${renderSyllabusStudyPlan(coverage)}
+    ${showStudyFocus ? `<div id="study-focus-panel">${renderSyllabusStudyPlan(calculateUnitCoverage())}</div>` : ''}
+    ${renderReadinessMeter()}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
     <div class="card" style="margin-top:14px">
