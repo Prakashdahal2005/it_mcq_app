@@ -6277,7 +6277,7 @@ function renderSyllabusStudyPlan(snapshot) {
             Start session · ${coverageMissionQuestions.length}
           </button>
         </div>
-        <p class="mu sm" style="margin:8px 0 0">This is a breadth pass: answering marks a unit practiced, not mastered, and it does not revisit topic gaps in already-touched units. “Units with bank questions” counts active questions mapped to a syllabus unit; “unmapped questions” need corrected subject/unit metadata and will not disappear just by practicing them.</p>
+        <p class="mu sm" style="margin:8px 0 0">This is a breadth pass: answering marks a unit practiced, not mastered, and it does not revisit topic gaps in already-touched units. Topic recommendations without an exact <code>topic_id</code> mapping can only start a unit-level drill; those concepts remain open until mapped MCQs provide topic evidence. “Units with bank questions” counts active questions mapped to a syllabus unit; “unmapped questions” need corrected subject/unit metadata and will not disappear just by practicing them.</p>
       </div>
       ${(snapshot.taggedTopics > 0 && snapshot.unmappedTopicQuestions) ? `<p class="mu sm">ℹ️ ${snapshot.unmappedTopicQuestions} bank question(s) lack a valid <code>topic_id</code>; they remain available for normal practice and unit coverage, but do not count as concept evidence.</p>` : ''}
       ${recommendations.length ? `
@@ -6291,7 +6291,7 @@ function renderSyllabusStudyPlan(snapshot) {
                   ? `Practiced · ${topic.knownCount} confident correct`
                   : topic.bankCount
                     ? `${topic.bankCount} mapped question(s) available`
-                    : 'Unit drill available';
+                    : 'No topic-mapped MCQs · unit-level drill only';
             const detail = [
               `Level ${topic.level} · ${topic.type} · priority ${topic.importance}/10`,
               topic.confusableWith.length ? `Distinguish: ${topic.confusableWith.join(' / ')}` : '',
@@ -9949,6 +9949,7 @@ function exportUI() {
   return `
     <div class="row" style="flex-wrap:wrap">
       <select id="xs">
+        <option value="study">Study Pack: Errors + Weak Syllabus Concepts</option>
         <option value="all">All Categories: Mistakes + Skipped + Unsure/Guessed</option>
         <option value="w">Mistakes Only</option>
         <option value="s">Skipped Only</option>
@@ -9966,19 +9967,20 @@ function exportUI() {
       <button class="p sm" onclick="exportLog(0)">⬇ Download</button>
       <button class="sm" onclick="exportLog(1)">Copy</button>
     </div>
-    <div class="mu sm" style="margin-top:4px">Each category keeps its own export checkpoint on this device. Current unresolved errors are always included.</div>
+    <div class="mu sm" style="margin-top:4px">Study Pack is the default: it includes current unresolved errors and every non-skipped syllabus concept that is not yet solid. MCQ history follows the selected range; weak-concept status is current. Export checkpoints are kept on this device.</div>
     <div id="xm" class="mu" style="margin-top:4px"></div>
   `;
 }
 
 // Build error-log or weak-topic reports from attempt history; export checkpoints are device-local metadata.
 function exportLog(copy) {
-  const scope = ($('#xs') || {}).value || 'all';
+  const scope = ($('#xs') || {}).value || 'study';
   const rangeMode = ($('#xr') || {}).value || ('since');
   const isMd = (($('#xf') || {}).value || 'md') === 'md';
   const m = $('#xm');
   const todayStr = localDateKey();
-  const ckptKey = 'bitmcq_export_ckpt_v2_' + scope;
+  const ckptKey = scope === 'study' ? 'bitmcq_export_ckpt_v3_study' : 'bitmcq_export_ckpt_v2_' + scope;
+  const coverage = (scope === 'study' || scope === 'weak') ? calculateUnitCoverage() : null;
   let checkpoint = null;
   try { checkpoint = JSON.parse(localStorage.getItem(ckptKey) || 'null'); } catch(e){ checkpoint = null; }
   if (!checkpoint || typeof checkpoint !== 'object') checkpoint = { lastAt: 0, lastTs: 0 };
@@ -9993,9 +9995,20 @@ function exportLog(copy) {
     rangeLabel = `Last ${rangeMode} days`;
   }
 
-  let text = (scope === 'weak' ? `# Weak Topics - ${todayStr}` : `# Recall Error Log - ${todayStr}`) +
+  let text = (scope === 'study'
+    ? `# Study Pack - ${todayStr}`
+    : scope === 'weak' ? `# Weak Topics - ${todayStr}` : `# Recall Error Log - ${todayStr}`) +
     `\nRange: ${rangeLabel}\n\n`;
   const results = [];
+  const latestRecordByIdentity = new Map();
+  (L || []).forEach(rec => {
+    if (!rec) return;
+    const q = findQuestionByRecord(rec);
+    const identity = q ? questionUid(q) : recordIdentity(rec);
+    if (!identity) return;
+    const previous = latestRecordByIdentity.get(identity);
+    if (!previous || recordTs(rec) >= recordTs(previous)) latestRecordByIdentity.set(identity, rec);
+  });
 
   function inRange(ts){
     if (!cutoff) return true;
@@ -10007,17 +10020,18 @@ function exportLog(copy) {
     return Number(rec.t) || Number(rec.ts) || Number(rec.at) || 0;
   }
 
-  function addResult(q, type, src, cf, identity) {
+  function addResult(q, type, src, cf, identity, rec, ts) {
     if (!q) return;
     const id = identity || questionUid(q) || qk(q);
     if (!id) return;
-    results.push({ q, type, src, cf, identity: id });
+    results.push({ q, type, src, cf, identity: id, rec: rec || null, ts: Number(ts) || recordTs(rec) });
   }
 
   (D || []).forEach(q => {
     const id = questionUid(q) || qk(q);
-    if (R[q.n] === 'w') addResult(q, 'w', 'current', null, id);
-    if (R[q.n] === 's') addResult(q, 's', 'current', null, id);
+    const rec = latestRecordByIdentity.get(id) || null;
+    if (R[q.n] === 'w') addResult(q, 'w', 'current', rec && rec.cf, id, rec);
+    if (R[q.n] === 's') addResult(q, 's', 'current', rec && rec.cf, id, rec);
   });
 
   (A || []).forEach((attempt, ai) => {
@@ -10029,7 +10043,7 @@ function exportLog(copy) {
       const q = findQuestionByRecord(rec) || rec;
       const id = questionUid(q) || recordIdentity(rec) || qk(q) || `archive:${ai}:${qi}`;
       const status = rec.r || (rec.skipped || rec.ch < 0 ? 's' : 'w');
-      addResult(q, status === 's' ? 's' : 'w', 'archive', null, id);
+      addResult(q, status === 's' ? 's' : 'w', 'archive', rec.cf != null ? rec.cf : rec.p, id, rec, ts);
     });
   });
 
@@ -10042,21 +10056,60 @@ function exportLog(copy) {
       const id = questionUid(q) || recordIdentity(rec) || qk(q);
       const isSkip = rec.ch < 0 || rec.skipped || rec.ch === -2;
       if (isSkip) {
-        addResult(q, 's', 'log', rec.cf, id);
+        addResult(q, 's', 'log', rec.cf, id, rec, ts);
       } else if (rec.ok === false) {
-        addResult(q, 'w', 'log', rec.cf, id);
+        addResult(q, 'w', 'log', rec.cf, id, rec, ts);
       }
-      if (!isSkip && (rec.cf === 1 || rec.cf === 2)) addResult(q, 'ug', 'log', rec.cf, id);
+      if (!isSkip && (rec.cf === 1 || rec.cf === 2)) addResult(q, 'ug', 'log', rec.cf, id, rec, ts);
     } catch(e){}
   });
 
-  const seen = new Set();
-  const unique = results.filter(r => {
+  const uniqueByKey = new Map();
+  results.forEach(r => {
     const key = `${r.identity}|${r.type}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+    const previous = uniqueByKey.get(key);
+    if (!previous || r.ts >= previous.ts) uniqueByKey.set(key, r);
   });
+  const unique = [...uniqueByKey.values()];
+
+  function questionStudyMetadata(q) {
+    const subjectName = canonSubj(q && q.s);
+    const subject = syllabusSubjectList().find(item => item.canonicalName === subjectName) || null;
+    const unitNumber = questionScopeUnit(q);
+    const unit = subject && unitNumber != null ? subject.units[unitNumber - 1] : null;
+    const topicId = String(q && q.topic_id || '').trim();
+    const topicMatch = topicId ? findSyllabusTopic(topicId) : null;
+    const topic = topicMatch && topicMatch.subject === subjectName && topicMatch.unit === unitNumber
+      ? topicMatch.topic
+      : null;
+    return {
+      subjectName,
+      subject,
+      unitNumber,
+      unit,
+      topic,
+      mapping: topic ? 'Exact syllabus topic mapping' : (topicId ? 'Topic mapping does not match this subject/unit' : 'No exact topic_id mapping')
+    };
+  }
+
+  const weakConcepts = scope === 'study' && coverage && coverage.topics
+    ? [...coverage.topics.values()].filter(topic => {
+      if (topic.skip || topic.solid) return false;
+      const subject = coverage.subjects[topic.subject];
+      const unit = subject && subject.units[topic.unit];
+      return topic.bankCount > 0 || (unit && unit.bankCount > 0);
+    })
+    : [];
+  const tierRank = subject => subjectTier(subject) === 'A' ? 0 : subjectTier(subject) === 'B' ? 1 : 2;
+  weakConcepts.sort((a, b) =>
+    Number(b.recentConf3Miss) - Number(a.recentConf3Miss) ||
+    tierRank(a.subject) - tierRank(b.subject) ||
+    a.level - b.level ||
+    b.importance - a.importance ||
+    b.weight - a.weight ||
+    a.subject.localeCompare(b.subject) ||
+    a.unit - b.unit
+  );
 
   if (scope === 'weak') {
     const bySubj = {};
@@ -10085,23 +10138,95 @@ function exportLog(copy) {
 
     function renderEntry(r, showConfidence) {
       const q = r.q;
+      const meta = questionStudyMetadata(q);
+      const rec = r.rec || {};
       const answer = q && Array.isArray(q.o) && q.a != null ? `${'ABCD'[q.a]}) ${q.o[q.a]}` : 'Unavailable';
-      return `### ${q.n != null ? 'Q' + q.n : 'Question'} (${q.s || 'General'})\n${q.q || ''}\nCorrect: ${answer}\n` +
-        (showConfidence ? `Confidence: ${r.cf || '-'}\n` : '') +
-        (q.e ? `Reason: ${q.e}\n` : '') + '\n';
+      const chosen = Number.isInteger(rec.ch) && rec.ch >= 0 && Array.isArray(q.o) && q.o[rec.ch] != null
+        ? `${'ABCD'[rec.ch]}) ${q.o[rec.ch]}`
+        : 'Unavailable';
+      const questionLevel = Number.isInteger(rec.lvl) ? rec.lvl : (Number.isInteger(rec.level) ? rec.level : effLevel(q));
+      const target = Math.round(subjectTarget(meta.subjectName) * 100);
+      const topicMetadata = meta.topic
+        ? `Topic: ${meta.topic.name} · Topic level: L${meta.topic.level} · Importance: ${meta.topic.importance}/10 · Type: ${meta.topic.type}\n`
+        : `Topic: Not mapped exactly · ${meta.mapping}\n`;
+      const confidence = r.cf != null ? r.cf : (rec.cf != null ? rec.cf : rec.p);
+      return `### ${q.n != null ? 'Q' + q.n : 'Question'} — ${r.type === 'w' ? 'Mistake' : r.type === 's' ? 'Skipped' : 'Unsure/guessed'}\n` +
+        `Subject: ${meta.subjectName} · Tier ${subjectTier(meta.subjectName)} · Target: ${target}%` +
+        `${meta.subject && meta.subject.importance != null ? ` · Subject importance: ${meta.subject.importance}/10` : ''}` +
+        `${meta.subject && meta.subject.exam_marks != null ? ` · Exam marks: ${meta.subject.exam_marks}` : ''}\n` +
+        `Unit: ${meta.unitNumber == null ? 'Unmapped' : `U${meta.unitNumber}${meta.unit && meta.unit.name ? ` · ${meta.unit.name}` : ''}`}` +
+        `${meta.unit && meta.unit.importance != null ? ` · Unit importance: ${meta.unit.importance}/10` : ''} · Question level: L${questionLevel}\n` +
+        topicMetadata +
+        `${q.q || ''}\nYour answer: ${chosen}\nCorrect answer: ${answer}\n` +
+        (showConfidence ? `Confidence: ${confidence == null ? 'Unavailable' : `${confidence}/3`}\n` : '') +
+        (q.e ? `Explanation: ${q.e}\n` : '') + '\n';
     }
 
-    if (scope === 'all' || scope === 'wsk' || scope === 'w') {
+    if (scope === 'study') {
+      text += `## How to prioritize\n\nWork through Tier A subjects before Tier B and C. Within each subject, revisit recent confident misses first, then lower syllabus levels (L0 first) and higher topic importance. A unit-level practice entry is not proof of topic mastery.\n\n`;
+    }
+
+    if (scope === 'study' || scope === 'all' || scope === 'wsk' || scope === 'w') {
       text += `## Mistakes (${wList.length})\n\n`;
       wList.forEach(r => { text += renderEntry(r, true); });
     }
-    if (scope === 'all' || scope === 'wsk' || scope === 's') {
+    if (scope === 'study' || scope === 'all' || scope === 'wsk' || scope === 's') {
       text += `## Skipped (${sList.length})\n\n`;
       sList.forEach(r => { text += renderEntry(r, false); });
     }
-    if (scope === 'all' || scope === 'ug') {
+    if (scope === 'study' || scope === 'all' || scope === 'ug') {
       text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
       ugList.forEach(r => { text += renderEntry(r, true); });
+    }
+    if (scope === 'study') {
+      text += `## Weak Syllabus Concepts / Subtopics (${weakConcepts.length})\n\n` +
+        `Non-skipped, non-solid concepts with mapped topic MCQs or an available unit-level question pool. Unit-level questions are not evidence of topic mastery; an exact topic_id mapping is required.\n\n`;
+      if (!MIT_SYLLABUS) {
+        text += 'Structured syllabus data is unavailable, so this export could not calculate weak-concept status.\n\n';
+      } else if (!weakConcepts.length) {
+        text += 'No non-skipped, non-solid syllabus concepts were found.\n\n';
+      } else {
+        const bySubject = new Map();
+        weakConcepts.forEach(topic => {
+          if (!bySubject.has(topic.subject)) bySubject.set(topic.subject, []);
+          bySubject.get(topic.subject).push(topic);
+        });
+        const subjectOrder = [...bySubject.keys()].sort((a, b) =>
+          tierRank(a) - tierRank(b) || a.localeCompare(b)
+        );
+        subjectOrder.forEach(subjectName => {
+          const subjectMeta = syllabusSubjectList().find(item => item.canonicalName === subjectName);
+          const items = bySubject.get(subjectName);
+          text += `### ${subjectName} — Tier ${subjectTier(subjectName)} · target ${Math.round(subjectTarget(subjectName) * 100)}%` +
+            `${subjectMeta && subjectMeta.exam_marks != null ? ` · ${subjectMeta.exam_marks} exam marks` : ''} (${items.length} weak concepts)\n\n`;
+          items.forEach(topic => {
+            const subjectCoverage = coverage.subjects[topic.subject];
+            const unit = subjectCoverage && subjectCoverage.units[topic.unit];
+            const subjectDefinition = syllabusSubjectList().find(item => item.canonicalName === topic.subject);
+            const unitDefinition = subjectDefinition && subjectDefinition.units[topic.unit - 1];
+            const status = topic.recentConf3Miss
+              ? 'Recent confident miss — revisit first'
+              : topic.attemptCount
+                ? 'Practiced, but not yet solid'
+                : 'Not yet practiced';
+            const mapping = topic.bankCount
+              ? `${topic.bankCount} topic-mapped MCQ(s)`
+              : unit && unit.bankCount
+                ? `No topic-mapped MCQs; unit-level pool has ${unit.bankCount} MCQ(s)`
+                : 'No mapped MCQs in this unit';
+            text += `#### ${topic.name}\n` +
+              `Unit: U${topic.unit}${unitDefinition && unitDefinition.name ? ` · ${unitDefinition.name}` : ''} · ${status}\n` +
+              `Priority: Tier ${subjectTier(topic.subject)}` +
+              `${subjectMeta && subjectMeta.importance != null ? ` · Subject importance ${subjectMeta.importance}/10` : ''}` +
+              `${unitDefinition && unitDefinition.importance != null ? ` · Unit importance ${unitDefinition.importance}/10` : ''}` +
+              ` · Level L${topic.level} · Importance ${topic.importance}/10` +
+              `${topic.weight ? ` · Guide weight ${topic.weight}%` : ''} · Type: ${topic.type}\n` +
+              `Evidence: ${topic.attemptCount} mapped question(s) practiced · ${topic.knownCount} confident correct · ${mapping}\n` +
+              (topic.confusableWith.length ? `Distinguish from: ${topic.confusableWith.join(' / ')}\n` : '') +
+              (topic.note ? `Study note: ${topic.note}\n` : '') + '\n';
+          });
+        });
+      }
     }
   }
 
@@ -10111,13 +10236,16 @@ function exportLog(copy) {
       localStorage.setItem(ckptKey, JSON.stringify({ lastAt: nowTs, lastTs: nowTs, scope: scope, range: rangeMode, at: new Date().toISOString() }));
     } catch(e){}
     if (m) {
-      const label = scope === 'weak' ? 'weak topics' : 'error log';
-      m.textContent = `${copy ? 'Copied' : 'Downloaded'} ${label} · ${unique.length} entr${unique.length === 1 ? 'y' : 'ies'} · ${rangeLabel}.`;
+      const label = scope === 'study' ? 'study pack' : scope === 'weak' ? 'weak topics' : 'error log';
+      const count = unique.length + weakConcepts.length;
+      m.textContent = `${copy ? 'Copied' : 'Downloaded'} ${label} · ${count} entr${count === 1 ? 'y' : 'ies'}${scope === 'study' ? ` (${unique.length} MCQs + ${weakConcepts.length} concepts)` : ''} · ${rangeLabel}.`;
     }
   };
 
   if (!copy) {
-    const fname = scope === 'weak' ? `weak-topics-${todayStr}.${isMd ? 'md' : 'txt'}` : `recall-error-log-${todayStr}.${isMd ? 'md' : 'txt'}`;
+    const fname = scope === 'study'
+      ? `study-pack-${todayStr}.${isMd ? 'md' : 'txt'}`
+      : scope === 'weak' ? `weak-topics-${todayStr}.${isMd ? 'md' : 'txt'}` : `recall-error-log-${todayStr}.${isMd ? 'md' : 'txt'}`;
     saveFile(fname, text, isMd ? 'text/markdown' : 'text/plain');
     finishExport();
   } else if (navigator.clipboard && navigator.clipboard.writeText) {
