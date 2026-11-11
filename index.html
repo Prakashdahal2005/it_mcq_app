@@ -5621,8 +5621,7 @@ const TIER_A_SUBJECTS = new Set([
   'Management Information System',
   'E-Commerce',
   'Systems Analysis & Design',
-  'Software Engineering',
-  'Web Technology'
+  'Software Engineering'
 ]);
 
 const TIER_B_SUBJECTS = new Set([
@@ -5632,7 +5631,8 @@ const TIER_B_SUBJECTS = new Set([
   'Digital Logic',
   'Artificial Intelligence',
   'Computer Graphics',
-  'Microprocessor & Computer Architecture'
+  'Microprocessor & Computer Architecture',
+  'Web Technology'
 ]);
 
 function subjectTier(subject) {
@@ -6257,6 +6257,7 @@ function renderSyllabusStudyPlan(snapshot) {
   const readiness = snapshot.taggedTopics > 0
     ? `${snapshot.touchedTopics}/${snapshot.totalTopics} topics practiced · ${snapshot.solidTopics} solid with spaced evidence · ${snapshot.taggedTopics}/${snapshot.totalTopics} topics with mapped questions`
     : `🧭 Unit Coverage: ${snapshot.touchedUnits}/${snapshot.totalUnits} units practiced (${snapshot.solidUnits} solid) · ${snapshot.bankSupportedUnits}/${snapshot.totalUnits} units with questions`;
+  const coverageMissionQuestions = getCoverageMissionQuestions(snapshot);
 
   return `
     <div class="card">
@@ -6266,6 +6267,18 @@ function renderSyllabusStudyPlan(snapshot) {
       </div>
       <p class="mu sm" style="margin:6px 0 10px">${readiness}${snapshot.taggedTopics > 0 ? ` · ${snapshot.mappedTopicQuestions} mapped MCQs.` : ''}</p>
       <p class="mu sm">Recommended next: core and high-priority concepts first, with confusable pairs and calculation practice where specified. “Solid” requires spaced, confident evidence—not just one correct answer. Guide weights are study priorities, not verified exam predictions.</p>
+      <div style="border:1px solid var(--bd);border-radius:12px;padding:12px;margin:12px 0">
+        <div class="row" style="justify-content:space-between;align-items:center;gap:8px">
+          <div>
+            <b>🧭 Syllabus Coverage Session</b>
+            <div class="mu sm">One eligible question from each untouched unit with bank questions. Already-touched units, units without eligible questions, and questions answered today are skipped.</div>
+          </div>
+          <button class="p sm" onclick="startCoverageMission()" ${coverageMissionQuestions.length ? '' : 'disabled'}>
+            Start session · ${coverageMissionQuestions.length}
+          </button>
+        </div>
+        <p class="mu sm" style="margin:8px 0 0">This is a breadth pass: answering marks a unit practiced, not mastered, and it does not revisit topic gaps in already-touched units. “Units with bank questions” counts active questions mapped to a syllabus unit; “unmapped questions” need corrected subject/unit metadata and will not disappear just by practicing them.</p>
+      </div>
       ${(snapshot.taggedTopics > 0 && snapshot.unmappedTopicQuestions) ? `<p class="mu sm">ℹ️ ${snapshot.unmappedTopicQuestions} bank question(s) lack a valid <code>topic_id</code>; they remain available for normal practice and unit coverage, but do not count as concept evidence.</p>` : ''}
       ${recommendations.length ? `
         <div style="display:grid;gap:8px;margin-top:12px">
@@ -6608,15 +6621,15 @@ function renderReadinessMeter(coverageSnapshot) {
           <span>🎯 L0 mastered: <b>${l0Mastered}/${l0Tracked}</b> subjects</span>
           <span>🧭 Units touched: <b>${unitCoverage.touchedUnits}/${unitCoverage.totalUnits}</b></span>
           <span>🛡️ Solid units: <b>${unitCoverage.solidUnits}/${unitCoverage.totalUnits}</b></span>
-          <span>🏦 Bank supports: <b>${unitCoverage.bankSupportedUnits}/${unitCoverage.totalUnits}</b></span>
-          ${unitCoverage.unmappedQuestions ? `<span>⚠️ Unmapped questions: <b>${unitCoverage.unmappedQuestions}</b></span>` : ''}
+          <span title="Syllabus units with at least one active bank question mapped to a recognized subject and numeric unit. This measures question availability, not study completion.">🏦 Units with bank questions: <b>${unitCoverage.bankSupportedUnits}/${unitCoverage.totalUnits}</b></span>
+          ${unitCoverage.unmappedQuestions ? `<span title="Active bank questions whose subject or numeric unit does not match a syllabus unit. They do not count toward unit coverage.">⚠️ Unmapped questions: <b>${unitCoverage.unmappedQuestions}</b></span>` : ''}
         </div>
       </div>
     </div>
 
     <div class="row" style="justify-content:space-between;align-items:center;margin-top:18px">
       <b>Subject Status &amp; Targeted Drills</b>
-      <span class="mu sm">Tier A target 85% · Tier B target 75% · 15 attempts to calibrate</span>
+      <span class="mu sm">Tier A target 85% · Tier B target 80% · Tier C target 75% · 15 attempts to calibrate</span>
     </div>
 
     <div class="subject-card-grid">
@@ -6658,7 +6671,7 @@ function renderReadinessMeter(coverageSnapshot) {
     ${unattemptedInDeck.length ? `<p class="mu sm" style="margin-top:14px">📚 <b>Not yet attempted in active deck:</b> ${unattemptedInDeck.map(s => esc(s)).join(' · ')}</p>` : ''}
     ${nextUntouchedPreview.length ? `<p class="mu sm" style="margin-top:8px">🧭 <b>Next untouched units:</b> ${nextUntouchedPreview.map(entry => esc(`${entry.subject} U${entry.unit} ${entry.name}`)).join(' · ')}</p>` : ''}
     ${missingBankPreview.length ? `<p class="mu sm" style="margin-top:8px">🏦 <b>No bank questions yet:</b> ${missingBankPreview.map(entry => esc(`${entry.subject} U${entry.unit} ${entry.name}`)).join(' · ')}</p>` : ''}
-    ${unitCoverage.unmappedQuestions ? `<p class="mu sm" style="margin-top:8px">⚠️ <b>${unitCoverage.unmappedQuestions} bank questions have no numeric unit.</b> They stay in practice but are excluded from coverage.</p>` : ''}
+    ${unitCoverage.unmappedQuestions ? `<p class="mu sm" style="margin-top:8px">⚠️ <b>${unitCoverage.unmappedQuestions} active bank questions have no recognized subject-and-unit mapping.</b> They are excluded from unit coverage; practicing them will not change this count. Correct their subject/unit metadata to include them.</p>` : ''}
   </div>
   `;
 }
@@ -7062,9 +7075,9 @@ function home(preserveScroll = false) {
       <div class="mu sm" style="text-align:center;margin-top:6px">Due and weak practice are capped so breadth gets a share of every session</div>
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCoverageMission()" ${coverageMissionQuestions.length ? '' : 'disabled'}>
-        🧭 Coverage Mission · ${coverageMissionQuestions.length} untouched units
+        🧭 Coverage Mission · ${coverageMissionQuestions.length} questions
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">One question per eligible untouched unit · ${coverage.bankSupportedUnits}/${coverage.totalUnits} units have bank questions · ${coverage.missingBankUnits.length} bank gap(s)</div>
+      <div class="mu sm" style="text-align:center;margin-top:6px">One eligible question per untouched unit · ${coverage.bankSupportedUnits}/${coverage.totalUnits} units have bank questions · ${coverage.missingBankUnits.length} units have no bank questions</div>
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
         ${freshButtonText}

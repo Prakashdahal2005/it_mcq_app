@@ -31,12 +31,12 @@ Recall is structured around seven interconnected cognitive study engines designe
 
 ### 1.4. Calibrated 3-Tier Exam Strategy
 The 19 syllabus subjects are grouped into calibrated target readiness thresholds based on exam weight, syllabus volume, and return-on-effort:
-- **Tier A (Target: 85%) — Verbal & High-Yield Core**:
-  - *Subjects*: Introduction to Information Technology (IIT), Management Information System (MIS), E-Commerce (EC), Systems Analysis and Design (SAD), Software Engineering (SE), Web Technology.
-  - *Rationale*: Definitional, conceptual, and standardized; high score return per study hour.
-- **Tier B (Target: 80%) — Technical Systems & Architecture**:
-  - *Subjects*: Database Management System (DBMS), Computer Networks (CN), Operating System (OS), Digital Logic (DL), Artificial Intelligence (AI), Computer Graphics (CG), Microprocessor System (MP).
-  - *Rationale*: Core CSIT pillars with high question density; requires clear architectural understanding.
+- **Tier A (Target: 85%) — Compact, high-return recall core**:
+  - *Subjects*: Introduction to Information Technology (IIT), Management Information System (MIS), E-Commerce (EC), Systems Analysis and Design (SAD), Software Engineering (SE).
+  - *Rationale*: Prioritize concise, high-yield concepts and common distinctions for strong marks per study hour.
+- **Tier B (Target: 80%) — Technical systems and broader syllabi**:
+  - *Subjects*: Database Management System (DBMS), Computer Networks (CN), Operating System (OS), Digital Logic (DL), Artificial Intelligence (AI), Computer Graphics (CG), Microprocessor System (MP), Web Technology.
+  - *Rationale*: Build the core across technical subjects; for broad areas such as Web, prioritize likely fundamentals and avoid spending disproportionate time on niche detail.
 - **Tier C (Target: 75%) — Calculation, Coding & High-Syllabus Ratios**:
   - *Subjects*: C Programming, Object Oriented Programming (C++), Data Structures and Algorithms (DSA), Calculus & Functions, Linear & Abstract Algebra, Statistics & Probability.
   - *Rationale*: Time-intensive calculations and syntax tracing; target 75% solid foundation rather than diminishing returns from exhaustive edge cases.
@@ -59,7 +59,7 @@ The 19 syllabus subjects are grouped into calibrated target readiness thresholds
 - **Comprehensive Score Analysis**: In-depth breakdown by subject tier, timing analysis, and mock history tracking with personal best celebration triggers.
 
 ### 1.8. Dignified Milestone Celebrations
-- **Authentic Motivation**: Clean, distraction-free modal dialog celebrating score milestones (e.g., reaching 85% in a Tier A subject, beating a mock personal best).
+- **Authentic Motivation**: Clean, distraction-free modal dialog celebrating score milestones (e.g., reaching the subject's tier target or beating a mock personal best).
 - **Curated Wisdom**: Displays authentic quotes on mastery, focus, and computer science discipline without childish gamification or disruptive browser alerts.
 
 ---

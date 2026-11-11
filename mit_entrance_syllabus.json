@@ -6505,9 +6505,9 @@
    "code": "WEB",
    "name": "Web Technology",
    "block": "computing",
-   "tier": "A",
+   "tier": "B",
    "exam_marks": 5,
-   "target_pct": 85,
+   "target_pct": 80,
    "importance": 7,
    "know_cold": [
     "h1-h6, HTML5 semantic tags",
@@ -6524,7 +6524,7 @@
    ],
    "skip_deep": [
     "AJAX/jQuery",
-    "PHP DB/upload (14 units for 5 Qs; syntax-level only)"
+    "Deep PHP DB/upload work and obscure syntax (14 units for 5 Qs; prioritize breadth and core syntax)"
    ],
    "units": [
     {

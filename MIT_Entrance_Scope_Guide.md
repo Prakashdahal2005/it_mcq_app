@@ -9,7 +9,7 @@
 - [Part I: Exam Blueprint, Marks Math & Scope Strategies](#part-i-exam-blueprint-marks-math--scope-strategies)
   - [1. Scope and marks](#1-scope-and-marks)
   - [2. What the paper really is](#2-what-the-paper-really-is)
-  - [3. Subject cheat lines (Tier A, Tier B)](#3-subject-cheat-lines)
+  - [3. Subject cheat lines (Tier A, Tier B, Tier C)](#3-subject-cheat-lines)
   - [4. Calc and trace bank](#4-calc-and-trace-bank)
   - [5. Shaky keys and ambiguous questions](#5-shaky-keys-and-ambiguous-questions)
   - [6. Method](#6-method-optimal-and-non-boring)
@@ -47,8 +47,8 @@
 
 | Tier | Subjects | Aim | Strategy & Character |
 |---|---|---|---|
-| **A** (pure recall & sibling pairs) | IIT, MIS, EC, SAD, SE, Web | 85% (4.25/5) | Jargon-elimination easily rules out 2 distractors; target near-perfect marks. |
-| **B** (strong recall core + small calc tail) | DBMS, CN, OS, DL, AI, CG, MP | 80% (4.0/5) | Foundations (SQL order, OSI, deadlocks) are as guessable as Tier A; only 1–2 calc/trace questions. |
+| **A** (compact, high-return recall core) | IIT, MIS, EC, SAD, SE | 85% (4.25/5) | Prioritize concise concepts and common distinctions with strong marks-per-hour return. |
+| **B** (technical systems and broader syllabi) | DBMS, CN, OS, DL, AI, CG, MP, Web | 80% (4.0/5) | Build technical foundations; for broad subjects such as Web, prioritize fundamentals and avoid spending disproportionate time on niche detail. |
 | **C** (trace & calculation-heavy) | C, OOP, DSA, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | 75% (3.75/5) | Skill-based; master core fingerprints so you never face a blind 25% guess. |
 
 ## 2. What the paper really is
@@ -66,25 +66,27 @@
 
 Format: **know cold** | *trap* | skip deep until the core is fluent.
 
-### Tier A
+### Tier A · compact, high-return recall core
 - **IIT:** hierarchy registers → cache → RAM → disk → tape; RAM≠ROM; system≠application≠utility software; assembler≠compiler; virus≠worm≠Trojan; firewall≠IDS; DNS/DHCP/FTP/Telnet/SMTP roles; Access is a DBMS. | *trap:* easy wording → skipping options | skip history, case studies.
-- **DL:** NAND/NOR universal; De Morgan; half/full adder; mux 2ⁿ:1 needs n selects; encoder≠decoder; SR/D/JK/T (JK=11 toggles, SR=11 invalid); latch≠FF; sync≠async (ripple) counter; mod-N → ⌈log₂N⌉ FFs; ring≠Johnson; K-map (Gray order); 1's≠2's complement; BCD, Gray, parity. | *trap:* edge vs level | skip ALU/shifter design.
-- **Web:** h1–h6, HTML5 semantic tags; `.class`≠`#id`; box model; JS alert/confirm/prompt; PHP `$var` rules, `;`, `echo`; cookies≠sessions; DTD≠XSD (both schemas); XSLT≠XQuery. | *trap:* tiny syntax differences | skip AJAX/jQuery, PHP DB/upload (14 units for 5 Qs, so syntax-level only).
 - **SAD:** waterfall / prototype (unclear requirements) / **spiral (risk)** / RAD (speed) / agile (Scrum, XP, Kanban); DFD=process, ERD=data, decision table/tree=logic; **alpha (in-house) ≠ beta (real users) ≠ acceptance**. | *trap:* structured vs OO tool | skip Gantt/PERT, interface design.
 - **SE:** **verification (product right) ≠ validation (right product)**; functional≠non-functional; CMM levels; COCOMO (organic/semi/embedded); version≠change≠release; team structures (democratic decentralized = no permanent leader). | *trap:* reverse engineering ≠ re-engineering | skip design patterns.
 - **MIS:** TPS (operational) / MIS (middle, routine) / DSS (middle, non-routine) / ESS (senior); Porter's 5 forces; value chain≠value web; 6 ethical principles (Descartes: if it can't be done repeatedly, don't do it once); push (build-to-stock)≠pull (build-to-order); structured/semi/unstructured; ERP/SCM/CRM/KMS. | *trap:* wording-matching, so memorise the one-liners.
 - **EC:** 7 unique features; B2C/B2B/C2C/C2B; 6 security dimensions; **phishing≠pharming≠spoofing**; DoS≠DDoS; SSL/TLS, PKI, VPN; auctions; EDI; Nepal ETA. | *trap:* dimension vs attack names | skip SET steps, social-media tools.
+
+### Tier B · technical systems and broader syllabi
+- **DL:** NAND/NOR universal; De Morgan; half/full adder; mux 2ⁿ:1 needs n selects; encoder≠decoder; SR/D/JK/T (JK=11 toggles, SR=11 invalid); latch≠FF; sync≠async (ripple) counter; mod-N → ⌈log₂N⌉ FFs; ring≠Johnson; K-map (Gray order); 1's≠2's complement; BCD, Gray, parity. | *trap:* edge vs level | skip ALU/shifter design.
+- **Web:** h1–h6, HTML5 semantic tags; `.class`≠`#id`; box model; JS alert/confirm/prompt; PHP `$var` rules, `;`, `echo`; cookies≠sessions; DTD≠XSD (both schemas); XSLT≠XQuery. | *trap:* tiny syntax differences | prioritize breadth and common fundamentals; defer AJAX/jQuery detail, deep PHP DB/upload work, and obscure syntax until core coverage is secure.
 - **CG:** DDA (float) ≠ Bresenham (integer); translation/scaling/rotation matrices; Cohen-Sutherland≠Liang-Barsky; Z-buffer (image space)≠painter's (object space); flat≠Gouraud≠Phong; Bezier≠B-spline; RGB (additive)≠CMY (subtractive)≠HSV. | *trap:* translation/transformation wording | skip derivations, OpenGL, VR.
 - **AI:** PEAS, 5 agent types; BFS/DFS/IDS; **greedy f=h ≠ A\* f=g+h**; minimax, alpha-beta (alpha = best for MAX); CNF; forward≠backward chaining; Bayes; supervised/unsupervised/RL; ANN training updates weights. | *trap:* which f for which search | skip Dempster-Shafer, scripts, NLP detail.
 - **MP (8085 & computer architecture):** 8085 = 8-bit data, 16-bit address (64 KB), 40 pins; address bus one-way, data bus two-way; flags S Z AC P CY; interrupts TRAP > 7.5 > 6.5 > 5.5 > INTR; fetch→decode→execute; RISC≠CISC; Booth = multiplication; pipelining = overlap. | *trap:* bus direction, flag/interrupt details, and one-step pipeline arithmetic | skip assembly programs and microprogramming.
-
-### Tier B
-- **C:** precedence; pre vs post `++`; integer division; `=` vs `==`; switch fall-through; macro without parentheses; pointer arithmetic scales by type size; `strlen`≠`sizeof`; fopen modes; struct≠union; array size n+1 for a string of n. | *trap:* trace on paper; "compile error" is often an option | skip file handling, preprocessor.
-- **OOP:** struct (public) ≠ class (private); **ctor base→derived, dtor reverse**; copy ctor takes a reference; static = one per class; overloading≠overriding; pure virtual = abstract; virtual destructor; non-overloadable `:: . .* ?: sizeof`; member memory allocated at **object creation**. | *trap:* "declaration" vs "creation" | skip template depth, file streams.
-- **DSA:** LIFO/FIFO; overflow≠underflow; infix↔postfix by hand; BST in-order = sorted; BFS=queue, DFS=stack; Prim/Kruskal=MST, Dijkstra=shortest path; array/stack/queue/list are linear, trees/graphs aren't; merge sort suits linked lists. | skip worked graph algorithms, hashing detail.
 - **DBMS:** **FROM→WHERE→GROUP BY→HAVING→SELECT→ORDER BY**; 1NF atomic, 2NF no partial, 3NF no transitive, BCNF every determinant a candidate key; specialization≠generalization≠aggregation; ACID; deferred (NO-UNDO/REDO)≠immediate (UNDO/REDO)≠shadow paging; DDL/DML/DCL/TCL. | *trap:* ALTER vs DROP vs UPDATE | skip NoSQL detail, MVD derivations.
 - **OS:** process≠thread; FCFS/SJF/SRTF/RR/priority; busy-waiting (lock, strict alternation, Peterson) ≠ blocking (sleep/wakeup, semaphore, monitor); **4 deadlock conditions** (mutual exclusion, hold & wait, no preemption, circular wait); Ostrich = ignore, not recovery; internal≠external fragmentation; FIFO/LRU/optimal. | *trap:* ignore extra numbers in the stem | skip file-system implementation, I/O layers.
 - **CN:** layers and devices (hub 1, switch 2, router 3); TCP≠UDP; IPv4 32-bit classful ≠ IPv6 128-bit classless; ARP≠RARP; SMTP (send) ≠ POP/IMAP (receive); stop-and-wait / Go-Back-N / selective repeat; TDM≠FDM≠WDM; RIP (distance-vector)≠OSPF (link-state); fibre immune to EMI. | *trap:* TCP header is 20–60 B | skip CRC/Hamming, routing walkthroughs.
+
+### Tier C · calculation, coding, and tracing
+- **C:** precedence; pre vs post `++`; integer division; `=` vs `==`; switch fall-through; macro without parentheses; pointer arithmetic scales by type size; `strlen`≠`sizeof`; fopen modes; struct≠union; array size n+1 for a string of n. | *trap:* trace on paper; "compile error" is often an option | skip file handling, preprocessor.
+- **OOP:** struct (public) ≠ class (private); **ctor base→derived, dtor reverse**; copy ctor takes a reference; static = one per class; overloading≠overriding; pure virtual = abstract; virtual destructor; non-overloadable `:: . .* ?: sizeof`; member memory allocated at **object creation**. | *trap:* "declaration" vs "creation" | skip template depth, file streams.
+- **DSA:** LIFO/FIFO; overflow≠underflow; infix↔postfix by hand; BST in-order = sorted; BFS=queue, DFS=stack; Prim/Kruskal=MST, Dijkstra=shortest path; array/stack/queue/list are linear, trees/graphs aren't; merge sort suits linked lists. | skip worked graph algorithms, hashing detail.
 - **Calculus (9):** derivative rules (chain, implicit); limit as a derivative (xᵏ−2ᵏ)/(x−2) = k·2ᵏ⁻¹; extremes = critical points **plus endpoints**; f'>0 increasing; ∫ and substitution; improper integral with a discontinuity inside diverges (∫dx/(x−a)); y'+ky=0 → Ce⁻ᵏˣ; partial derivative; plane a(x−x₀)+b(y−y₀)+c(z−z₀)=0. | *trap:* skipped endpoints, hidden discontinuity | skip volumes, arc length, Newton/Euler, Lagrange. **Promote first:** series tests, related rates.
 - **Linear Algebra (6):** reduce to 0 = nonzero → no solution; det 0 → singular/dependent; 2×2 inverse = (1/det)[[d,−b],[−c,a]]; symmetric A=Aᵀ; |a+b| ≤ |a|+|b|; group = closure, associativity, identity, inverse. | *trap:* forgetting ÷det, two true options | skip Gram-Schmidt, SVD, rings. **Promote first:** 2×2 eigenvalues, Cramer.
 - **Statistics (5):** nominal < ordinal < interval < ratio; shift by c: mean ±c, variance unchanged; scale by c: mean×c, variance×c²; constants → variance 0; total probability ΣP(A|Bᵢ)P(Bᵢ), Bayes; r sign = direction, |r| = strength, correlation ≠ causation. | skip CI, sampling distributions. **Promote first:** binomial, normal.
@@ -541,6 +543,8 @@ No unit skipped.
 
 ## 9. Web Technology (BIT251 and BIT301)
 
+Web spans 14 units across HTML, CSS, JavaScript, XML, and PHP for the guide's assumed 5-mark subject allocation. It is Tier B on return per effort: cover the syllabus breadth and common distinctions first, then spend time on exact syntax or deep implementation only when evidence suggests it is worth the effort. This is a study priority, not a verified prediction of the exam's unit distribution.
+
 - **Part A: Client side**
 - **U1 Introduction**
   - Internet ≠ intranet ≠ WWW · static ≠ dynamic web site · single-tier ≠ two-tier ≠ multi-tier
@@ -594,7 +598,7 @@ No unit skipped.
 - **U14 File handling**
   - Read · write · close · file upload · parsing CSV ≠ parsing JSON
 
-No unit skipped.
+All 14 units are represented above; study breadth-first rather than trying to memorize every niche syntax detail before the core is secure.
 
 ## 10. Systems Analysis and Design (BIT253)
 
@@ -1281,14 +1285,14 @@ Return JSON only: {"alt_explain":"<=80 words with one concrete example",
 | Linear Algebra | 3Blue1Brown "Essence of Linear Algebra": https://www.youtube.com/results?search_query=3Blue1Brown+Essence+of+linear+algebra | Khan Academy exercises; use a matrix calculator only to check hand work |
 | Statistics | StatQuest: https://www.youtube.com/results?search_query=StatQuest+statistics | Seeing Theory https://seeing-theory.brown.edu/ ; Khan Academy exercises |
 | IIT (Tier A) | CrashCourse CS, 2-3 episodes only | Your own comparison cards (RAM vs ROM, virus vs worm vs Trojan) |
-| Digital Logic (Tier A) | Neso Academy digital electronics for weak units | CircuitVerse https://circuitverse.org/ : half adder, full adder, 4:1 mux, SR/JK/D/T, ring and Johnson counters |
-| Web (Tier A) | none needed | W3Schools "Try it Yourself" https://www.w3schools.com/ ; Flexbox Froggy https://flexboxfroggy.com/ ; CSS Diner https://flukeout.github.io/ |
+| Digital Logic (Tier B) | Neso Academy digital electronics for weak units | CircuitVerse https://circuitverse.org/ : half adder, full adder, 4:1 mux, SR/JK/D/T, ring and Johnson counters |
+| Web (Tier B) | none needed | W3Schools "Try it Yourself" https://www.w3schools.com/ ; Flexbox Froggy https://flexboxfroggy.com/ ; CSS Diner https://flukeout.github.io/ |
 | SAD (Tier A) | short "waterfall vs spiral vs agile" explainers | Draw a DFD, ERD and use-case diagram for a library system in https://app.diagrams.net/ |
 | SE (Tier A) | short videos on verification vs validation, COCOMO, CMM | Write each sibling pair as a two-line comparison |
 | MIS (Tier A) | short explainers on TPS/MIS/DSS/ESS, Porter's five forces, value chain | Turn the one-liners into your own table |
 | E-Commerce (Tier A) | Computerphile on HTTPS, public-key encryption, DDoS | Google Phishing Quiz https://phishingquiz.withgoogle.com/ , then phishing vs pharming vs spoofing in one line each |
-| Computer Graphics (Tier A) | Pixar in a Box https://www.khanacademy.org/computing/pixar ; Computerphile | GeoGebra for translation, scaling, rotation; search "line drawing algorithm demo" to compare DDA and Bresenham |
-| AI (Tier A) | Computerphile on A\* and search | Elements of AI https://www.elementsofai.com/ ; TensorFlow Playground https://playground.tensorflow.org/ ; Teachable Machine https://teachablemachine.withgoogle.com/ ; search "pathfinding visualizer" and "alpha beta pruning visualizer" |
+| Computer Graphics (Tier B) | Pixar in a Box https://www.khanacademy.org/computing/pixar ; Computerphile | GeoGebra for translation, scaling, rotation; search "line drawing algorithm demo" to compare DDA and Bresenham |
+| AI (Tier B) | Computerphile on A\* and search | Elements of AI https://www.elementsofai.com/ ; TensorFlow Playground https://playground.tensorflow.org/ ; Teachable Machine https://teachablemachine.withgoogle.com/ ; search "pathfinding visualizer" and "alpha beta pruning visualizer" |
 
 **Extra MCQ banks (use with a filter):** Sanfoundry https://www.sanfoundry.com/ (textbook-style one-fact recall, closest to the exam level) and GeeksforGeeks https://www.geeksforgeeks.org/ (many GATE-style questions, often too deep). Filter every question: does it map to a unit in Part II, and is it one fact or one small step? If not, skip it. Never judge readiness by these scores, and verify any answer key that looks wrong in your textbook. Real past or model questions from your own university are the best source.
 
