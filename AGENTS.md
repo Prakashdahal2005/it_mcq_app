@@ -16,14 +16,14 @@ Search `index.html` for the named section or function; line numbers are intentio
 | Question identity, edits, deletion, source links | `questionUid()`, `openQuestionEditorForQuestion()`, `deleteQuestionByQ()` | `applyQuestionOverridesEverywhere()`, `syncFlashcardSourceLinks()`, `cloud-sync.js` |
 | MCQ/TF/free-response presentation and grading | `Question Screen & Presentation`, `prepareQuestionForDisplay()`, `pick()` | `showTypedAnswerPanel()`, `submitFreeResponse()`, `freeResponseGrade()`, `sr()` |
 | Spaced repetition and weak-topic/readiness decisions | `Spaced Repetition, Deadline & Locked-In Logic`, `sr()`, `buildTodaySession()`, `readinessStats()` | `milestoneSubjectSignals()`, `recordFixDay()` |
-| Concept gaps rescue & error analysis | `renderConceptGapsRescue()`, `getConceptGapsList()` | `V`, confident miss / leech detection |
+| Concept gaps rescue & error analysis | `startConceptGapsRescue()`, `getConceptGapsList()` | `V`, confident miss / leech detection |
 | Milestone celebrations & 3-Tier targets | `triggerCelebrationModal()`, `subjectTarget()`, `subjectTier()` | `TIER_A_SUBJECTS`, `TIER_B_SUBJECTS` |
 | Recall-first presentation & choice detection | `show()`, `isOptionDependentQuestion()`, `setRecallFirst()` | `recallFirst`, `showTypedAnswerPanel()` |
 | Flashcard creation, links, review, and ratings | `PHASE 5`, `generateConceptCardData()`, `saveConceptCard()`, `findSourceQuestionForCard()`, `renderFlashcardView()`, `rateCard()` | MCQ feedback in `pick()`, `CARD_TOMBSTONES`, `cloud-sync.js` |
 | Timed and weekly mocks | `weeklyMockStatus()`, `mock()`, `mockEnd()` | `WEEKLY_MOCK`, `persistMockState()` |
 | Bank import, backups, and exports | `Import & Bank Handling`, `Backup & Persistence`, `exportLog()` | `restore()`, `cloud-sync.js` |
 | Settings and AI configuration | `Settings`, `saveSettings()` | Gemini request helpers and local storage |
-| MIT syllabus and study coverage | `mit_entrance_syllabus.json`, `calculateUnitCoverage()`, `renderSyllabusStudyPlan()` | `parseBank()`, `parseJson()`, `cloud-sync.js`, `sw.js` |
+| MIT syllabus and study coverage | `mit_entrance_syllabus.json`, `calculateUnitCoverage()`, `pickCoverageQuestions()` | `parseBank()`, `parseJson()`, `cloud-sync.js`, `sw.js` |
 
 ## Safe-change rules
 

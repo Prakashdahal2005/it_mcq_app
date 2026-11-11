@@ -912,8 +912,8 @@ window.MathJax = {
  *   applyQuestionOverridesEverywhere(), editor and deletion helpers.
  * Scheduling/readiness: Spaced Repetition; sr(), buildTodaySession(),
  *   readinessStats(), milestoneSubjectSignals().
- * MIT syllabus focus: mit_entrance_syllabus.json, calculateUnitCoverage(),
- *   renderSyllabusStudyPlan(), explicit question topic_id mappings.
+ * Syllabus tracking: mit_entrance_syllabus.json, calculateUnitCoverage(),
+ *   explicit question topic_id mappings.
  * Flashcards: PHASE 5; card generation/linking, manager, review, and ratings.
  * Question UI/grading: Question Screen & Presentation; show(), pick(),
  *   typed/free-response handlers, done().
@@ -1058,7 +1058,6 @@ let defaultBankLoading = false;
 let defaultBankLoadError = '';
 let todayMins = 15;
 let showMoreMenu = false;
-let showStudyFocus = false;
 let bgGenQueue = [];
 let backgroundQuestionAiQueue = [];
 let backgroundQuestionAiInProgress = false;
@@ -6017,56 +6016,6 @@ function calculateUnitCoverage() {
   };
 }
 
-function getSyllabusStudyRecommendations(snapshot, limit = 6) {
-  if (!snapshot || !snapshot.topics) return [];
-  const availableTopics = [...snapshot.topics.values()].filter(topic => {
-    const unit = snapshot.subjects[topic.subject] && snapshot.subjects[topic.subject].units[topic.unit];
-    return topic.bankCount > 0 || (unit && unit.bankCount > 0);
-  });
-  const priorityRank = topic => {
-    if (topic.recentConf3Miss) return 0;
-    if (topic.bankCount && topic.attemptCount && !topic.solid) return 1;
-    if (topic.bankCount && !topic.attemptCount) return 2;
-    const unit = snapshot.subjects[topic.subject] && snapshot.subjects[topic.subject].units[topic.unit];
-    if (!topic.bankCount && unit && unit.bankCount && !unit.touchedCount) return 3 + topic.level;
-    if (!topic.bankCount && unit && unit.bankCount) return 6 + topic.level;
-    return 9 + topic.level;
-  };
-  const ranked = availableTopics
-    .filter(topic => !topic.skip)
-    .sort((a, b) =>
-      priorityRank(a) - priorityRank(b) ||
-      b.importance - a.importance ||
-      b.weight - a.weight ||
-      a.subject.localeCompare(b.subject) ||
-      a.unit - b.unit
-    );
-  const selected = [];
-  const selectedTopics = new Set();
-  const selectedSubjects = new Set();
-  ranked.forEach(topic => {
-    if (selected.length >= limit || selectedSubjects.has(topic.subject)) return;
-    selected.push(topic);
-    selectedTopics.add(topic.id);
-    selectedSubjects.add(topic.subject);
-  });
-  const selectedUnits = new Set(selected.map(topic => `${topic.subject}::${topic.unit}`));
-  ranked.forEach(topic => {
-    if (selected.length >= limit || selectedTopics.has(topic.id)) return;
-    const key = `${topic.subject}::${topic.unit}`;
-    if (selectedUnits.has(key)) return;
-    selected.push(topic);
-    selectedTopics.add(topic.id);
-    selectedUnits.add(key);
-  });
-  ranked.forEach(topic => {
-    if (selected.length >= limit || selectedTopics.has(topic.id)) return;
-    selected.push(topic);
-    selectedTopics.add(topic.id);
-  });
-  return selected;
-}
-
 function getConceptGapsList(limit = 5) {
   if (typeof V === 'undefined' || !V) return [];
   const candidates = [];
@@ -6154,85 +6103,6 @@ function getConceptGapsList(limit = 5) {
   return candidates.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
-function renderConceptGapsRescue(coverage) {
-  const gaps = getConceptGapsList(Infinity);
-  if (!gaps.length) return '';
-  const displayedGaps = gaps.slice(0, 5);
-
-  return `
-    <div class="card" style="margin-top:14px;border:1px solid rgba(239,68,68,0.25);background:var(--card)">
-      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
-        <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:6px">
-          <span>🧠 Concept Gaps &amp; Error Rescue</span>
-        </h2>
-        <span class="badge" style="background:rgba(239,68,68,0.12);color:var(--no);border:1px solid rgba(239,68,68,0.25);font-size:11px;font-weight:700">
-          ${displayedGaps.length} of ${gaps.length} Priority Concepts
-        </span>
-      </div>
-      <p class="mu sm" style="margin:0 0 12px">
-        Review the distinguishing rule and concept cue directly instead of grinding MCQs blindly. “Done for today” hides a gap until tomorrow without changing its mastery history.
-      </p>
-      <button class="p sm" style="margin-bottom:10px" onclick="startConceptGapsRescue()">🚑 Start Rescue Session (${gaps.length} questions)</button>
-      <div style="display:grid;gap:10px">
-        ${displayedGaps.map((item, idx) => {
-          const q = item.q;
-          const k = item.k;
-          const v = item.v;
-          const subj = canonSubj(q.s);
-          const clue = q.confusable_with
-            ? `Distinguish: ${Array.isArray(q.confusable_with) ? q.confusable_with.join(' / ') : q.confusable_with}`
-            : (q.e ? (String(q.e).slice(0, 120) + (String(q.e).length > 120 ? '…' : '')) : 'Recall rule: Focus on the discriminating criteria.');
-          const cardId = `gap-exp-${idx}`;
-          return `
-            <div style="border:1px solid var(--bd);border-radius:12px;padding:12px;background:rgba(0,0,0,0.015)">
-              <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
-                <div style="flex:1;min-width:180px">
-                  <div class="row" style="gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
-                    <span class="milestone-tag" style="background:${item.tier==='A'?'var(--ac)':'#6366f1'}">Tier ${item.tier}</span>
-                    <span class="mu sm"><b>${esc(subj)}</b> · U${q.unit || q.u || 1}</span>
-                    <span class="sm" style="color:var(--no);font-weight:700;font-size:11px">⚠️ ${esc(item.reason)}</span>
-                  </div>
-                  <div style="font-weight:600;font-size:13px;margin:3px 0 6px">${esc(q.q)}</div>
-                  <div class="mu sm" style="font-size:12px;background:rgba(245,158,11,0.08);padding:6px 10px;border-radius:8px;border-left:3px solid #f59e0b">
-                    💡 <b>Concept Cue:</b> ${esc(clue)}
-                  </div>
-                  ${v.mnemonic ? `<div class="anchor-chip" style="margin-top:6px">🧠 Anchor: <i>"${esc(v.mnemonic)}"</i></div>` : ''}
-                </div>
-              </div>
-              <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">
-                <button class="sm" onclick="toggleGapExplanation('${cardId}')">📖 Review Solution</button>
-                <button class="sm" onclick="addFlashcardForCurrent()">🗂 Add to Flashcards</button>
-                <button class="sm p" onclick="startSyllabusUnitDrill(${esc(JSON.stringify(subj))}, ${q.unit || q.u || 1})">🎯 Practice Unit</button>
-                <button class="sm" onclick="markGapDoneForToday(${esc(JSON.stringify(item.uid))})">✓ Done for today</button>
-              </div>
-              <div id="${cardId}" style="display:none;margin-top:8px;padding:10px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:12px">
-                <div><b>Correct Answer:</b> ${esc(q.options ? q.options[q.answer] || q.answer : (q.o ? q.o[q.a] : ''))}</div>
-                <div style="margin-top:4px" class="mu">${esc(q.e || q.explanation || 'Study the discrimination rule above.')}</div>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function markGapDoneForToday(uid) {
-  if (!uid) {
-    showToast('Could not mark this concept done: question identity is missing.', 'error');
-    return;
-  }
-  GAP_DONE_TODAY = normalizeGapDoneToday(GAP_DONE_TODAY);
-  GAP_DONE_TODAY[uid] = localDateKey();
-  if (!save()) {
-    delete GAP_DONE_TODAY[uid];
-    showToast('Could not save this for today. Please check browser storage and try again.', 'error');
-    return;
-  }
-  showToast('Marked done for today. Your answer history is unchanged.');
-  home(true);
-}
-
 function startConceptGapsRescue() {
   const gaps = getConceptGapsList(Infinity);
   if (!gaps.length) {
@@ -6240,65 +6110,6 @@ function startConceptGapsRescue() {
     return;
   }
   start(gaps.map(item => item.uid));
-}
-
-function toggleGapExplanation(id) {
-  const el = document.getElementById(id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function renderSyllabusStudyPlan(snapshot) {
-  if (!MIT_SYLLABUS) {
-    const message = syllabusLoadError
-      ? `Syllabus data could not be loaded: ${esc(syllabusLoadError)}`
-      : 'Loading the structured MIT syllabus…';
-    return `<div class="card"><h2 style="margin-top:0">🧭 Syllabus Study Focus</h2><p class="mu">${message}</p>${syllabusLoadError ? '<button class="sm" onclick="retryMitSyllabusLoad()">Retry syllabus load</button>' : ''}</div>`;
-  }
-  const recommendations = getSyllabusStudyRecommendations(snapshot);
-
-  return `
-    <div class="card">
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <h2 style="margin:0">🧭 Syllabus Study Focus</h2>
-        <a class="mu sm" href="mit_entrance_syllabus.json" target="_blank" rel="noopener">📋 Full Topic Syllabus (JSON)</a>
-      </div>
-      <p class="mu sm">Recommended concepts are based on mapped syllabus evidence where available. Unit-level drills are labeled as such and do not imply topic mastery. Guide weights are study priorities, not verified exam predictions.</p>
-      ${recommendations.length ? `
-        <div style="display:grid;gap:8px;margin-top:12px">
-          ${recommendations.map(topic => {
-            const status = topic.recentConf3Miss
-              ? 'Recent confident miss'
-              : topic.solid
-                ? 'Solid · spaced evidence'
-                : topic.attemptCount
-                  ? `Practiced · ${topic.knownCount} confident correct`
-                  : topic.bankCount
-                    ? `${topic.bankCount} mapped question(s) available`
-                    : 'No topic-mapped MCQs · unit-level drill only';
-            const detail = [
-              `Level ${topic.level} · ${topic.type} · priority ${topic.importance}/10`,
-              topic.confusableWith.length ? `Distinguish: ${topic.confusableWith.join(' / ')}` : '',
-              topic.note
-            ].filter(Boolean).join(' · ');
-            const action = topic.bankCount ? 'Practice concept' : 'Practice unit';
-            return `
-              <div style="border:1px solid var(--bd);border-radius:12px;padding:10px 12px">
-                <div class="row" style="justify-content:space-between;align-items:flex-start">
-                  <div style="flex:1;min-width:190px">
-                    <b>${esc(topic.name)}</b>
-                    <div class="mu sm">${esc(topic.subject)} · U${topic.unit} · ${esc(status)}</div>
-                    <div class="mu sm">${esc(detail)}</div>
-                  </div>
-                  <button class="sm" onclick="startSyllabusUnitDrill(${esc(JSON.stringify(topic.subject))},${topic.unit},${esc(JSON.stringify(topic.id))})">${action}</button>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      ` : '<p class="mu">No in-scope, non-skipped topics are available to recommend.</p>'}
-      <p class="mu sm" style="margin-bottom:0">💡 <b>Study Strategy:</b> Distinguish confusable pairs and practice hand-calculations first for maximum marks-per-hour return.</p>
-    </div>
-  `;
 }
 
 function coverageUnitOfQuestion(snapshot, q) {
@@ -6393,19 +6204,6 @@ function pickCoverageQuestions(pool, limit, snapshot, opts = {}) {
     }
   }
   return selected;
-}
-
-function getCoverageMissionQuestions(snapshot = calculateUnitCoverage()) {
-  const untouchedPool = bankQuestionPool().filter(q => {
-    if (!q || !normalSessionEligible(q) || isQuestionDeleted(q)) return false;
-    const unit = coverageUnitOfQuestion(snapshot, q);
-    return !!unit && unit.touchedCount === 0;
-  });
-  return pickCoverageQuestions(untouchedPool, Infinity, snapshot, {
-    maxPerUnit: 1,
-    includeUnmapped: false,
-    allTiers: true
-  });
 }
 
 function diagnosticSubjectStats() {
@@ -6741,45 +6539,6 @@ function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
   start(DRILL_D.map(q => q.n));
 }
 
-function startSyllabusUnitDrill(subjectName, unitNumber, topicId) {
-  const subject = canonSubj(subjectName);
-  const doneToday = questionsAnsweredToday();
-  const unitPool = bankQuestionPool().filter(q =>
-    q &&
-    canonSubj(q.s) === subject &&
-    questionScopeUnit(q) === Number(unitNumber) &&
-    !isQuestionQuarantined(q) &&
-    normalSessionEligible(q) &&
-    !isQuestionDeleted(q) &&
-    !wasAnsweredToday(q, doneToday)
-  );
-  const topicPool = unitPool.filter(q => String(q.topic_id || '').trim() === String(topicId || '').trim());
-  const pool = topicPool.length ? topicPool : unitPool;
-  if (!pool.length) {
-    alert(`No eligible questions are available for ${subjectName}, Unit ${unitNumber}.`);
-    return;
-  }
-  const count = Math.min(15, pool.length);
-  const selected = pickCoverageQuestions(pool, count, calculateUnitCoverage(), {
-    maxPerUnit: count,
-    doneToday,
-    includeUnmapped: true
-  });
-  if (!selected.length) {
-    alert(`No unattempted questions are available for ${subjectName}, Unit ${unitNumber} today.`);
-    return;
-  }
-  clearDrillDeck();
-  DRILL_SUBJECT = subject;
-  DRILL_D = selected.map((q, index) => ({ ...q, n: DRILL_N_BASE + index }));
-  if (!topicPool.length) {
-    showToast('No questions are explicitly mapped to this concept yet. Starting a unit-level drill; concept mastery will not be inferred.');
-  } else {
-    showToast(`Starting focused practice for ${topicPool.length} question(s) mapped to this concept.`);
-  }
-  start(DRILL_D.map(q => q.n));
-}
-
 // Backup Nudge
 function renderBackupNudge() {
   const daysSince = lastBackup ? Math.floor((Date.now() - lastBackup) / 864e5) : 999;
@@ -6819,17 +6578,6 @@ function toggleMoreMenu() {
     }
   } else {
     home(true);
-  }
-}
-
-function toggleStudyFocus() {
-  showStudyFocus = !showStudyFocus;
-  home(true);
-  if (showStudyFocus) {
-    setTimeout(() => {
-      const panel = $('#study-focus-panel');
-      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 50);
   }
 }
 
@@ -7048,14 +6796,9 @@ function home(preserveScroll = false) {
       </div>
       <div class="mu sm" style="text-align:center;margin-top:6px">Due and weak practice are capped to leave room for broader question practice</div>
 
-      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="big-btn" style="flex:1;min-width:210px;background:var(--card);border:2px solid var(--bd)" onclick="toggleStudyFocus()">
-          🧭 ${showStudyFocus ? 'Hide' : 'Open'} Study Focus
-        </button>
-        <button class="big-btn" style="flex:1;min-width:210px;background:var(--card);border:2px solid var(--bd)" onclick="startConceptGapsRescue()" ${conceptGapCount ? '' : 'disabled'}>
-          🚑 Error Rescue · ${conceptGapCount} active
-        </button>
-      </div>
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startConceptGapsRescue()" ${conceptGapCount ? '' : 'disabled'}>
+        🚑 Error Rescue · ${conceptGapCount} active
+      </button>
 
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
         ${freshButtonText}
@@ -7063,7 +6806,6 @@ function home(preserveScroll = false) {
       <div class="mu sm" style="text-align:center;margin-top:6px">${freshCount} unattempted questions across all 19 subjects</div>
     </div>
 
-    ${showStudyFocus ? `<div id="study-focus-panel">${renderSyllabusStudyPlan(calculateUnitCoverage())}</div>` : ''}
     ${renderReadinessMeter()}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
@@ -7270,15 +7012,6 @@ function startFreshSet() {
   const pick = pickCoverageQuestions(pool, targetQ, calculateUnitCoverage(), { maxPerUnit: 2, includeUnmapped: true });
   if (!pick.length) {
     alert('No unattempted questions are left for today. Use Today’s Mission or Due Review to keep practiced questions solid.');
-    return;
-  }
-  start(pick.map(q => questionUid(q) || qk(q)));
-}
-
-function startCoverageMission() {
-  const pick = getCoverageMissionQuestions(calculateUnitCoverage());
-  if (!pick.length) {
-    alert('No eligible untouched units have questions available right now. Questions answered today and units without bank questions are excluded.');
     return;
   }
   start(pick.map(q => questionUid(q) || qk(q)));
