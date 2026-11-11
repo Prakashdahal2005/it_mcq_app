@@ -748,27 +748,72 @@ body.quiet-mode .hide-quiet { display: none !important; }
   to { opacity: 1; }
 }
 .celebration-card {
+  position: relative;
+  z-index: 1;
   width: min(520px, 100%);
   background: var(--card);
   color: var(--tx);
-  border: 2px solid var(--ac);
+  border: 1px solid rgba(16, 185, 129, 0.45);
   border-radius: 20px;
-  padding: 28px 24px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+  padding: 30px 24px 24px;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.4), 0 0 0 6px rgba(16, 185, 129, 0.08);
   text-align: center;
-  animation: celSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: celSlideUp 0.42s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes celSlideUp {
-  from { transform: translateY(18px) scale(0.96); opacity: 0; }
+  0% { transform: translateY(28px) scale(0.9); opacity: 0; }
+  70% { transform: translateY(-4px) scale(1.015); opacity: 1; }
   to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.cel-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cel-confetti-piece {
+  position: absolute;
+  top: -14px;
+  left: var(--cel-x);
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: celConfettiFall 1.8s ease-in var(--cel-delay) forwards;
+}
+.cel-confetti-piece:nth-child(4n + 1) { background: #10b981; }
+.cel-confetti-piece:nth-child(4n + 2) { background: #f59e0b; }
+.cel-confetti-piece:nth-child(4n + 3) { background: #6366f1; }
+.cel-confetti-piece:nth-child(4n) { background: #ec4899; }
+@keyframes celConfettiFall {
+  0% { opacity: 0; transform: translate3d(0, -5vh, 0) rotate(0); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--cel-drift), 105vh, 0) rotate(680deg); }
+}
+.cel-hero-icon {
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #fef3c7, #fde68a 55%, #fbbf24);
+  box-shadow: 0 8px 26px rgba(245, 158, 11, 0.3), inset 0 2px 3px rgba(255,255,255,0.8);
+  font-size: 44px;
+  animation: celTrophyPop 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+@keyframes celTrophyPop {
+  0% { opacity: 0; transform: scale(0.35) rotate(-18deg); }
+  70% { opacity: 1; transform: scale(1.12) rotate(5deg); }
+  100% { transform: scale(1) rotate(0); }
 }
 .cel-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.28);
   font-size: 12px;
   font-weight: 800;
   padding: 4px 12px;
@@ -778,21 +823,34 @@ body.quiet-mode .hide-quiet { display: none !important; }
   margin-bottom: 12px;
 }
 .cel-title {
-  font-size: 20px;
+  font-size: clamp(23px, 5vw, 30px);
   font-weight: 800;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: var(--tx);
+  line-height: 1.15;
 }
 .cel-subtitle {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--mu);
-  margin-bottom: 16px;
+  margin: 0 auto 18px;
+  max-width: 420px;
+  line-height: 1.5;
+}
+.cel-next-step {
+  margin: 16px 0 20px;
+  padding: 11px 14px;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.07);
+  color: var(--tx);
+  font-size: 13px;
+  line-height: 1.45;
 }
 .cel-metrics-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin: 16px 0;
+  margin: 18px 0;
   padding: 12px;
   background: rgba(0, 0, 0, 0.03);
   border-radius: 12px;
@@ -804,7 +862,7 @@ body.quiet-mode .hide-quiet { display: none !important; }
 .cel-metric-val {
   font-size: 17px;
   font-weight: 800;
-  color: var(--ac);
+  color: #059669;
 }
 .cel-metric-lbl {
   font-size: 11px;
@@ -813,25 +871,8 @@ body.quiet-mode .hide-quiet { display: none !important; }
   text-transform: uppercase;
   font-weight: 600;
 }
-.cel-quote-box {
-  margin: 18px 0 22px;
-  padding: 12px 14px;
-  background: rgba(245, 158, 11, 0.08);
-  border-left: 3px solid #f59e0b;
-  border-radius: 0 10px 10px 0;
-  font-size: 13px;
-  font-style: italic;
-  text-align: left;
-  color: var(--tx);
-  line-height: 1.45;
-}
-.cel-quote-author {
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 700;
-  color: var(--mu);
-  margin-top: 4px;
-  text-align: right;
+@media (prefers-reduced-motion: reduce) {
+  .cel-confetti { display: none; }
 }
 
 /* Question editor + variant refresh status */
@@ -5653,35 +5694,37 @@ function isProvisionalSubject(subject) {
   return subjectTier(subject) === 'C';
 }
 
-const MOTIVATION_QUOTES = [
-  { q: "Breadth beats depth. Every clear concept turns 5 exam minutes into pure marks.", src: "Scope Strategy" },
-  { q: "One fact or one small step. You don't need derivations to top this exam — you need crisp discrimination.", src: "Exam Reality" },
-  { q: "In practice, investigate the question. In the exam, maximize marks.", src: "Golden Rule" },
-  { q: "The master has failed more times than the beginner has even tried. Every fixed error is banked marks.", src: "Method" },
-  { q: "Confidence matching accuracy is the true hallmark of the top percentile.", src: "Active Recall" },
-  { q: "Small calculations practiced by hand over weeks become effortless under 120-minute exam pressure.", src: "Math/Stats Principle" },
-  { q: "Distinguish A from B before seeing the options. When choices appear, the right answer shines instantly.", src: "Recall Web" }
-];
+let celebrationKeyHandler = null;
 
 function triggerCelebrationModal(info) {
   if (QUIET_MODE) return;
-  const old = document.getElementById('cel-modal-overlay');
-  if (old) old.remove();
+  closeCelebrationModal();
 
-  const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];
-  const quoteText = (info && info.quote) || randomQuote.q;
-  const quoteSrc = (info && info.quoteSrc) || randomQuote.src;
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const confetti = reducedMotion ? '' : `
+    <div class="cel-confetti" aria-hidden="true">
+      ${Array.from({ length: 32 }, () => {
+        const x = Math.round(Math.random() * 100);
+        const delay = (Math.random() * 0.45).toFixed(2);
+        const drift = `${Math.round(Math.random() * 160 - 80)}px`;
+        return `<span class="cel-confetti-piece" style="--cel-x:${x}%;--cel-delay:${delay}s;--cel-drift:${drift}"></span>`;
+      }).join('')}
+    </div>
+  `;
 
   const overlay = document.createElement('div');
   overlay.id = 'cel-modal-overlay';
   overlay.className = 'celebration-overlay';
+  overlay.setAttribute('role', 'presentation');
   overlay.onclick = e => { if (e.target === overlay) closeCelebrationModal(); };
 
   overlay.innerHTML = `
-    <div class="celebration-card" onclick="event.stopPropagation()">
-      <div class="cel-badge">🏆 Milestone Achieved</div>
-      <div class="cel-title">${esc((info && info.title) || 'Goal Reached!')}</div>
-      <div class="cel-subtitle">${esc((info && info.subtitle) || 'Your active recall and spaced practice are paying off.')}</div>
+    ${confetti}
+    <div class="celebration-card" role="dialog" aria-modal="true" aria-labelledby="cel-title" aria-describedby="cel-subtitle" tabindex="-1" onclick="event.stopPropagation()">
+      <div class="cel-hero-icon" aria-hidden="true">${esc((info && info.icon) || '🏆')}</div>
+      <div class="cel-badge">${esc((info && info.badge) || 'Milestone unlocked')}</div>
+      <div class="cel-title" id="cel-title">${esc((info && info.title) || 'Goal reached!')}</div>
+      <div class="cel-subtitle" id="cel-subtitle">${esc((info && info.subtitle) || 'Your steady practice is paying off.')}</div>
       ${Array.isArray(info && info.metrics) && info.metrics.length ? `
         <div class="cel-metrics-grid">
           ${info.metrics.map(m => `
@@ -5692,29 +5735,32 @@ function triggerCelebrationModal(info) {
           `).join('')}
         </div>
       ` : ''}
-      <div class="cel-quote-box">
-        "${esc(quoteText)}"
-        <div class="cel-quote-author">— ${esc(quoteSrc)}</div>
-      </div>
+      ${info && info.nextStep ? `<div class="cel-next-step"><b>Next up:</b> ${esc(info.nextStep)}</div>` : ''}
       <button class="p big-btn" style="width:100%" onclick="closeCelebrationModal()">
-        Keep the Momentum Going → (Enter)
+        Celebrate &amp; continue
       </button>
     </div>
   `;
   document.body.appendChild(overlay);
 
-  const escHandler = e => {
+  const card = overlay.querySelector('.celebration-card');
+  if (card) card.focus();
+
+  celebrationKeyHandler = e => {
     if (e.key === 'Escape' || e.key === 'Enter') {
       closeCelebrationModal();
-      document.removeEventListener('keydown', escHandler);
     }
   };
-  document.addEventListener('keydown', escHandler);
+  document.addEventListener('keydown', celebrationKeyHandler);
 }
 
 function closeCelebrationModal() {
   const m = document.getElementById('cel-modal-overlay');
   if (m) m.remove();
+  if (celebrationKeyHandler) {
+    document.removeEventListener('keydown', celebrationKeyHandler);
+    celebrationKeyHandler = null;
+  }
 }
 
 function checkSubjectTargetCelebration(subj, acc, target, attempts) {
@@ -5728,8 +5774,11 @@ function checkSubjectTargetCelebration(subj, acc, target, attempts) {
       localStorage.setItem('bitmcq_celebrated_subjs', JSON.stringify(celebrated));
       const tier = subjectTier(subj);
       triggerCelebrationModal({
-        title: `Tier ${tier} Target Reached!`,
-        subtitle: `${canon} has crossed its target of ${Math.round(target * 100)}% with ${Math.round(acc * 100)}% accuracy.`,
+        icon: '🏅',
+        badge: `Tier ${tier} subject goal unlocked`,
+        title: `${canon} hit its target!`,
+        subtitle: `You reached ${Math.round(acc * 100)}% accuracy and cleared the ${Math.round(target * 100)}% target. That’s a real step toward exam readiness.`,
+        nextStep: 'Keep building consistency across your other subjects.',
         metrics: [
           { label: 'Tier', value: `Tier ${tier}` },
           { label: 'Score', value: `${Math.round(acc * 100)}%` },
