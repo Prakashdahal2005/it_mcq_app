@@ -6399,7 +6399,8 @@ function renderReadinessMeter() {
 
   const l0Rows = Object.values(stats.l0);
   const l0Mastered = l0Rows.filter(r => r.mastered).length;
-  const l0Tracked = l0Rows.length;
+  const allSubjsList = bankSubjects();
+  const l0Tracked = Math.max(allSubjsList.length, l0Rows.length, 19);
 
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
   const unattemptedInDeck = [...activeDeckSubjs].filter(s => !stats.subjects[s]);
@@ -6439,7 +6440,7 @@ function renderReadinessMeter() {
         <div class="row sm mu" style="gap:10px;flex-wrap:wrap">
           <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions (${overall.weightedAttempts.toFixed(1)} weighted evidence)</span>
           <span>✅ Raw first-attempt: <b>${Math.round(overall.raw * 100)}%</b></span>
-          <span>🎯 L0 mastered: <b>${l0Mastered}/${l0Tracked}</b> subjects</span>
+          <span style="cursor:pointer" onclick="startLevelLadderSession(${l0Mastered >= l0Tracked ? 1 : 0})" title="Click to drill unattempted &amp; due L0 foundation questions">🎯 L0 mastered: <b style="text-decoration:underline">${l0Mastered}/${l0Tracked}</b> subjects</span>
         </div>
       </div>
     </div>
@@ -6588,6 +6589,138 @@ function startSubjectDrillFromBank(subjectName, requestedCount = 15) {
   start(DRILL_D.map(q => q.n));
 }
 
+function selectLevelLadderQuestions(targetLevel = 0, requestedCount = 15) {
+  const stats = readinessStats();
+  const allSubjs = bankSubjects();
+  const latestPractice = latestPracticeRecordMap();
+  const doneToday = questionsAnsweredToday();
+  const t = today();
+
+  const isMastered = s => {
+    if (targetLevel === 0) {
+      return !!(stats.l0[s] && stats.l0[s].mastered);
+    }
+    const subjRecs = stats.subjects[s];
+    return !!(subjRecs && subjRecs.attempts >= 5 && subjRecs.raw >= 0.80);
+  };
+
+  const unmasteredSubjs = allSubjs.filter(s => !isMastered(s));
+  const masteredSubjs = allSubjs.filter(s => isMastered(s));
+
+  unmasteredSubjs.sort((a, b) => {
+    const ra = (targetLevel === 0 ? stats.l0[a] : stats.subjects[a]) || { attempts: 0, raw: 0 };
+    const rb = (targetLevel === 0 ? stats.l0[b] : stats.subjects[b]) || { attempts: 0, raw: 0 };
+    return (ra.attempts - rb.attempts) || (ra.raw - rb.raw);
+  });
+
+  const pool = bankQuestionPool().filter(q =>
+    q &&
+    normalSessionEligible(q) &&
+    !isQuestionDeleted(q) &&
+    effLevel(q) === targetLevel
+  );
+
+  const seen = new Set();
+  const addQ = q => {
+    if (!q) return false;
+    const uid = questionUid(q) || qk(q);
+    if (seen.has(uid)) return false;
+    seen.add(uid);
+    return true;
+  };
+
+  const bySubj = {};
+  pool.forEach(q => {
+    const s = canonSubj(q.s);
+    (bySubj[s] = bySubj[s] || []).push(q);
+  });
+
+  const selected = [];
+  const wanted = Math.max(1, requestedCount || 15);
+
+  function pickFromSubject(s, maxPick) {
+    const list = bySubj[s] || [];
+    if (!list.length) return [];
+    const unattempted = [];
+    const due = [];
+    const lowConf = [];
+    const others = [];
+
+    list.forEach(q => {
+      if (wasAnsweredToday(q, doneToday)) return;
+      const v = V[qk(q)];
+      const last = latestPracticeRecordFor(q, latestPractice);
+      const isUnseen = !last;
+      const isDue = v && v.d <= t;
+      if (isUnseen) unattempted.push(q);
+      else if (isDue) due.push(q);
+      else if (last && (!last.ok || (last.cf != null && last.cf < 3))) lowConf.push(q);
+      else others.push(q);
+    });
+
+    const ordered = [...unattempted, ...due, ...lowConf, ...others];
+    const picked = [];
+    for (const q of ordered) {
+      if (picked.length >= maxPick) break;
+      if (addQ(q)) picked.push(q);
+    }
+    return picked;
+  }
+
+  let changed = true;
+  while (selected.length < wanted && changed) {
+    changed = false;
+    for (const s of unmasteredSubjs) {
+      if (selected.length >= wanted) break;
+      const p = pickFromSubject(s, 1);
+      if (p.length) {
+        selected.push(...p);
+        changed = true;
+      }
+    }
+  }
+
+  if (selected.length < wanted) {
+    for (const s of masteredSubjs) {
+      if (selected.length >= wanted) break;
+      const p = pickFromSubject(s, 2);
+      if (p.length) selected.push(...p);
+    }
+  }
+
+  return {
+    selected,
+    unmasteredSubjs,
+    targetLevel,
+    totalAvailable: pool.length
+  };
+}
+
+function startLevelLadderSession(preferredLevel = null) {
+  const stats = readinessStats();
+  const allSubjs = bankSubjects();
+  const l0Rows = Object.values(stats.l0);
+  const l0MasteredCount = l0Rows.filter(r => r.mastered).length;
+  const l0TrackedCount = Math.max(allSubjs.length, l0Rows.length, 19);
+
+  let level = preferredLevel != null ? preferredLevel : (l0MasteredCount >= l0TrackedCount ? 1 : 0);
+  let res = selectLevelLadderQuestions(level, 15);
+
+  if (!res.selected.length && level === 0) {
+    if (confirm(`No unanswered Level 0 questions are available today (${l0MasteredCount}/${l0TrackedCount} subjects mastered). Would you like to practice Level 1 (Standard) questions?`)) {
+      level = 1;
+      res = selectLevelLadderQuestions(1, 15);
+    }
+  }
+
+  if (!res.selected.length) {
+    alert(`No eligible Level ${level} questions are available right now. Keep practicing with Today's Mission or Due Review!`);
+    return;
+  }
+
+  start(res.selected.map(q => questionUid(q) || qk(q)), { kind: 'level_ladder' });
+}
+
 // Backup Nudge
 function renderBackupNudge() {
   const daysSince = lastBackup ? Math.floor((Date.now() - lastBackup) / 864e5) : 999;
@@ -6657,16 +6790,16 @@ function home(preserveScroll = false) {
       <h1>🧠 Recall</h1>
       <div class="card">
         <div class="row" style="margin-bottom:12px">
-          <button class="${B ? '' : 'p'}" onclick="impMode=0;home()">① Set import</button>
+          <button class="${B ? '' : 'p'}" onclick="impMode=0;home()">① Quick Text Import</button>
           <button class="${B ? 'p' : ''}" onclick="impMode=1;home()">② Question bank import</button>
         </div>
-        <p>${B ? 'Add a whole <b>question bank</b> JSON. It is auto-split into balanced sets of ~65 questions across every subject.' : 'Load your practice file or click below to launch the built-in 80-question practice set.'}</p>
+        <p>${B ? 'Add a full <b>question bank</b> JSON. It is organized into balanced sections across every subject.' : 'Load your practice questions or click below to launch the built-in 80-question foundation deck.'}</p>
         ${defaultBankLoading ? '<p class="mu">Loading the default question bank…</p>' : ''}
         ${defaultBankLoadError ? `<p class="c-no">${esc(defaultBankLoadError)}</p>` : ''}
-        ${!B ? `<p><button class="p" onclick="$('#t').value=LV1;doLoad()">📘 Add built-in set: Level 1 (80 Q, trap-dense)</button> <button onclick="tpl()">{ } JSON template</button></p>` : ''}
+        ${!B ? `<p><button class="p" onclick="$('#t').value=LV1;doLoad()">📘 Load built-in deck: Level 1 (80 Q, trap-dense)</button> <button onclick="tpl()">{ } JSON template</button></p>` : ''}
         <input type="file" id="f" accept=".txt,.md,.json,text/plain,text/markdown,application/json">
         <p class="mu">or paste the content below:</p>
-        <textarea id="t" placeholder="${B ? 'Paste question-bank JSON here' : 'Paste practice set text or Markdown here'}"></textarea>
+        <textarea id="t" placeholder="${B ? 'Paste question-bank JSON here' : 'Paste practice questions text or Markdown here'}"></textarea>
         <p class="row" style="margin-top:12px">
           <button class="p" onclick="doLoad()">${B ? '📥 Import bank & split' : 'Load questions'}</button>
           ${D ? '<button onclick="loadMode=0;home()">Cancel</button>' : ''}
@@ -6702,6 +6835,10 @@ function home(preserveScroll = false) {
   const conceptGapCount = getConceptGapsList(Infinity).length;
   const drillSubjects = bankSubjects();
   const drillBankCount = Math.max(1, bankQuestionPool().filter(q => normalSessionEligible(q)).length);
+  const homeReadiness = readinessStats();
+  const homeL0Rows = Object.values(homeReadiness.l0);
+  const homeL0Mastered = homeL0Rows.filter(r => r.mastered).length;
+  const homeL0Tracked = Math.max(drillSubjects.length, homeL0Rows.length, 19);
 
   const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
   const milestone = getCurrentMilestone();
@@ -6748,7 +6885,7 @@ function home(preserveScroll = false) {
           <span class="mu sm">${codeTraceDue} due now · ${codeTraceCount} available.</span>
         </div>
         <div class="row" style="gap:6px">
-          <button class="p sm" onclick="startCodeTraceSession()">Start 15 Q</button>
+          <button class="p sm" onclick="startCodeTraceSession(${codeTraceDue > 0})">${codeTraceDue ? `Review ${codeTraceDue} Due` : 'Start 15 Q'}</button>
           <button class="sm" onclick="snoozeCodeTraceReminder()">Snooze 1 day</button>
         </div>
       </div>
@@ -6785,7 +6922,7 @@ function home(preserveScroll = false) {
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
           <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
-          ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession()">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
+          ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession(true)">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
         </div>
@@ -6811,6 +6948,13 @@ function home(preserveScroll = false) {
           }catch(e){return `▶ Continue Today's Practice (${todayMins} min)`}
         })()}
       </button>
+
+      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid ${homeL0Mastered < homeL0Tracked ? 'var(--ac, #3b82f6)' : 'var(--bd)'};color:inherit" onclick="startLevelLadderSession(${homeL0Mastered < homeL0Tracked ? 0 : 1})">
+        ${homeL0Mastered < homeL0Tracked 
+          ? `🎯 Master Level 0 Core · <b>${homeL0Mastered}/${homeL0Tracked}</b> Subjects Mastered` 
+          : `⭐ Level 1 Standard Ladder (Level 0 Complete ✓)`}
+      </button>
+      <div class="mu sm" style="text-align:center;margin-top:4px">${homeL0Mastered < homeL0Tracked ? 'Prioritizes unattempted &amp; due foundation questions in pending subjects' : 'Advance Standard Level 1 foundation across subjects'}</div>
 
       ${dueCards.length ? `
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFlashcardReview()">
@@ -6870,7 +7014,9 @@ function home(preserveScroll = false) {
             <button class="sm" onclick="mock(50)">⏱ Half Mock (50 Q, 60m)</button>
             ${!DIAGNOSTIC_DONE ? `<button class="sm" onclick="startDiagnosticMock()">🎯 Day-1 Diagnostic Mock</button>` : ''}
           </div>
-          <div class="row" style="margin-bottom:12px;gap:6px">
+          <div class="row" style="margin-bottom:12px;gap:6px;flex-wrap:wrap">
+            <button class="sm" onclick="startLevelLadderSession(0)">🎯 Drill Level 0 (${homeL0Mastered}/${homeL0Tracked})</button>
+            <button class="sm" onclick="startLevelLadderSession(1)">⭐ Drill Level 1</button>
             <button class="sm" onclick="startMistakes()" ${wr.length ? '' : 'disabled'}>Retry mistakes (capped at 5)</button>
             <button class="sm" onclick="startUnattemptedSession()" ${freshCount ? '' : 'disabled'}>Unattempted (${freshCount})</button>
             <button class="sm" onclick="startSkippedSession()" ${sk.length ? '' : 'disabled'}>Skipped (${sk.length})</button>
@@ -6897,8 +7043,8 @@ function home(preserveScroll = false) {
             ${exportUI()}
           </div>
           <div style="margin-top:14px" class="row">
-            <button onclick="retake()">🔁 Retake this set</button>
-            <button onclick="loadMode=1;home()">➕ Add new MCQ set</button>
+            <button onclick="retake()">🔁 Retake active questions</button>
+            <button onclick="loadMode=1;home()">➕ Import more questions</button>
             <button onclick="backup()">💾 Backup JSON</button>
             <button onclick="$('#rb').click()">📂 Restore Backup</button>
             <input type="file" id="rb" accept=".json" style="display:none" onchange="restore(this.files[0])">
@@ -7093,7 +7239,13 @@ function startDueReview() {
     return true;
   });
   if (!due.length) { alert('No MCQs are due right now.'); return; }
-  start(due.slice(0, 15));
+  if (due.length > 30) {
+    if (!confirm(`You have ${due.length} MCQs due today. Start full due review to clear today's queue? (Cancel = practice 15 Q chunk)`)) {
+      start(due.slice(0, 15));
+      return;
+    }
+  }
+  start(due);
 }
 
 function isCodeSnippetQuestion(q) {
@@ -7210,7 +7362,7 @@ function codeTraceDueQuestions() {
   const t = today();
   return codeTracePool().filter(q => {
     const v = V[qk(q)];
-    return !v || v.d <= t;
+    return v && v.d <= t;
   });
 }
 
@@ -7252,7 +7404,7 @@ function startCalcTraceSession() {
   start(DRILL_D.map(q => q.n));
 }
 
-function startCodeTraceSession() {
+function startCodeTraceSession(dueOnly = false) {
   const seen = new Set();
   const candidates = codeTracePool().filter(q => {
     const key = questionUid(q) || qk(q);
@@ -7265,6 +7417,18 @@ function startCodeTraceSession() {
     return;
   }
   const t = today();
+  if (dueOnly) {
+    const dueList = candidates.filter(q => {
+      const v = V[qk(q)];
+      return v && v.d <= t;
+    });
+    if (!dueList.length) {
+      alert('No code-tracing questions are currently due.');
+      return;
+    }
+    start(dueList.map(q => questionUid(q) || qk(q)), { kind: 'code_trace' });
+    return;
+  }
   candidates.sort((a, b) => {
     const va = V[qk(a)];
     const vb = V[qk(b)];
@@ -9582,7 +9746,7 @@ function compact() {
 
 function retake() {
   if (!Object.keys(R).length) return;
-  if (confirm('Archive this attempt and restart this set fresh?')) {
+  if (confirm('Archive this attempt and restart fresh?')) {
     A.push(compact());
     S = A.length + 1;
     R = {}; W = {}; Q = []; QRESULTS = []; P = 0;
@@ -9611,12 +9775,12 @@ function bankCard() {
     if (D && SETBANK === bank.id && SETI >= 0 && D.every(q => !!R[q.n])) done.add(SETI);
     return `
       <div class="item">
-        <b>📚 ${esc(bank.name)}</b> <span class="mu">· ${bank.q.length} Q · ${bank.sets.length} sets</span>
+        <b>📚 ${esc(bank.name)}</b> <span class="mu">· ${bank.q.length} Q · ${bank.sets.length} parts</span>
         <div class="row" style="margin-top:6px">
           <select id="bks${bank.id}">
-            ${bank.sets.map((s, k) => `<option value="${k}" ${k === SETI && bank.id === SETBANK ? 'selected' : ''}>Set ${k + 1} (${s.length} Q)${done.has(k) ? ' ✓' : ''}</option>`).join('')}
+            ${bank.sets.map((s, k) => `<option value="${k}" ${k === SETI && bank.id === SETBANK ? 'selected' : ''}>Part ${k + 1} (${s.length} Q)${done.has(k) ? ' ✓' : ''}</option>`).join('')}
           </select>
-          <button class="p sm" onclick="loadSet(${bank.id}, +$('#bks${bank.id}').value)">Load Set</button>
+          <button class="p sm" onclick="loadSet(${bank.id}, +$('#bks${bank.id}').value)">Load Part</button>
         </div>
       </div>
     `;
@@ -9636,12 +9800,12 @@ function revCard() {
   if(!items.length) return '';
   return `
     <details style="margin-top:12px" class="card">
-      <summary style="cursor:pointer;font-weight:600">📁 Past Set Archives (${items.length})</summary>
+      <summary style="cursor:pointer;font-weight:600">📁 Past Session Archives (${items.length})</summary>
       <div style="margin-top:10px">
         ${items.map(x => `
           <div class="item row" style="justify-content:space-between">
-            <span>Set ${x.a.no} · ✗ ${x.w} misses</span>
-            <button class="sm" onclick="start(A[${x.i}].errs.map((e,j)=>'${x.i}:'+j))">Revise Set ${x.a.no}</button>
+            <span>Session #${x.a.no} · ✗ ${x.w} misses</span>
+            <button class="sm" onclick="start(A[${x.i}].errs.map((e,j)=>'${x.i}:'+j))">Revise Session #${x.a.no}</button>
           </div>
         `).join('')}
       </div>
@@ -9674,7 +9838,7 @@ function backup() {
 }
 
 function restore(f) {
-  if (!f || !confirm('Merge this backup with progress on this device? Both devices’ study history will be kept; the imported bank version and active set will take precedence.')) return;
+  if (!f || !confirm('Merge this backup with progress on this device? Both devices’ study history will be kept; the imported bank version and active deck will take precedence.')) return;
   const r = new FileReader();
   r.onload = () => {
     try {
