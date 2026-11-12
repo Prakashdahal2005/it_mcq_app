@@ -1,6 +1,6 @@
 {
   "meta": {
-    "total_questions": 1839,
+    "total_questions": 1898,
     "subjects": 19,
     "schema": "id, question (markdown; KaTeX $..$ for maths), options A-D, answer, level 0-3, type, unit/unit_name/unit_conf, regeneratable, shuffle_safe, giveaway_risk, explanation (null = fill with Gemini), source"
   },
@@ -8,7 +8,7 @@
     {
       "subject": "Introduction to IT",
       "subject_code": "BIT101",
-      "question_count": 99,
+      "question_count": 112,
       "questions": [
         {
           "id": 1,
@@ -2177,6 +2177,303 @@
           "unit_conf": "high",
           "explanation": "A data warehouse provides integrated data for analysis; data mining applies methods to discover patterns or relationships in data.",
           "source": "scope-expansion"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q10",
+          "question": "Which is the secondary memory?",
+          "options": {
+            "A": "Register",
+            "B": "Hard Disk",
+            "C": "RAM",
+            "D": "Cache"
+          },
+          "answer": "B",
+          "level": 0,
+          "type": "recall",
+          "tag": "L0 - BIT101",
+          "topic_id": "BIT101.U2.T9",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 2,
+          "unit_name": "2 Computer hardware",
+          "unit_conf": "high",
+          "explanation": "Secondary = non-volatile, large, slow (HDD/SSD/tape). Registers, cache, RAM = primary.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q14",
+          "question": "Primary function of the Control Unit?",
+          "options": {
+            "A": "Arithmetic calculations",
+            "B": "Direct and coordinate CPU operations",
+            "C": "Store permanent data",
+            "D": "Display output"
+          },
+          "answer": "B",
+          "level": 0,
+          "type": "recall",
+          "tag": "L0 - BIT101",
+          "topic_id": "BIT101.U2.T1",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 2,
+          "unit_name": "2 Computer hardware",
+          "unit_conf": "high",
+          "explanation": "CU fetches/decodes instructions and generates control signals for ALU, registers, memory, I/O. ALU does arithmetic.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q23",
+          "question": "Which notation represents an IPv4 network using CIDR?",
+          "options": {
+            "A": "192.168.1.0/24",
+            "B": "192.168.1.0:24",
+            "C": "192.168.1.0-24",
+            "D": "192.168.1.0\\24"
+          },
+          "answer": "A",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U5.T11",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 5,
+          "unit_name": "5 Networks and Internet services",
+          "unit_conf": "high",
+          "explanation": "CIDR = address/prefix-length. /24 = 255.255.255.0 → 256 addresses (254 usable).",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q26",
+          "question": "Social engineering attacks primarily exploit ______",
+          "options": {
+            "A": "software bugs",
+            "B": "hardware failures",
+            "C": "network bandwidth limits",
+            "D": "human psychology and trust"
+          },
+          "answer": "D",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT101",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 7,
+          "unit_name": "7 Computer security",
+          "unit_conf": "medium",
+          "explanation": "Manipulating people (pretexting, phishing, baiting, tailgating), not technology.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q1",
+          "question": "The fundamental building block of an analog computer is the ______",
+          "options": {
+            "A": "Transistor switch (logic)",
+            "B": "Operational amplifier (Op-Amp)",
+            "C": "Magnetic core memory",
+            "D": "IC microprocessor"
+          },
+          "answer": "B",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U1.T4",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Introduction to computer",
+          "unit_conf": "high",
+          "explanation": "Analog computers model continuous quantities (voltage) and use op-amps for summing, integrating, differentiating. Transistor switches/microprocessors = digital.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q2",
+          "question": "Which computer is best suited for weather forecasting / climate modelling?",
+          "options": {
+            "A": "Desktop",
+            "B": "Mini",
+            "C": "Mainframe",
+            "D": "Supercomputer"
+          },
+          "answer": "D",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U1.T5",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Introduction to computer",
+          "unit_conf": "high",
+          "explanation": "Supercomputer = massively parallel, FLOPS-level; used for weather, climate, nuclear/space simulation. Mainframe = bulk transactions (banks, airlines).",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q3",
+          "question": "What does BCC mean in email?",
+          "options": {
+            "A": "Blind Carbon Copy",
+            "B": "Basic Carbon Copy",
+            "C": "Backup Carbon Copy",
+            "D": "Binary Carbon Copy"
+          },
+          "answer": "A",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U5.T14",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 5,
+          "unit_name": "5 Networks and Internet services",
+          "unit_conf": "high",
+          "explanation": "To = visible recipient, Cc = visible copy, Bcc = hidden recipients (others can't see them).",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q9",
+          "question": "Which register holds the address of the next instruction to be executed?",
+          "options": {
+            "A": "IR",
+            "B": "MAR",
+            "C": "AC",
+            "D": "PC"
+          },
+          "answer": "D",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U2.T10",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 2,
+          "unit_name": "2 Computer hardware",
+          "unit_conf": "high",
+          "explanation": "PC = next instruction address; IR = current instruction; MAR = memory address being accessed; AC = accumulator.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q12",
+          "question": "The purpose of the spindle in a hard disk is ______",
+          "options": {
+            "A": "to read files",
+            "B": "to write files",
+            "C": "to rotate platter",
+            "D": "to point address"
+          },
+          "answer": "C",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U2.T13",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 2,
+          "unit_name": "2 Computer hardware",
+          "unit_conf": "high",
+          "explanation": "Spindle motor spins platters (5400/7200 rpm); actuator arm positions the heads which read/write.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q24",
+          "question": "Which is an example of symmetric encryption?",
+          "options": {
+            "A": "RSA",
+            "B": "AES",
+            "C": "ECC",
+            "D": "DSA"
+          },
+          "answer": "B",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U7.T3",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 7,
+          "unit_name": "7 Computer security",
+          "unit_conf": "high",
+          "explanation": "AES = one shared key. RSA/ECC = asymmetric; DSA = signature algorithm.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q29",
+          "question": "Authentication in cybersecurity refers to ______",
+          "options": {
+            "A": "granting permissions after identity is verified",
+            "B": "verifying the identity of a user",
+            "C": "encrypting data",
+            "D": "auditing usage"
+          },
+          "answer": "B",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U7.T6",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 7,
+          "unit_name": "7 Computer security",
+          "unit_conf": "high",
+          "explanation": "AuthN = who are you; AuthZ = what may you do; accounting/audit = what did you do.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q32",
+          "question": "Which is NOT Two-Factor Authentication?",
+          "options": {
+            "A": "PIN and Biometric",
+            "B": "Card and PIN",
+            "C": "Password and PIN",
+            "D": "Card and Biometric"
+          },
+          "answer": "C",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT101",
+          "topic_id": "BIT101.U7.T6",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 7,
+          "unit_name": "7 Computer security",
+          "unit_conf": "high",
+          "explanation": "2FA needs two different categories: know / have / are. Password + PIN are both 'know' = same factor.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT101-P1-Q42",
+          "question": "______ is a common data-warehousing technique for handling large-scale aggregation quickly.",
+          "options": {
+            "A": "Foreign keys",
+            "B": "Materialized views",
+            "C": "Normalization",
+            "D": "Triggers"
+          },
+          "answer": "B",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT101",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 6,
+          "unit_name": "6 Database systems",
+          "unit_conf": "medium",
+          "explanation": "Materialized view = physically stored precomputed result (aggregates); ordinary view is virtual.",
+          "source": "rbb-loksewa"
         }
       ]
     },
@@ -3990,7 +4287,7 @@
     {
       "subject": "Digital Logic",
       "subject_code": "BIT103",
-      "question_count": 65,
+      "question_count": 67,
       "questions": [
         {
           "id": 1,
@@ -5463,7 +5760,7 @@
     {
       "subject": "Microprocessor and Computer Architecture",
       "subject_code": "BIT151",
-      "question_count": 96,
+      "question_count": 102,
       "questions": [
         {
           "id": 2,
@@ -7658,13 +7955,57 @@
           "explanation": "The Address bus is strictly unidirectional (signals flow only FROM the microprocessor TO memory/IO devices to specify target memory addresses). The Data bus is bidirectional (data transfers to and from CPU). Control lines consist of individual dedicated unidirectional or bidirectional signals.",
           "topic_id": "BIT151.U1.T2",
           "source": "high-yield-enrichment"
+        },
+        {
+          "id": "RBB-BIT151-P1-Q11",
+          "question": "A CPU has a 3 GHz clock. Which statement is most accurate?",
+          "options": {
+            "A": "≈3 billion clock cycles per second",
+            "B": "Executes exactly 3 billion instructions/s",
+            "C": "Each instruction needs exactly one cycle",
+            "D": "Processes exactly 3 billion bytes/s"
+          },
+          "answer": "A",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT151",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Introduction to microprocessor",
+          "unit_conf": "medium",
+          "explanation": "Hz = cycles/s. Instructions/s depends on CPI (some need many cycles; superscalar can do >1 per cycle). Clock ≠ throughput.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT151-P1-Q13",
+          "question": "Which CPU architecture uses separate memory and buses for instruction and data?",
+          "options": {
+            "A": "Von Neumann",
+            "B": "Harvard",
+            "C": "CISC",
+            "D": "RISC"
+          },
+          "answer": "B",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT151",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Introduction to microprocessor",
+          "unit_conf": "low",
+          "explanation": "Harvard = separate instruction/data memory + buses (parallel fetch). Von Neumann = one shared memory/bus (bottleneck). Modern CPUs: modified Harvard (split L1 I/D cache). CISC/RISC = instruction-set styles, not memory layout.",
+          "source": "rbb-loksewa"
         }
       ]
     },
     {
       "subject": "Object Oriented Programming, C++",
       "subject_code": "BIT153",
-      "question_count": 79,
+      "question_count": 81,
       "questions": [
         {
           "id": 1,
@@ -9447,7 +9788,7 @@
     {
       "subject": "Data Structures and Algorithms",
       "subject_code": "BIT201",
-      "question_count": 99,
+      "question_count": 101,
       "questions": [
         {
           "id": 1,
@@ -11668,7 +12009,7 @@
     {
       "subject": "Database Management System",
       "subject_code": "BIT202",
-      "question_count": 100,
+      "question_count": 104,
       "questions": [
         {
           "id": 1,
@@ -13905,13 +14246,59 @@
           "explanation": "After executing its final statement, a transaction enters the \"Partially committed\" state. Only after all recovery log records are written to non-volatile disk storage does it transition to \"Committed\". If a check fails, it transitions to \"Failed\".",
           "topic_id": "BIT202.U6.T2",
           "source": "high-yield-enrichment"
+        },
+        {
+          "id": "RBB-BIT202-P1-Q38",
+          "question": "A view of the database that appears to an application program is known as ______",
+          "options": {
+            "A": "Schema",
+            "B": "Subschema",
+            "C": "Virtual table",
+            "D": "Internal level"
+          },
+          "answer": "B",
+          "level": 0,
+          "type": "recall",
+          "tag": "L0 - BIT202",
+          "topic_id": "BIT202.U1.T4",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Concepts and architecture",
+          "unit_conf": "high",
+          "explanation": "Subschema = external view (user/application) in the three-schema architecture: external → conceptual → internal.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT202-P1-Q39",
+          "question": "______ enforces that a parent record cannot be deleted when child records exist.",
+          "options": {
+            "A": "Data integrity",
+            "B": "Domain integrity",
+            "C": "Referential integrity",
+            "D": "Security"
+          },
+          "answer": "C",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT202",
+          "topic_id": "BIT202.U3.T2",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Relational model",
+          "unit_conf": "high",
+          "explanation": "FK must match an existing PK (or NULL); ON DELETE RESTRICT/NO ACTION.",
+          "source": "rbb-loksewa"
         }
       ]
     },
     {
       "subject": "Operating Systems",
       "subject_code": "BIT204",
-      "question_count": 76,
+      "question_count": 86,
       "questions": [
         {
           "id": 1,
@@ -15647,13 +16034,173 @@
           "explanation": "Because services like file systems and drivers run in separate user-space address spaces, handling a simple request requires frequent IPC message copying and CPU context switches between user and kernel modes, creating a performance penalty relative to monolithic kernels.",
           "topic_id": "BIT204.U2.T3",
           "source": "high-yield-enrichment"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q43",
+          "question": "Which is a preemptive scheduling algorithm?",
+          "options": {
+            "A": "Round Robin",
+            "B": "Repetitive First",
+            "C": "Batch Processing",
+            "D": "FCFS"
+          },
+          "answer": "A",
+          "level": 0,
+          "type": "recall",
+          "tag": "L0 - BIT204",
+          "topic_id": "BIT204.U3.T9",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Process management and synchronization",
+          "unit_conf": "high",
+          "explanation": "RR: time-quantum, preempts when quantum expires. FCFS non-preemptive. 'Repetitive First' isn't real. SRTF & preemptive priority are the other classics.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q44",
+          "question": "A deadlock occurs when ______",
+          "options": {
+            "A": "a process completes unsuccessfully",
+            "B": "two or more processes wait indefinitely for resources held by each other",
+            "C": "CPU is idle",
+            "D": "memory is defragmented"
+          },
+          "answer": "B",
+          "level": 0,
+          "type": "recall",
+          "tag": "L0 - BIT204",
+          "topic_id": "BIT204.U3.T15",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Process management and synchronization",
+          "unit_conf": "high",
+          "explanation": "Four conditions: mutual exclusion, hold & wait, no preemption, circular wait.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q49",
+          "question": "Copy-on-write is primarily used to optimize ______",
+          "options": {
+            "A": "network packet transfer",
+            "B": "disk management",
+            "C": "process creation via fork",
+            "D": "file management"
+          },
+          "answer": "C",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT204",
+          "topic_id": "BIT204.U3.T1",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Process management and synchronization",
+          "unit_conf": "high",
+          "explanation": "After fork(), parent & child share pages read-only; a page is copied only when someone writes → cheap process creation.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q50",
+          "question": "A system state is 'safe' in Banker's Algorithm if ______",
+          "options": {
+            "A": "all processes can complete without deadlock",
+            "B": "all resources are free",
+            "C": "100% CPU utilization",
+            "D": "no process is waiting"
+          },
+          "answer": "A",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT204",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Process management and synchronization",
+          "unit_conf": "medium",
+          "explanation": "Safe = ∃ a safe sequence letting every process finish. Unsafe ≠ deadlock, but deadlock is possible. Banker's = deadlock avoidance.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q15",
+          "question": "Which I/O technique lets a device notify the CPU when it needs attention?",
+          "options": {
+            "A": "Polling",
+            "B": "Caching",
+            "C": "Spooling",
+            "D": "Interrupt-driven I/O"
+          },
+          "answer": "D",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT204",
+          "topic_id": "BIT204.U5.T4",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 5,
+          "unit_name": "5 Input/output management",
+          "unit_conf": "high",
+          "explanation": "Interrupt = device signals CPU. Polling = CPU keeps asking.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q16",
+          "question": "Accessing I/O devices by repeatedly checking status flags is ______",
+          "options": {
+            "A": "Program-controlled I/O",
+            "B": "Memory-mapped I/O",
+            "C": "I/O mapped",
+            "D": "DMA"
+          },
+          "answer": "A",
+          "level": 1,
+          "type": "pair",
+          "tag": "L1 - BIT204",
+          "topic_id": "BIT204.U5.T4",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 5,
+          "unit_name": "5 Input/output management",
+          "unit_conf": "high",
+          "explanation": "Program-controlled (programmed/polled) I/O = busy-wait on status flag. Memory-mapped/I/O-mapped = addressing schemes. DMA = transfer without CPU.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT204-P1-Q45",
+          "question": "Time for the disk arm to move heads to the cylinder with the desired sector = ______ time.",
+          "options": {
+            "A": "Disk",
+            "B": "Seek",
+            "C": "Arm",
+            "D": "Sector"
+          },
+          "answer": "B",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT204",
+          "topic_id": "BIT204.U5.T6",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 5,
+          "unit_name": "5 Input/output management",
+          "unit_conf": "high",
+          "explanation": "Access = seek + rotational latency + transfer.",
+          "source": "rbb-loksewa"
         }
       ]
     },
     {
       "subject": "Web Technology",
       "subject_code": "BIT251",
-      "question_count": 129,
+      "question_count": 133,
       "questions": [
         {
           "id": 1,
@@ -18528,13 +19075,59 @@
           "explanation": "Cookies reside on the client device in cleartext files or browser storage and are transmitted across the network, making them vulnerable to tampering, sniffing, and XSS attacks. Sensitive state should reside in server-side sessions.",
           "topic_id": "BIT251/BIT301.U12.T1",
           "source": "high-yield-enrichment"
+        },
+        {
+          "id": "RBB-BIT251-P1-Q37",
+          "question": "Which controls presentation/styling of a web page?",
+          "options": {
+            "A": "XML",
+            "B": "HTML",
+            "C": "CSS",
+            "D": "UML"
+          },
+          "answer": "C",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT251",
+          "topic_id": "BIT251/BIT301.U3.T1",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 [Client] CSS",
+          "unit_conf": "high",
+          "explanation": "CSS = presentation; HTML = structure; XML = data; UML = modelling.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT251-P1-Q41",
+          "question": "In HTTP, ______ submits form data securely without appending it to the URL.",
+          "options": {
+            "A": "GET",
+            "B": "PUT",
+            "C": "POST",
+            "D": "HEAD"
+          },
+          "answer": "C",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT251",
+          "topic_id": "BIT251/BIT301.U10.T1",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 10,
+          "unit_name": "10 [PHP] Handling forms",
+          "unit_conf": "high",
+          "explanation": "POST = data in request body (not in URL/history); GET = query string, bookmarkable. ('Secure' here means not visible in URL — still needs HTTPS.)",
+          "source": "rbb-loksewa"
         }
       ]
     },
     {
       "subject": "Systems Analysis and Design",
       "subject_code": "BIT253",
-      "question_count": 94,
+      "question_count": 98,
       "questions": [
         {
           "id": 1,
@@ -20691,7 +21284,7 @@
     {
       "subject": "Network and Data Communications",
       "subject_code": "BIT254",
-      "question_count": 90,
+      "question_count": 93,
       "questions": [
         {
           "id": 1,
@@ -22662,13 +23255,82 @@
           "unit_conf": "high",
           "explanation": "A resolver can reuse a cached DNS mapping while it remains valid, reducing repeated lookup work and response time.",
           "source": "scope-expansion"
+        },
+        {
+          "id": "RBB-BIT254-P1-Q17",
+          "question": "Which device broadcasts incoming data to all connected ports?",
+          "options": {
+            "A": "Hub",
+            "B": "Router",
+            "C": "Switch",
+            "D": "Bridge"
+          },
+          "answer": "A",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT254",
+          "topic_id": "BIT254.U1.T5",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Fundamentals",
+          "unit_conf": "high",
+          "explanation": "Hub = Layer 1, dumb repeater, one collision domain. Switch/bridge = L2 (MAC-based), router = L3.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT254-P1-Q19",
+          "question": "Which is used by the internet?",
+          "options": {
+            "A": "Circuit switching",
+            "B": "Packet switching",
+            "C": "No switching",
+            "D": "Internet switching"
+          },
+          "answer": "B",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT254",
+          "topic_id": "BIT254.U2.T10",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 2,
+          "unit_name": "2 Physical layer and media",
+          "unit_conf": "high",
+          "explanation": "Internet = packet switching (IP datagrams). Telephone network = circuit switching.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT254-P1-Q35",
+          "question": "In which OSI layer does a Proxy Server operate?",
+          "options": {
+            "A": "Layer 4",
+            "B": "Layer 5",
+            "C": "Layer 6",
+            "D": "Layer 7"
+          },
+          "answer": "D",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT254",
+          "topic_id": "BIT254.U1.T7",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 1,
+          "unit_name": "1 Fundamentals",
+          "unit_conf": "high",
+          "explanation": "Application-layer proxy → Layer 7 (circuit-level proxy ~L5; packet filter L3/4).",
+          "source": "rbb-loksewa"
         }
       ]
     },
     {
       "subject": "Software Engineering",
       "subject_code": "BIT302",
-      "question_count": 88,
+      "question_count": 95,
       "questions": [
         {
           "id": 1,
@@ -24764,7 +25426,7 @@
     {
       "subject": "Management Information System",
       "subject_code": "BIT353",
-      "question_count": 117,
+      "question_count": 119,
       "questions": [
         {
           "id": 2,
@@ -27383,7 +28045,7 @@
     {
       "subject": "E-Commerce",
       "subject_code": "BIT403",
-      "question_count": 115,
+      "question_count": 118,
       "questions": [
         {
           "id": 1,
@@ -29906,13 +30568,82 @@
           "unit_conf": "high",
           "explanation": "Mobile payment describes the use of a mobile device or platform in initiating or authorizing payment; the underlying payment method can vary.",
           "source": "scope-expansion"
+        },
+        {
+          "id": "RBB-BIT403-P1-Q5",
+          "question": "Which protocol is commonly used for browsing websites securely?",
+          "options": {
+            "A": "HTTP",
+            "B": "FTP",
+            "C": "HTTPS",
+            "D": "SMTP"
+          },
+          "answer": "C",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT403",
+          "topic_id": "BIT403.U3.T12",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Security",
+          "unit_conf": "high",
+          "explanation": "HTTPS = HTTP over SSL/TLS (port 443). FTP = file transfer, SMTP = send mail.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT403-P1-Q28",
+          "question": "Email looks like it's from your bank, asks you to click a link and reset your password. Attack type?",
+          "options": {
+            "A": "Spyware",
+            "B": "Phishing",
+            "C": "Pharming",
+            "D": "Email Spoofing"
+          },
+          "answer": "B",
+          "level": 0,
+          "type": "pair",
+          "tag": "L0 - BIT403",
+          "topic_id": "BIT403.U3.T3",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 3,
+          "unit_name": "3 Security",
+          "unit_conf": "high",
+          "explanation": "Phishing = deceptive message luring you to a fake site/credentials. Spoofing = forged sender (the technique used); pharming = DNS/hosts redirection without a lure.",
+          "source": "rbb-loksewa"
+        },
+        {
+          "id": "RBB-BIT403-P1-Q8",
+          "question": "Which requires participants to solve computationally difficult problems in blockchain?",
+          "options": {
+            "A": "Difficulty Level",
+            "B": "Block Level Computation",
+            "C": "Consensus Mechanism",
+            "D": "Authentication"
+          },
+          "answer": "C",
+          "level": 1,
+          "type": "recall",
+          "tag": "L1 - BIT403",
+          "topic_id": "BIT403.U4.T3",
+          "regeneratable": false,
+          "shuffle_safe": true,
+          "giveaway_risk": false,
+          "unit": 4,
+          "unit_name": "4 Payment systems",
+          "unit_conf": "high",
+          "explanation": "Consensus mechanism (Proof-of-Work: miners solve hash puzzles; PoS is the alternative). ⚠️ 'Difficulty level' is a PoW parameter, so wording is ambiguous — C is the intended key (medium confidence).",
+          "source": "rbb-loksewa"
         }
       ]
     },
     {
       "subject": "Computer Graphics",
       "subject_code": "BIT304",
-      "question_count": 60,
+      "question_count": 65,
       "questions": [
         {
           "id": 1,
@@ -31344,7 +32075,7 @@
     {
       "subject": "Artificial Intelligence",
       "subject_code": "BIT252",
-      "question_count": 105,
+      "question_count": 107,
       "questions": [
         {
           "id": 2,
@@ -33697,7 +34428,7 @@
     {
       "subject": "Basic Mathematics: Calculus & Functions",
       "subject_code": "MTH104",
-      "question_count": 147,
+      "question_count": 151,
       "questions": [
         {
           "id": 1,
@@ -37014,7 +37745,7 @@
     {
       "subject": "Linear Algebra and Abstract Algebra",
       "subject_code": "MTH168",
-      "question_count": 98,
+      "question_count": 102,
       "questions": [
         {
           "id": 1,
