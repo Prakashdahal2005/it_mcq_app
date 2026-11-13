@@ -224,6 +224,8 @@ button:disabled { opacity: .45; cursor: default; }
 @keyframes correctPulse { 0% { transform: scale(1); } 50% { transform: scale(1.015); } 100% { transform: scale(1); } }
 .opt.no { background: var(--nob) !important; border-color: var(--no) !important; color: var(--no); }
 .opt.ans { border-color: var(--ac) !important; background: var(--ac-bg) !important; font-weight: 600; }
+.opt.eliminated { text-decoration: line-through; opacity: 0.42; filter: grayscale(0.7); background: color-mix(in srgb, var(--card) 88%, var(--mu) 12%) !important; }
+.opt.eliminated .kbd-badge { text-decoration: none; opacity: 0.6; }
 .opt:disabled { opacity: 1; cursor: default; }
 .opt-text { flex: 1; }
 .kbd-badge {
@@ -872,7 +874,60 @@ body.quiet-mode .hide-quiet { display: none !important; }
   font-weight: 600;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cel-confetti { display: none; }
+  .cel-confetti, .celebration-burst-overlay { display: none !important; }
+}
+
+/* Non-blocking Auto-dismissing Celebration Burst */
+.celebration-burst-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  overflow: hidden;
+  animation: celFadeIn 0.2s ease-out;
+}
+.celebration-burst-toast {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--card) 95%, #10b981 5%);
+  color: var(--tx);
+  border: 1.5px solid #10b981;
+  box-shadow: 0 12px 36px rgba(16, 185, 129, 0.25), 0 4px 16px rgba(0,0,0,0.18);
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  animation: burstToastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1), burstToastOut 0.4s ease-in 2.4s forwards;
+}
+@keyframes burstToastIn {
+  from { opacity: 0; transform: translate(-50%, -20px) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes burstToastOut {
+  from { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -15px) scale(0.95); }
+}
+
+/* Sticky Question Footer for Laptops & Mobile */
+.q-footer-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 80;
+  background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 10px 16px;
+  margin: 16px -20px -20px -20px;
+  border-top: 1px solid var(--bd);
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
 }
 
 /* Question editor + variant refresh status */
@@ -3694,6 +3749,30 @@ function regenerateCurrentQuestion() {
   alert('A Gemini API key is required to regenerate questions. Please configure your Gemini API Key in Settings (⚙).');
 }
 
+function sharpenCurrentQuestion() {
+  if (MK || !CURRENT_Q || P >= Q.length) return;
+  const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+  if (!rawQ) return;
+  if (effWellMade(rawQ)) {
+    alert('This question is marked Well made. Unmark it first to sharpen distractors.');
+    return;
+  }
+  if (!GEM_KEY) {
+    alert('A Gemini API key is required to sharpen MCQs with competitive distractors. Please add your Gemini key in Settings (⚙).');
+    return;
+  }
+  const qStem = $('#q-stem');
+  if (qStem) qStem.innerHTML = '<span class="c-sk">🎯 Sharpening MCQ: generating competitive distractors & rigorous phrasing...</span>';
+  rewriteQuestionWithGemini(rawQ, { sharpen: true, background: false }).then(() => {
+    sessionHistory[P] = null;
+    show();
+  }).catch(err => {
+    try { alert('Sharpening failed: ' + (err.message || err)); } catch(e){}
+    sessionHistory[P] = null;
+    show();
+  });
+}
+
 function openQuestionEditor(n) {
   const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
   const q = rawQ || byN(n);
@@ -4146,6 +4225,13 @@ async function drainBackgroundQuestionAiQueue() {
         sourceOverride: job.sourceOverride
       });
       clearQuestionQuarantine(job.q);
+      save();
+    } else if (job.kind === 'sharpen') {
+      if (effWellMade(job.q) || isQuestionQuarantined(job.q)) return;
+      await rewriteQuestionWithGemini(job.q, {
+        background: true,
+        sharpen: true
+      });
       save();
     }
   } catch (err) {
@@ -5121,7 +5207,7 @@ function renderFlashcardView() {
             ${curCard.back}
           </div>
         ` : `
-          <button class="p big-btn" style="margin-top:24px" onclick="event.stopPropagation();flipCard()">Show Answer</button>
+          <button class="p big-btn" style="margin-top:24px" onclick="event.stopPropagation();flipCard()">Show Answer <span class="mu sm" style="opacity:0.85;font-weight:normal">(Space)</span></button>
         `}
         ${flashRes ? `
           <a href="${flashRes.url}" target="_blank" rel="noopener noreferrer" class="res-pill"
@@ -5149,12 +5235,13 @@ function renderFlashcardView() {
           <button class="sm p" onclick="rateCard(3)">3 &middot; Good</button>
           <button class="sm" style="background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)" onclick="rateCard(4)">4 &middot; Easy</button>
         </div>
+        <div class="mu sm" style="text-align:center;margin-top:8px">Keyboard: <b>Space</b> flip · <b>1–4</b> rate · <b>B/N</b> nav</div>
       </div>
     ` : ''}
 
     <div class="row" style="justify-content:space-between;gap:8px;margin-top:14px">
-      <button class="sm" onclick="fcPrevious()" ${ACTIVE_FC_INDEX === 0 ? 'disabled' : ''}>Previous</button>
-      <button class="sm" onclick="fcNext()">${ACTIVE_FC_INDEX === sessionLen - 1 ? 'Finish session' : 'Next card'}</button>
+      <button class="sm" onclick="fcPrevious()" ${ACTIVE_FC_INDEX === 0 ? 'disabled' : ''}>← Previous (B)</button>
+      <button class="sm" onclick="fcNext()">${ACTIVE_FC_INDEX === sessionLen - 1 ? 'Finish session' : 'Next card (N) →'}</button>
     </div>
   `;
   typesetMath($('#app'));
@@ -5580,14 +5667,33 @@ function buildTodaySession(minutes = 15, quickOnly = false) {
   }
 
   // Prefer unseen questions for coverage before using previously mastered, non-due items.
+  // TIER-WEIGHTED ALLOCATION: 45% Tier A, 35% Tier B, 20% Tier C
   const coveragePool = pool.filter(q => !addedIdentities.has(questionUid(q) || qk(q)));
   const coverageSlots = Math.min(coverageReserve, targetQ - session.length);
   const unseenCoveragePool = coveragePool.filter(q => !hasPracticeAttempt(q, latestPractice));
-  const coveragePicks = pickCoverageQuestions(unseenCoveragePool, coverageSlots, coverageSnapshot, {
-    maxPerUnit: 1,
-    exclude: addedIdentities
-  });
-  coveragePicks.forEach(q => add(q));
+  
+  // Allocate coverage slots by tier
+  const tierASlots = Math.ceil(coverageSlots * 0.45);
+  const tierBSlots = Math.ceil(coverageSlots * 0.35);
+  const tierCSlots = Math.ceil(coverageSlots * 0.20);
+  
+  const tierAPicks = pickCoverageQuestions(
+    unseenCoveragePool.filter(q => subjectTier(q.s) === 'A'),
+    tierASlots, coverageSnapshot, { maxPerUnit: 1, exclude: addedIdentities, allTiers: true }
+  );
+  tierAPicks.forEach(q => add(q));
+  
+  const tierBPicks = pickCoverageQuestions(
+    unseenCoveragePool.filter(q => subjectTier(q.s) === 'B'),
+    tierBSlots, coverageSnapshot, { maxPerUnit: 1, exclude: addedIdentities, allTiers: true }
+  );
+  tierBPicks.forEach(q => add(q));
+  
+  const tierCPicks = pickCoverageQuestions(
+    unseenCoveragePool.filter(q => subjectTier(q.s) === 'C'),
+    tierCSlots, coverageSnapshot, { maxPerUnit: 1, exclude: addedIdentities, allTiers: true }
+  );
+  tierCPicks.forEach(q => add(q));
 
   // If the pool is exhausted, prefer the longest-unseen review rather than a recent mastered item.
   const remainingAll = pool.filter(q => !addedIdentities.has(questionUid(q) || qk(q)));
@@ -5761,6 +5867,46 @@ function closeCelebrationModal() {
     document.removeEventListener('keydown', celebrationKeyHandler);
     celebrationKeyHandler = null;
   }
+}
+
+function triggerAutoConfetti(title, subtitle) {
+  if (QUIET_MODE) return;
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reducedMotion) {
+    if (typeof showToast === 'function') showToast(title || '🎉 Goal Reached!', 'ok');
+    return;
+  }
+  const old = document.getElementById('cel-burst-overlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cel-burst-overlay';
+  overlay.className = 'celebration-burst-overlay';
+
+  const pieces = Array.from({ length: 42 }, () => {
+    const x = Math.round(Math.random() * 100);
+    const delay = (Math.random() * 0.45).toFixed(2);
+    const drift = `${Math.round(Math.random() * 200 - 100)}px`;
+    const dur = (1.8 + Math.random() * 0.7).toFixed(2);
+    return `<span class="cel-confetti-piece" style="--cel-x:${x}%;--cel-delay:${delay}s;--cel-drift:${drift};animation-duration:${dur}s"></span>`;
+  }).join('');
+
+  overlay.innerHTML = `
+    <div class="cel-confetti" aria-hidden="true">${pieces}</div>
+    <div class="celebration-burst-toast">
+      <span style="font-size:20px" aria-hidden="true">🎉</span>
+      <div>
+        <div style="font-weight:700">${esc(title || 'Goal Reached!')}</div>
+        ${subtitle ? `<div style="font-size:12px;font-weight:400;opacity:0.85;margin-top:2px">${esc(subtitle)}</div>` : ''}
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  setTimeout(() => {
+    const el = document.getElementById('cel-burst-overlay');
+    if (el) el.remove();
+  }, 2900);
 }
 
 function checkSubjectTargetCelebration(subj, acc, target, attempts) {
@@ -6895,6 +7041,7 @@ function home(preserveScroll = false) {
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <h1>🧠 Recall</h1>
       <div class="row" style="gap:6px">
+        <button class="sm" onclick="openExportModal()" title="Export Error Log &amp; Study Pack">📥 Export</button>
         <button class="sm" onclick="toggleQuietMode()" title="Toggle quiet mode without streak/advice">${QUIET_MODE ? '🤫 Quiet' : '🔔 Normal'}</button>
         <button class="sm" onclick="openSettings()">⚙</button>
       </div>
@@ -7032,24 +7179,27 @@ function home(preserveScroll = false) {
             <button onclick="startSubjectDrill()">Diagnostic Subject Drill</button>
           </div>
 
-          <hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
-          <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-            <span class="sm mu">📚 <b>${(BANKS || []).reduce((n, b) => n + (Array.isArray(b.q) ? b.q.length : 0), 0)}</b> questions loaded across ${(BANKS || []).length} bank(s)</span>
-            <button class="sm" onclick="forceReloadBank()">🔄 Reload bundled bank</button>
-          </div>
-          ${revCard()}
-          <div style="margin-top:14px">
-            <h3>Error Log &amp; Data Export</h3>
-            ${exportUI()}
-          </div>
-          <div style="margin-top:14px" class="row">
-            <button onclick="retake()">🔁 Retake active questions</button>
-            <button onclick="loadMode=1;home()">➕ Import more questions</button>
-            <button onclick="backup()">💾 Backup JSON</button>
-            <button onclick="$('#rb').click()">📂 Restore Backup</button>
-            <input type="file" id="rb" accept=".json" style="display:none" onchange="restore(this.files[0])">
-          </div>
+      </div>
+    </div>
+
+    <!-- Data, Export & Storage Management -->
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0">📥 Error Log, Data &amp; Backups</h3>
+        <span class="sm mu">📚 <b>${(BANKS || []).reduce((n, b) => n + (Array.isArray(b.q) ? b.q.length : 0), 0)}</b> questions across ${(BANKS || []).length} bank(s)</span>
+      </div>
+      ${exportUI()}
+      <hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="sm" onclick="forceReloadBank()">🔄 Reload bundled bank</button>
+        <div class="row" style="gap:6px;flex-wrap:wrap">
+          <button class="sm" onclick="retake()">🔁 Retake active</button>
+          <button class="sm" onclick="loadMode=1;home()">➕ Import bank</button>
+          <button class="sm" onclick="backup()">💾 Backup JSON</button>
+          <button class="sm" onclick="$('#rb').click()">📂 Restore Backup</button>
+          <input type="file" id="rb" accept=".json" style="display:none" onchange="restore(this.files[0])">
         </div>
+      </div>
     </div>
   `;
 }
@@ -7654,7 +7804,7 @@ function show() {
           <button class="sm" id="wellmade-btn" style="padding:2px 8px;font-size:11px;${isWellMade ? 'background:#fff7e6;color:#b45309;border-color:#f0b45a' : 'color:var(--mu);border-color:var(--bd)'}" onclick="toggleWellMade(${rawQ.n})" title="Well-made questions are protected from AI regeneration and appear more often in practice">
             ${isWellMade ? '⭐ Well made' : '☆ Mark well made'}
           </button>
-          ${isShowingVariant ? '<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">✨ Variant</span>' : ''}
+          ${isShowingVariant ? `<span class="chip" style="background:${activeVariant && activeVariant.sharpened ? '#fef3c7;color:#92400e;border-color:#fcd34d' : 'var(--ac-bg);color:var(--ac);border-color:var(--ac)'}">${activeVariant && activeVariant.sharpened ? '🎯 Sharpened' : '✨ Variant'}</span>` : ''}
           ${isShowingVariant && activeVariant && activeVariant.verified === false ? '<span class="badge-unverified" title="Generated single-pass without blind verify">unverified</span>' : ''}
         </div>
         <div class="row" style="gap:6px;align-items:center">
@@ -7668,8 +7818,11 @@ function show() {
         <span class="mu">Question ${P + 1} of ${Q.length} · Q${rawQ.n} · ${esc(rawQ.s)}</span>
         <div class="row" style="gap:6px">
           ${!isWellMade ? `
-            <button class="sm" id="refresh-now-btn" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified variant within the same unit and topic">
-              ✨ Refresh now
+            <button class="sm" id="sharpen-btn" style="padding:2px 8px;font-size:11px;background:#fef3c7;color:#92400e;border-color:#fcd34d" onclick="sharpenCurrentQuestion()" title="Keep exact same concept, but rewrite with competitive entrance-grade distractors and eliminate obvious answers (Alt+S)">
+              🎯 Sharpen MCQ
+            </button>
+            <button class="sm" id="refresh-now-btn" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified sibling variant within the same unit and topic">
+              ✨ Sibling variant
             </button>
           ` : ''}
           ${hasVariant ? `
@@ -7762,14 +7915,14 @@ function show() {
         </div>
 
         <!-- Footer Navigation and Submission -->
-        <div class="row" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bd);justify-content:space-between;align-items:center">
+        <div class="q-footer-bar row" style="justify-content:space-between;align-items:center">
           <div>
             ${MK ? `
               <button id="flag-btn" class="sm ${MK.flagged && MK.flagged[rawQ.n] ? 'p' : ''}" onclick="toggleFlag()">
                 🚩 Flag <kbd class="kbd-badge sm">F</kbd>
               </button>
             ` : (hist.locked ? `
-              <span class="mu sm">Answered (Read-only)</span>
+              <span class="mu sm">Answered</span>
             ` : `
               <button id="dontknow-btn" class="sm" onclick="dontKnow()">
                 🤷 Don't know <kbd class="kbd-badge sm">S</kbd>
@@ -7778,8 +7931,8 @@ function show() {
           </div>
           <div class="row" style="gap:6px">
             <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back <kbd class="kbd-badge sm">B</kbd></button>
-            <button class="sm ${hist.locked ? 'p' : ''}" id="nx" onclick="navForward()" ${P >= Q.length - 1 && !hist.locked && !MK ? 'disabled' : ''}>
-              ${P >= Q.length - 1 ? (MK ? 'Finish' : 'Complete Session →') : 'Forward → <kbd class="kbd-badge sm">N</kbd>'}
+            <button class="sm ${hist.locked ? 'p' : ''}" id="nx" onclick="${hist.locked && !MK ? 'fin()' : 'navForward()'}" ${P >= Q.length - 1 && !hist.locked && !MK ? 'disabled' : ''}>
+              ${P >= Q.length - 1 ? (MK ? 'Finish' : 'Complete Session →') : (hist.locked ? 'Continue → <kbd class="kbd-badge sm">Enter / N</kbd>' : 'Forward → <kbd class="kbd-badge sm">N</kbd>')}
             </button>
             ${MK ? `<button class="p sm" onclick="confirmSubmitMock()">Submit Mock</button>` : ''}
           </div>
@@ -7788,7 +7941,7 @@ function show() {
 
       ${MK ? renderMockPalette() : ''}
     </div>
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b> back · <b>N</b> forward · <b>S</b> don't know · <b>Enter</b> continue</p>
+    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b> back · <b>N</b> forward · <b>S</b> don't know · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
   `;
   typesetMath($('#app'));
   updateVariantQueueStatus();
@@ -7819,6 +7972,23 @@ function toggleOriginalStem(n) {
   if (sessionHistory[P]) delete sessionHistory[P];
   save();
   show();
+}
+
+function toggleEliminateOpt(e, i) {
+  if (e) e.preventDefault();
+  if (locked || (MK && MK.expired)) return;
+  const btn = document.getElementById(`opt-${i}`);
+  if (!btn || btn.disabled) return;
+  btn.classList.toggle('eliminated');
+}
+
+function handleOptClick(e, i) {
+  if (e && (e.altKey || e.shiftKey)) {
+    e.preventDefault();
+    toggleEliminateOpt(e, i);
+    return;
+  }
+  pick(i);
 }
 
 function renderOptionsHtml(q, hist) {
@@ -7855,7 +8025,7 @@ function renderOptionsHtml(q, hist) {
         }
       }
       return `
-        <button class="${cls}" id="opt-${i}" onclick="pick(${i})" ${disabled ? 'disabled' : ''}>
+        <button class="${cls}" id="opt-${i}" onclick="handleOptClick(event, ${i})" oncontextmenu="toggleEliminateOpt(event, ${i})" ${disabled ? 'disabled' : ''}>
           <span class="opt-text">${esc(o)}</span>
           ${stateIcon}
         </button>
@@ -7880,7 +8050,7 @@ function renderOptionsHtml(q, hist) {
       }
     }
     return `
-      <button class="${cls}" id="opt-${i}" onclick="pick(${i})" ${disabled ? 'disabled' : ''}>
+      <button class="${cls}" id="opt-${i}" onclick="handleOptClick(event, ${i})" oncontextmenu="toggleEliminateOpt(event, ${i})" ${disabled ? 'disabled' : ''} title="Click to choose · Right-click or Alt+click to strike out">
         <kbd class="kbd-badge">${'ABCD'[i]}</kbd>
         <span class="opt-text">${esc(o)}</span>
         ${stateIcon}
@@ -8176,8 +8346,11 @@ function pick(i, cfOverride) {
     bs[i].classList.add('ok');
     const isFastMastery = timeTakenMs < 15000;
     $('#fb').innerHTML = `
-      <div class="exp">
-        <b class="c-ok">${isFastMastery ? '⚡ Correct in <15s (Mastery Recall)' : 'Correct.'}</b>
+      <div class="exp" onmouseenter="cancelAutoAdvance()" ontouchstart="cancelAutoAdvance()">
+        <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <b class="c-ok">${isFastMastery ? '⚡ Correct in <15s (Mastery Recall)' : '✓ Correct.'}</b>
+          <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
+        </div>
         <div class="row" style="margin-top:6px;gap:6px;align-items:center">
           <span class="mu sm">Confidence:</span>
           <button type="button" class="cf-btn${confidence === 1 ? ' on' : ''}" data-cf="1" onclick="updateConfidence(1)" title="Count as lucky guess (miss)">1 · Guess (Miss)</button>
@@ -8185,7 +8358,7 @@ function pick(i, cfOverride) {
           <button type="button" class="cf-btn${confidence === 3 ? ' on' : ''}" data-cf="3" onclick="updateConfidence(3)">3 · Sure</button>
         </div>
         <div id="current-exp-container" style="margin-top:6px">
-          ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+          ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, false) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
           ${(() => {
@@ -8203,9 +8376,15 @@ function pick(i, cfOverride) {
       </div>
       <p class="row" style="margin-top:12px;gap:8px">
         <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
-        <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
+        <button class="p sm" onclick="fin()">Continue → (Enter or N)</button>
       </p>
     `;
+    const nxFooterOk = document.getElementById('nx');
+    if (nxFooterOk) {
+      nxFooterOk.classList.add('p');
+      nxFooterOk.innerHTML = (P >= Q.length - 1) ? (MK ? 'Finish' : 'Complete Session →') : 'Continue → <kbd class="kbd-badge sm">Enter / N</kbd>';
+      nxFooterOk.onclick = () => fin();
+    }
     hist.feedbackHtml = $('#fb').innerHTML;
     typesetMath($('#fb'));
     save();
@@ -8228,10 +8407,13 @@ function pick(i, cfOverride) {
 
     $('#fb').innerHTML = `
       <div class="exp ${isLeech ? 'leech' : ''}">
-        <b style="color:var(--no)">✗ Incorrect.</b>
+        <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:gap:8px">
+          <b style="color:var(--no)">✗ Incorrect.</b>
+          <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
+        </div>
         <div style="margin-top:6px">Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
         <div id="current-exp-container" style="margin-top:6px">
-          ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+          ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, true) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
           ${(() => {
@@ -8249,9 +8431,15 @@ function pick(i, cfOverride) {
   </div>
       <p class="row" style="margin-top:12px;gap:8px">
         <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
-        <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
+        <button class="p sm" onclick="fin()">Continue → (Enter or N)</button>
       </p>
     `;
+    const nxFooterNo = document.getElementById('nx');
+    if (nxFooterNo) {
+      nxFooterNo.classList.add('p');
+      nxFooterNo.innerHTML = (P >= Q.length - 1) ? (MK ? 'Finish' : 'Complete Session →') : 'Continue → <kbd class="kbd-badge sm">Enter / N</kbd>';
+      nxFooterNo.onclick = () => fin();
+    }
     hist.feedbackHtml = $('#fb').innerHTML;
     typesetMath($('#fb'));
     save();
@@ -8318,9 +8506,13 @@ function dontKnow() {
 
   $('#fb').innerHTML = `
     <div class="exp">
-      <b class="c-no">Scheduled for tomorrow.</b> Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b>
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <b class="c-no">Scheduled for tomorrow.</b>
+        <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
+      </div>
+      <div style="margin-top:6px">Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
       <div id="current-exp-container" style="margin-top:6px">
-        ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+        ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, true) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
       </div>
       <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
         ${(() => {
@@ -8337,9 +8529,15 @@ function dontKnow() {
     </div>
     <p class="row" style="margin-top:12px;gap:8px">
       <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
-      <button class="p sm" id="nx" onclick="fin()">Continue → (Enter or N)</button>
+      <button class="p sm" onclick="fin()">Continue → (Enter or N)</button>
     </p>
   `;
+  const nxFooterDk = document.getElementById('nx');
+  if (nxFooterDk) {
+    nxFooterDk.classList.add('p');
+    nxFooterDk.innerHTML = (P >= Q.length - 1) ? (MK ? 'Finish' : 'Complete Session →') : 'Continue → <kbd class="kbd-badge sm">Enter / N</kbd>';
+    nxFooterDk.onclick = () => fin();
+  }
   hist.feedbackHtml = $('#fb').innerHTML;
   typesetMath($('#fb'));
   save();
@@ -8353,9 +8551,9 @@ function setEt(x) {
   });
 }
 
-function explanationHtml(text) {
+function explanationHtml(text, autoOpen = false) {
   if (!text) return '';
-  return `<details class="exp explanation"><summary>Why?</summary><div>${esc(text)}</div></details>`;
+  return `<details class="exp explanation" ${autoOpen ? 'open' : ''}><summary>Why?</summary><div>${esc(text)}</div></details>`;
 }
 
 function fin() {
@@ -8676,16 +8874,21 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
     };
 
     const isCorrection = opts.correction === true;
-    const isCold = isColdQuestion(targetQ) && !isCorrection;
+    const isSharpen = opts.sharpen === true;
+    const isCold = isColdQuestion(targetQ) && !isCorrection && !isSharpen;
     const coldRule = isCold
       ? ' SPECIAL RULE: This is a replacement for a question the student marked too easy. Keep the same broad concept and exact subject/unit/topic, but test a clearly DIFFERENT microconcept within that subunit. Do not paraphrase, reuse the same fact, or merely change numbers/scenario. If no genuinely useful sibling microconcept exists, say so in sibling_reason and the validator should reject it.'
       : '';
     const promptB = isCorrection
       ? 'You are an expert exam writer reviewing a question flagged as possibly incorrect. Correct factual, mathematical, coding, answer-key, or explanation errors while preserving the original learning objective and difficulty. Do not introduce an unrelated concept. If the source is already correct, return a corrected equivalent question with the same intended answer. Solve it independently and return a clear explanation. '
-      : 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. State source_microconcept and microconcept separately, and explain the relationship in sibling_reason. For factual, definitional, or programming-concept questions, target a different property, comparison, consequence, or application, not just a rewording. For calculation, trace, or code questions, test a different operation or principle, not merely different numbers or a scenario swap. If the unit offers no meaningful sibling, say so rather than inventing an unrelated question.';
+      : (isSharpen
+        ? 'You are an expert entrance exam item-writer. The source question tests a valuable curriculum concept, but is low quality because the answer is too obvious, the distractors are implausible/silly, or the stem gives away the answer. Upgrade this MCQ into a high-quality entrance exam question while preserving the EXACT SAME core concept, formula, or principle tested in the source: 1. Keep the exact same concept and learning objective. 2. Rewrite the stem to be academically rigorous and precise without giveaway hints. 3. Write THREE highly plausible, competitive distractors representing common student misconceptions, near-miss technical distinctions, or calculation slips (no absurd or giveaway options). 4. Ensure all four options are balanced in length, grammatical style, and plausibility. '
+        : 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. State source_microconcept and microconcept separately, and explain the relationship in sibling_reason. For factual, definitional, or programming-concept questions, target a different property, comparison, consequence, or application, not just a rewording. For calculation, trace, or code questions, test a different operation or principle, not merely different numbers or a scenario swap. If the unit offers no meaningful sibling, say so rather than inventing an unrelated question.');
     const fullPrompt = isCorrection
       ? promptB + ' Rules: Keep the same subject, unit, topic_id, learning objective, and difficulty. Correct the flagged error rather than avoiding or paraphrasing the source. Solve independently in "working"; ensure the answer and explanation agree. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}'
-      : promptB + coldRule + ' Rules: 1. Keep the same subject, unit, topic_id, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}';
+      : (isSharpen
+        ? promptB + ' Rules: 1. Keep the exact same subject, unit, topic_id, and core concept. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible misconception or slip named in "slips". 4. Ensure all four options are competitive and distinct. 5. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","concept":"string"}'
+        : promptB + coldRule + ' Rules: 1. Keep the same subject, unit, topic_id, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}');
 
     const genResult = await fetchGeminiWithFallback(fullPrompt + '\n\nSource Question:\n' + JSON.stringify(source), isCorrection ? 0.2 : 0.8, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
@@ -8776,6 +8979,7 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
         microconcept: String(v.microconcept).trim(),
         siblingReason: String(v.sibling_reason).trim()
       } : {}),
+      ...(isSharpen ? { sharpened: true } : {}),
       verified: true,
       modelUsed: genResult.modelUsed,
       date: Date.now()
@@ -8787,7 +8991,7 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
       const bgBox = $('#bg-gen-box');
       if (bgBox) {
         bgBox.style.display = 'flex';
-        bgBox.textContent = `✓ Q${targetQ.n != null ? targetQ.n : ''} (${targetQ.s}): Variant generated via ${genResult.modelUsed} (verified).`;
+        bgBox.textContent = `✓ Q${targetQ.n != null ? targetQ.n : ''} (${targetQ.s}): ${isSharpen ? 'MCQ sharpened with competitive distractors' : 'Variant generated'} via ${genResult.modelUsed} (verified).`;
       }
     }
     return vRec._variant;
@@ -9004,13 +9208,38 @@ function done() {
       ${cardsCreated ? `<p class="mu sm" style="margin-top:14px">🃏 <b>${cardsCreated}</b> flashcard(s) created for your spaced review queue.</p>` : ''}
       <div id="bg-gen-box" class="bg-gen-banner" style="display:none"></div>
 
-      <p class="row" style="margin-top:20px;justify-content:space-between">
+      <p class="row" style="margin-top:20px;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <button class="p big-btn" onclick="home()">Back to Dashboard</button>
         ${revisitKeys.length ? `<button class="big-btn" onclick="start(${esc(JSON.stringify(revisitKeys))})">Retry Missteps Now</button>` : ''}
+        <button class="big-btn" onclick="openExportModal()">📥 Export Errors / Study Pack</button>
         <button class="big-btn" onclick="backToLastQuestion()">Back to Last Question</button>
       </p>
     </div>
   `;
+
+  // Celebration check: Inbox Zero (all due MCQs cleared) or Today's Goal reached
+  try {
+    const dueLeft = typeof dueKeys === 'function' ? dueKeys().length : 0;
+    const todayKey = localDateKey();
+    const todayDone = parseInt(localStorage.getItem('bitmcq_today_done') || '0', 10);
+    const targetMins = todayMins || 15;
+    const todayGoalCelebratedKey = 'bitmcq_goal_celeb_' + todayKey;
+
+    if (dueLeft === 0 && (Q || []).length > 0) {
+      setTimeout(() => {
+        triggerAutoConfetti('Inbox Zero! All Due MCQs Cleared 🏆', 'Every due card reviewed for today. Outstanding consistency!');
+      }, 400);
+    } else if (todayDone >= targetMins && !localStorage.getItem(todayGoalCelebratedKey)) {
+      localStorage.setItem(todayGoalCelebratedKey, '1');
+      setTimeout(() => {
+        triggerAutoConfetti("🎯 Today's Mission Completed!", `${todayDone} minutes of active recall logged today.`);
+      }, 400);
+    } else if (acc === 100 && (Q || []).length >= 5) {
+      setTimeout(() => {
+        triggerAutoConfetti('🌟 Clean Run! 100% Accuracy', 'Flawless recall across all questions in this session.');
+      }, 400);
+    }
+  } catch (err) {}
 
   // Refresh only questions the user explicitly marked as regeneratable.
   enqueueEligibleVariantRefresh(Q);
@@ -9377,7 +9606,7 @@ function confirmSubmitMock() {
     return q && MK.a[q.n] === undefined;
   }).length;
   if (unans > 0) {
-    if (!confirm(`⚠️ You have ${unans} unanswered question(s)!\n\nUnanswered questions earn 0 marks. The MIT exam's negative-marking rule is unconfirmed.\n\nAre you sure you want to submit now?`)) {
+    if (!confirm(`⚠️ You have ${unans} unanswered question(s)!\n\nNote: TU IOST MIT Entrance has NO negative marking. Leaving blanks gives away free probability of scoring.\n\nAre you sure you want to submit anyway?`)) {
       return;
     }
   }
@@ -9393,7 +9622,7 @@ function mockEnd() {
   const refreshKeys = (MOCK_D || []).map(q => q && q._mockOrigUid).filter(Boolean);
   localStorage.removeItem('bitmcq_mock_state');
 
-  const sub = {}, bad = [], n = Q.length;
+  const sub = {}, bad = [], flagged = [], n = Q.length;
   let c = 0;
 
   Q.forEach(k => {
@@ -9401,6 +9630,7 @@ function mockEnd() {
     if (!q) return;
     const a = MK.a[q.n];
     const ok = a !== undefined && a === q.a;
+    const isFlg = !!(MK.flagged && MK.flagged[q.n]);
     const s = cl(q.s), x = sub[s] = sub[s] || [0, 0];
     x[1]++;
     L.push({
@@ -9412,6 +9642,9 @@ function mockEnd() {
       c++; x[0]++;
     } else {
       bad.push([q, a]);
+    }
+    if (isFlg) {
+      flagged.push([q, a, ok]);
     }
   });
 
@@ -9451,6 +9684,20 @@ function mockEnd() {
     <div id="bg-gen-box" class="bg-gen-banner refresh-status" style="display:none"></div>
       <p class="row" style="margin-top:16px"><button class="p big-btn" onclick="home()">Back to Dashboard</button></p>
     </div>
+    ${flagged.length ? `
+    <div class="card">
+      <h2 style="margin-top:0">🚩 Flagged Questions for Review (${flagged.length})</h2>
+      <p class="mu sm" style="margin-top:-6px;margin-bottom:12px">Questions you flagged during the mock (including correct guesses you were uncertain about).</p>
+      ${flagged.map(([q, a, ok]) => `
+        <div class="item">
+          <b>Q${q.n}</b> ${esc(q.q)}<br>
+          <span class="${ok ? 'c-ok' : 'c-no'}">Your answer: ${a === undefined ? 'None' : 'ABCD'[a] + ') ' + esc(q.o[a])} ${ok ? '✓ Correct' : '✗ Missed'}</span><br>
+          ${!ok ? `<span class="c-ok">Correct Answer: ${'ABCD'[q.a]}) ${esc(q.o[q.a])}</span><br>` : ''}
+          ${q.e ? `<span class="mu">${esc(q.e)}</span>` : ''}
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
     <div class="card">
       <h2 style="margin-top:0">Review Missed Questions (${bad.length})</h2>
       ${bad.map(([q, a]) => `
@@ -9471,10 +9718,46 @@ function mockEnd() {
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-  if (document.getElementById('q-editor-overlay')) return;
+  if (document.getElementById('q-editor-overlay') || document.getElementById('export-modal-overlay')) return;
   if (view === 'q' && e.altKey && e.key.toLowerCase() === 'c') {
     e.preventDefault();
     toggleCalcPanel();
+    return;
+  }
+  if (view === 'q' && e.altKey && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    sharpenCurrentQuestion();
+    return;
+  }
+  // Flashcard review shortcuts
+  if (view === 'cards' && Array.isArray(ACTIVE_FC_SESSION_IDS) && ACTIVE_FC_SESSION_IDS.length > 0 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const k = e.key.toLowerCase();
+    if (e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      flipCard();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!ACTIVE_FC_SHOW_BACK) flipCard();
+      else fcNext();
+      return;
+    }
+    if (ACTIVE_FC_SHOW_BACK && ['1', '2', '3', '4'].includes(e.key)) {
+      e.preventDefault();
+      rateCard(parseInt(e.key, 10));
+      return;
+    }
+    if (k === 'b' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      fcPrevious();
+      return;
+    }
+    if (k === 'n' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      fcNext();
+      return;
+    }
     return;
   }
   if (view !== 'q' || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -9788,29 +10071,7 @@ function bankCard() {
 }
 
 function revCard() {
-  const T = A.map((a, i) => ({ a, i, w: a.errs.filter(e => e.r === 'w').length, s: a.errs.filter(e => e.r === 's').length }))
-    .filter(x => x.w + x.s > 0);
-  if (!T.length) return '';
-  const seen = new Set();
-  const items = T.filter(x=>{
-    const key = (x.a.bankId!=null&&x.a.bi!=null)?('b'+x.a.bankId+'i'+x.a.bi):('s'+x.a.no+':'+(x.a.date||''));
-    if(seen.has(key)) return false;
-    seen.add(key); return true;
-  }).slice(0,15);
-  if(!items.length) return '';
-  return `
-    <details style="margin-top:12px" class="card">
-      <summary style="cursor:pointer;font-weight:600">📁 Past Session Archives (${items.length})</summary>
-      <div style="margin-top:10px">
-        ${items.map(x => `
-          <div class="item row" style="justify-content:space-between">
-            <span>Session #${x.a.no} · ✗ ${x.w} misses</span>
-            <button class="sm" onclick="start(A[${x.i}].errs.map((e,j)=>'${x.i}:'+j))">Revise Session #${x.a.no}</button>
-          </div>
-        `).join('')}
-      </div>
-    </details>
-  `;
+  return '';
 }
 
 // Backup & Persistence
@@ -9868,10 +10129,42 @@ function restore(f) {
   r.readAsText(f);
 }
 
+function openExportModal() {
+  const old = document.getElementById('export-modal-overlay');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'export-modal-overlay';
+  overlay.className = 'q-editor-overlay';
+  overlay.tabIndex = -1;
+  overlay.onclick = e => { if (e.target === overlay) closeExportModal(); };
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closeExportModal(); } });
+  overlay.innerHTML = `
+    <div class="q-editor-card" role="dialog" aria-modal="true" aria-label="Export Study Pack and Errors" onclick="event.stopPropagation()">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+        <b style="font-size:16px">📥 Export Error Log &amp; Study Pack</b>
+        <button class="sm" onclick="closeExportModal()">✕ Close</button>
+      </div>
+      <div class="card" style="margin:0;padding:16px">
+        ${exportUI()}
+      </div>
+      <div class="row" style="margin-top:14px;justify-content:flex-end">
+        <button class="sm p" onclick="closeExportModal()">Done</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.focus(), 20);
+}
+
+function closeExportModal() {
+  const overlay = document.getElementById('export-modal-overlay');
+  if (overlay) overlay.remove();
+}
+
 function exportUI() {
   return `
-    <div class="row" style="flex-wrap:wrap">
-      <select id="xs">
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+      <select id="xs" style="flex:1;min-width:200px">
         <option value="study">Study Pack: Errors + Weak Syllabus Concepts</option>
         <option value="all">All Categories: Mistakes + Skipped + Unsure/Guessed</option>
         <option value="w">Mistakes Only</option>
@@ -9888,19 +10181,20 @@ function exportUI() {
       </select>
       <select id="xf"><option value="md">Markdown (.md)</option><option value="txt">Plain Text (.txt)</option></select>
       <button class="p sm" onclick="exportLog(0)">⬇ Download</button>
-      <button class="sm" onclick="exportLog(1)">Copy</button>
+      <button class="sm" onclick="exportLog(1)">📋 Copy</button>
     </div>
-    <div class="mu sm" style="margin-top:4px">Study Pack is the default: it includes current unresolved errors and every non-skipped syllabus concept that is not yet solid. MCQ history follows the selected range; weak-concept status is current. Export checkpoints are kept on this device.</div>
-    <div id="xm" class="mu" style="margin-top:4px"></div>
+    <div class="mu sm" style="margin-top:6px;line-height:1.4">Study Pack is the default: includes current unresolved errors and non-skipped syllabus concepts that are not yet solid. Checkpoints are kept locally on this device.</div>
+    <div id="xm" class="mu" style="margin-top:6px"></div>
   `;
 }
 
 // Build error-log or weak-topic reports from attempt history; export checkpoints are device-local metadata.
 function exportLog(copy) {
-  const scope = ($('#xs') || {}).value || 'study';
-  const rangeMode = ($('#xr') || {}).value || ('since');
-  const isMd = (($('#xf') || {}).value || 'md') === 'md';
-  const m = $('#xm');
+  const root = document.getElementById('export-modal-overlay') || document;
+  const scope = (root.querySelector('#xs') || {}).value || 'study';
+  const rangeMode = (root.querySelector('#xr') || {}).value || ('since');
+  const isMd = ((root.querySelector('#xf') || {}).value || 'md') === 'md';
+  const m = root.querySelector('#xm') || $('#xm');
   const todayStr = localDateKey();
   const ckptKey = scope === 'study' ? 'bitmcq_export_ckpt_v3_study' : 'bitmcq_export_ckpt_v2_' + scope;
   const coverage = (scope === 'study' || scope === 'weak') ? calculateUnitCoverage() : null;
@@ -9953,8 +10247,14 @@ function exportLog(copy) {
   (D || []).forEach(q => {
     const id = questionUid(q) || qk(q);
     const rec = latestRecordByIdentity.get(id) || null;
-    if (R[q.n] === 'w') addResult(q, 'w', 'current', rec && rec.cf, id, rec);
-    if (R[q.n] === 's') addResult(q, 's', 'current', rec && rec.cf, id, rec);
+    
+    // Check if the latest log record for this question is in range
+    // Use current time if no log record exists (brand new attempt)
+    const ts = rec ? recordTs(rec) : Date.now();
+    if (!inRange(ts)) return;
+    
+    if (R[q.n] === 'w') addResult(q, 'w', 'current', rec && rec.cf, id, rec, ts);
+    if (R[q.n] === 's') addResult(q, 's', 'current', rec && rec.cf, id, rec, ts);
   });
 
   (A || []).forEach((attempt, ai) => {
@@ -9987,13 +10287,30 @@ function exportLog(copy) {
     } catch(e){}
   });
 
-  const uniqueByKey = new Map();
+  // Deduplicate questions across all three sources (current session, archive, log)
+  // Priority: Mistakes > Unsure/Guessed > Skipped (show worst outcome)
+  // Within same priority, newest record wins
+  // This prevents a question from appearing in multiple sections
+  const statusPriority = { 'w': 3, 'ug': 2, 's': 1 };
+  const worstByIdentity = new Map();
+  
   results.forEach(r => {
-    const key = `${r.identity}|${r.type}`;
-    const previous = uniqueByKey.get(key);
-    if (!previous || r.ts >= previous.ts) uniqueByKey.set(key, r);
+    const existing = worstByIdentity.get(r.identity);
+    if (!existing) {
+      worstByIdentity.set(r.identity, r);
+    } else {
+      const currPriority = statusPriority[r.type] || 0;
+      const existPriority = statusPriority[existing.type] || 0;
+      
+      // Replace if worse status, or same status but newer
+      if (currPriority > existPriority || 
+          (currPriority === existPriority && r.ts >= existing.ts)) {
+        worstByIdentity.set(r.identity, r);
+      }
+    }
   });
-  const unique = [...uniqueByKey.values()];
+  
+  const unique = [...worstByIdentity.values()];
 
   function questionStudyMetadata(q) {
     const subjectName = canonSubj(q && q.s);
@@ -10015,12 +10332,27 @@ function exportLog(copy) {
     };
   }
 
+  // Filter weak concepts: must have attempted 2+ questions with <70% accuracy
+  // This excludes unpracticed topics and topics already mastered
   const weakConcepts = scope === 'study' && coverage && coverage.topics
     ? [...coverage.topics.values()].filter(topic => {
+      // Skip explicitly marked topics
       if (topic.skip || topic.solid) return false;
+      
+      // Must have questions available
       const subject = coverage.subjects[topic.subject];
       const unit = subject && subject.units[topic.unit];
-      return topic.bankCount > 0 || (unit && unit.bankCount > 0);
+      const hasQuestions = topic.bankCount > 0 || (unit && unit.bankCount > 0);
+      if (!hasQuestions) return false;
+      
+      // Must have attempted at least 2 questions
+      if (topic.attemptCount < 2) return false;
+      
+      // Must have accuracy below 70%
+      const accuracy = topic.knownCount / topic.attemptCount;
+      if (accuracy >= 0.70) return false;
+      
+      return true;
     })
     : [];
   const tierRank = subject => subjectTier(subject) === 'A' ? 0 : subjectTier(subject) === 'B' ? 1 : 2;
@@ -10059,7 +10391,7 @@ function exportLog(copy) {
     const sList = unique.filter(r => r.type === 's');
     const ugList = unique.filter(r => r.type === 'ug');
 
-    function renderEntry(r, showConfidence) {
+    function renderEntry(r, showConfidence, showTimestamp) {
       const q = r.q;
       const meta = questionStudyMetadata(q);
       const rec = r.rec || {};
@@ -10082,6 +10414,7 @@ function exportLog(copy) {
         topicMetadata +
         `${q.q || ''}\nYour answer: ${chosen}\nCorrect answer: ${answer}\n` +
         (showConfidence ? `Confidence: ${confidence == null ? 'Unavailable' : `${confidence}/3`}\n` : '') +
+        (showTimestamp && r.ts ? `Recorded: ${new Date(r.ts).toLocaleString()}\n` : '') +
         (q.e ? `Explanation: ${q.e}\n` : '') + '\n';
     }
 
@@ -10089,25 +10422,28 @@ function exportLog(copy) {
       text += `## How to prioritize\n\nWork through Tier A subjects before Tier B and C. Within each subject, revisit recent confident misses first, then lower syllabus levels (L0 first) and higher topic importance. A unit-level practice entry is not proof of topic mastery.\n\n`;
     }
 
+    // Only study mode shows timestamps for diagnostic purposes
+    const includeTimestamp = (scope === 'study');
+
     if (scope === 'study' || scope === 'all' || scope === 'wsk' || scope === 'w') {
       text += `## Mistakes (${wList.length})\n\n`;
-      wList.forEach(r => { text += renderEntry(r, true); });
+      wList.forEach(r => { text += renderEntry(r, true, includeTimestamp); });
     }
     if (scope === 'study' || scope === 'all' || scope === 'wsk' || scope === 's') {
       text += `## Skipped (${sList.length})\n\n`;
-      sList.forEach(r => { text += renderEntry(r, false); });
+      sList.forEach(r => { text += renderEntry(r, false, includeTimestamp); });
     }
     if (scope === 'study' || scope === 'all' || scope === 'ug') {
       text += `## Unsure & Guessed (Confidence 1-2) (${ugList.length})\n\n`;
-      ugList.forEach(r => { text += renderEntry(r, true); });
+      ugList.forEach(r => { text += renderEntry(r, true, includeTimestamp); });
     }
     if (scope === 'study') {
       text += `## Weak Syllabus Concepts / Subtopics (${weakConcepts.length})\n\n` +
-        `Non-skipped, non-solid concepts with mapped topic MCQs or an available unit-level question pool. Unit-level questions are not evidence of topic mastery; an exact topic_id mapping is required.\n\n`;
+        `Topics with < 70% accuracy from 2+ attempts. Unit-level questions are not evidence of topic mastery; an exact topic_id mapping is required.\n\n`;
       if (!MIT_SYLLABUS) {
         text += 'Structured syllabus data is unavailable, so this export could not calculate weak-concept status.\n\n';
       } else if (!weakConcepts.length) {
-        text += 'No non-skipped, non-solid syllabus concepts were found.\n\n';
+        text += 'No weak syllabus concepts were found. Either you haven\'t attempted enough questions yet (need 2+ per topic), or you\'re performing well (≥70% accuracy).\n\n';
       } else {
         const bySubject = new Map();
         weakConcepts.forEach(topic => {

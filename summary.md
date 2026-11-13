@@ -10,10 +10,14 @@ The application prioritizes active recall over passive recognition, adaptive spa
 
 Recall is structured around seven interconnected cognitive study engines designed to maximize marks-per-hour return and eliminate the illusion of competence:
 
-### 1.1. Strict Recall-First Pipeline
+### 1.1. Strict Recall-First Pipeline & Question Presentation
 - **Philosophy**: Prevents the "recognition trap" where multiple-choice options make questions seem familiar before actual memory retrieval has occurred.
 - **Implementation**: Default mode conceals options and prompts the user to mentally retrieve (or type) the answer. Options are revealed only upon intentional prompt.
 - **Smart Choice-Dependency Detection**: An optimized regex automatically bypasses recall-first when the stem is inherently option-dependent (e.g., *"Which of the following..."*, *"Which statement is TRUE/FALSE..."*, *"Select the invalid option..."*).
+- **Zero-Scroll Laptop Navigation**: A sticky footer bar keeps `← Back` and `Continue → (Enter / N)` perpetually reachable without scrolling past lengthy explanations. A top quick-continue button is also placed directly on the feedback badge.
+- **Active Distractor Elimination**: Right-click or Alt/Shift+Click options to strike them through (`.eliminated`), practicing test-day elimination strategy without submitting answers.
+- **Intelligent Explanation Opening**: Explanations auto-expand on missteps and skips, while staying cleanly collapsed on solid recalls to maximize study throughput.
+- **Feedback Hover Pause**: Hovering or touching the answer feedback banner halts auto-advance timers, ensuring calm, deliberate self-confidence ratings (1–3★).
 
 ### 1.2. Confidence-Calibrated Spaced Repetition (SM-2 Variant)
 - **3-Star Confidence Rating**: Every answer is paired with a self-assessed confidence level:
@@ -51,15 +55,19 @@ The 19 syllabus subjects are grouped into calibrated target readiness thresholds
 ### 1.6. Dual-Mode Concept Flashcard System (Phase 5)
 - **Bidirectional Question-Card Linking**: Turn any challenging MCQ into a dedicated concept card with one click. Flashcards maintain a persistent pointer (`sourceQuestionId`) to their origin question.
 - **Dedicated Spaced Review**: Concept flashcards have their own spaced repetition schedule independent of MCQ attempts.
+- **Rapid Hands-on-Keyboard Review**: High-throughput keyboard navigation: <kbd>Space</kbd> / <kbd>Enter</kbd> to reveal the back, <kbd>1</kbd>–<kbd>4</kbd> to rate recall quality (`Again`, `Hard`, `Good`, `Easy`), and <kbd>B</kbd>/<kbd>N</kbd> (or arrow keys) to navigate.
 - **Tombstone Sync Safety**: Deleted cards are recorded in `CARD_TOMBSTONES` to prevent accidental resurrection during multi-device synchronization.
 
 ### 1.7. Timed Mock Exam Simulation
 - **Full Exam Simulation**: 100-question timed mocks with realistic subject weight distribution mirroring the TU IOST entrance format.
-- **In-Mock Question Triage**: Learners can edit, delete, mark "too hard", or tag questions without invalidating the mock; timer cleanly pauses during question editing.
+- **In-Mock Question Triage**: Learners can edit, delete, mark "too hard", flag (<kbd>F</kbd>), or tag questions without invalidating the mock; timer cleanly pauses during question editing.
+- **Flagged Questions Recap**: Flagged questions are preserved across submission and rendered in a dedicated review card (`🚩 Flagged for Review`), allowing candidates to analyze uncertain guesses (even correct ones) alongside misses.
+- **Exam Rule Clarification**: Warnings and disclaimers explicitly reflect official TU IOST policy: no negative marking, reinforcing that candidates should never leave blanks.
 - **Comprehensive Score Analysis**: In-depth breakdown by subject tier, timing analysis, and mock history tracking with personal best celebration triggers.
 
 ### 1.8. Dignified Milestone Celebrations
 - **Authentic Motivation**: Clean, distraction-free modal dialog celebrating score milestones (e.g., reaching the subject's tier target or beating a mock personal best).
+- **Auto-Dismissing Confetti Toasts**: Non-blocking celebratory toasts with confetti fire on Inbox Zero, clean runs, and daily mission completion, automatically cleaning up after 2.8s without obstructing the interface.
 - **Curated Wisdom**: Displays authentic quotes on mastery, focus, and computer science discipline without childish gamification or disruptive browser alerts.
 
 ---
@@ -80,6 +88,7 @@ flowchart TD
 - **Local Storage (`AppState`)**: Stores attempts history (`V`), spaced repetition metadata, concept flashcards, question overrides, mock histories, and custom settings.
 - **Non-Destructive Merge**: `cloud-sync.js` performs a conflict-free merge of question histories (`V`), taking the union of attempts, latest review dates, and max intervals.
 - **Tombstone Synchronization**: Explicit deletion tombstones (`CARD_TOMBSTONES`, deleted question hashes) ensure that removals on one device are propagated correctly without resurrection.
+- **1-Click Error Log & Study Pack Exports**: Quick export available directly from the header navigation and session complete screens, generating formatted markdown study packs and error logs without navigating nested drawers.
 - **JSON Backup & Restore**: Full system state can be exported to or restored from a portable JSON snapshot at any time.
 
 ---
@@ -87,6 +96,7 @@ flowchart TD
 ## 3. Inline AI Integration (Gemini API)
 
 - **Configurable BYOK (Bring Your Own Key)**: Configurable securely in client settings without exposing API keys.
+- **`🎯 Sharpen MCQ` Pipeline (<kbd>Alt</kbd>+<kbd>S</kbd>)**: A dedicated item-writing engine for questions with obvious answers or weak options. Preserves the exact same syllabus concept, rewrites the stem for rigor, and generates 3 competitive, entrance-grade distractors validated by independent blind solving.
 - **On-Demand Conceptual Explanations**: Context-aware prompts generate concise conceptual explanations, discriminating rules, and common distractor pitfalls for any question.
 - **Concept Card Generation**: Automatically synthesizes question stems and explanations into clean flashcard front/back pairs.
 
@@ -97,7 +107,7 @@ flowchart TD
 | File | Role & Contents |
 |---|---|
 | `index.html` | Complete SPA application: UI markup, CSS design system, inline state management, 7 study engines, PWA integration, and modals. |
-| `question_bank.json` | Bundled repository of 1,866 curated MCQs with verified answers, explanations, syllabus `topic_id` tags, and priority levels. |
+| `question_bank.json` | Bundled repository of 1,957 curated MCQs with verified answers, explanations, syllabus `topic_id` tags, and priority levels. |
 | `mit_entrance_syllabus.json` | Canonical syllabus database: 19 subjects, 160 units, 1,036 topics with calculated weights and study guidance. |
 | `MIT_Entrance_Scope_Guide.md` | Strategic handbook: Exam structure, preparation roadmap, recall webs, confusable pairs, and authoring guidelines. |
 | `cloud-sync.js` | State normalization, bi-directional 3-way merge logic, and cloud synchronization client. |
