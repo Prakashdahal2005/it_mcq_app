@@ -3754,22 +3754,44 @@ function sharpenCurrentQuestion() {
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
   if (effWellMade(rawQ)) {
-    alert('This question is marked Well made. Unmark it first to sharpen distractors.');
+    showToast('This question is marked Well made. Unmark it first to sharpen distractors.', 'warn');
     return;
   }
   if (!GEM_KEY) {
-    alert('A Gemini API key is required to sharpen MCQs with competitive distractors. Please add your Gemini key in Settings (⚙).');
+    showToast('A Gemini API key is required to sharpen MCQs. Please add your Gemini key in Settings (⚙).', 'warn');
     return;
   }
-  const qStem = $('#q-stem');
-  if (qStem) qStem.innerHTML = '<span class="c-sk">🎯 Sharpening MCQ: generating competitive distractors & rigorous phrasing...</span>';
+  const targetP = P;
+  const targetUid = questionUid(rawQ) || qk(rawQ);
+  const btn = $('#sharpen-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '🎯 Sharpening...';
+  }
+  showToast('🎯 Sharpening MCQ with concise entrance-grade distractors... (You can wait or continue)');
   rewriteQuestionWithGemini(rawQ, { sharpen: true, background: false }).then(() => {
-    sessionHistory[P] = null;
-    show();
+    const currentRaw = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+    const currentUid = currentRaw ? (questionUid(currentRaw) || qk(currentRaw)) : null;
+    if (P === targetP && currentUid === targetUid) {
+      sessionHistory[P] = null;
+      show();
+      showToast('🎯 Question sharpened with concise, competitive distractors!');
+    } else {
+      showToast('🎯 Previous question sharpened in background. Updated for your next review.');
+    }
   }).catch(err => {
-    try { alert('Sharpening failed: ' + (err.message || err)); } catch(e){}
-    sessionHistory[P] = null;
-    show();
+    const currentRaw = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+    const currentUid = currentRaw ? (questionUid(currentRaw) || qk(currentRaw)) : null;
+    if (P === targetP && currentUid === targetUid) {
+      const activeBtn = $('#sharpen-btn');
+      if (activeBtn) {
+        activeBtn.disabled = false;
+        activeBtn.innerHTML = '🎯 Sharpen MCQ';
+      }
+      showToast('Sharpening failed: ' + (err.message || err), 'error');
+    } else {
+      console.warn('Background sharpening failed for question ' + targetUid, err);
+    }
   });
 }
 
@@ -8882,15 +8904,16 @@ async function rewriteQuestionWithGemini(targetQ, opts = {}) {
     const promptB = isCorrection
       ? 'You are an expert exam writer reviewing a question flagged as possibly incorrect. Correct factual, mathematical, coding, answer-key, or explanation errors while preserving the original learning objective and difficulty. Do not introduce an unrelated concept. If the source is already correct, return a corrected equivalent question with the same intended answer. Solve it independently and return a clear explanation. '
       : (isSharpen
-        ? 'You are an expert entrance exam item-writer. The source question tests a valuable curriculum concept, but is low quality because the answer is too obvious, the distractors are implausible/silly, or the stem gives away the answer. Upgrade this MCQ into a high-quality entrance exam question while preserving the EXACT SAME core concept, formula, or principle tested in the source: 1. Keep the exact same concept and learning objective. 2. Rewrite the stem to be academically rigorous and precise without giveaway hints. 3. Write THREE highly plausible, competitive distractors representing common student misconceptions, near-miss technical distinctions, or calculation slips (no absurd or giveaway options). 4. Ensure all four options are balanced in length, grammatical style, and plausibility. '
+        ? 'You are an expert entrance exam item-writer. The source MCQ tests a curriculum concept, but suffers from low quality (obvious giveaway, trivial surface recall, or implausible distractors). Upgrade it into a high-yield entrance exam question testing the EXACT SAME core concept, formula, or mechanism: 1. Keep the exact same concept and learning objective. 2. Write a concise, precise stem (1–2 sentences, maximum 45 words; avoid bloated scenario filler or preamble). 3. Distractors: Provide THREE realistic, competitive distractors from the exact same technical domain (e.g. adjacent algorithms, near-miss parameters, or genuine technical misconceptions). 4. STRICT OPTION BREVITY: Keep all 4 options SHORT and CONCISE (typically 1 to 7 words each; never write paragraphs, full sentences, or definitions inside options). 5. Do not use "Term: definition" format; provide only the crisp term, value, or phrase itself. '
         : 'You are an expert exam writer. Create ONE new MCQ in the SAME SUBJECT and SAME UNIT/TOPIC as the source, but test a SIBLING sub-skill or adjacent idea rather than repeating the exact same fact with reworded options. State source_microconcept and microconcept separately, and explain the relationship in sibling_reason. For factual, definitional, or programming-concept questions, target a different property, comparison, consequence, or application, not just a rewording. For calculation, trace, or code questions, test a different operation or principle, not merely different numbers or a scenario swap. If the unit offers no meaningful sibling, say so rather than inventing an unrelated question.');
     const fullPrompt = isCorrection
       ? promptB + ' Rules: Keep the same subject, unit, topic_id, learning objective, and difficulty. Correct the flagged error rather than avoiding or paraphrasing the source. Solve independently in "working"; ensure the answer and explanation agree. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}'
       : (isSharpen
-        ? promptB + ' Rules: 1. Keep the exact same subject, unit, topic_id, and core concept. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible misconception or slip named in "slips". 4. Ensure all four options are competitive and distinct. 5. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","concept":"string"}'
+        ? promptB + ' Rules: 1. Keep the exact same subject, unit, topic_id, and core concept. 2. Solve step by step in "working". 3. STRICT BREVITY: stem must be concise (under 45 words); all 4 options must be concise terms/phrases (under 7 words each; NO paragraphs, NO definitions in options). 4. Each wrong option must be a specific plausible misconception named in "slips". 5. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","concept":"string"}'
         : promptB + coldRule + ' Rules: 1. Keep the same subject, unit, topic_id, and difficulty as the source. 2. Solve it step by step yourself first in "working". 3. Each wrong option must be a specific plausible slip named in "slips". 4. Keep the four options similar in length, but never sacrifice correctness for length. 5. Avoid degenerate values (0, 1, equal numbers), do not reuse numbers or stems listed in "avoid", and do not duplicate any prior variant. 6. Return ONLY valid JSON: {"stem":"string","code":["string"],"options":["A","B","C","D"],"answer":0,"working":"string","slips":["string"],"why":"string","source_microconcept":"string","microconcept":"string","sibling_reason":"string"}');
 
-    const genResult = await fetchGeminiWithFallback(fullPrompt + '\n\nSource Question:\n' + JSON.stringify(source), isCorrection ? 0.2 : 0.8, GEM_GEN_MODEL, 18000, true);
+    const genTemp = isCorrection ? 0.2 : (isSharpen ? 0.35 : 0.8);
+    const genResult = await fetchGeminiWithFallback(fullPrompt + '\n\nSource Question:\n' + JSON.stringify(source), genTemp, GEM_GEN_MODEL, 18000, true);
     const v = extractJson(genResult.text);
     const generatedOptions = Array.isArray(v.options)
       ? v.options.slice()
