@@ -6074,6 +6074,18 @@ function firstPracticeAttempts() {
   return [...map.values()];
 }
 
+function latestPracticeAttempts() {
+  const map = new Map();
+  (L || []).forEach(rec => {
+    if (!rec || rec.mock === 1 || recordIsOutOfScope(rec)) return;
+    const key = recordIdentity(rec);
+    if (!key) return;
+    const prev = map.get(key);
+    if (!prev || (rec.t || 0) >= (prev.t || 0)) map.set(key, rec);
+  });
+  return [...map.values()];
+}
+
 function scoreRecords(records) {
   const scoredRecords = records.filter(rec => rec && !recordIsOutOfScope(rec));
   const attempts = scoredRecords.length;
@@ -6100,8 +6112,10 @@ function rawAccuracy(records) {
 }
 
 // Estimate readiness from first practice attempts; mock results and repeated attempts are handled separately.
+// For Level 0 Core Mastery, learning is rewarded: questions retried and answered correctly on latest attempts redeem past misses.
 function readinessStats() {
   const first = firstPracticeAttempts();
+  const latest = latestPracticeAttempts();
   const bySubject = {};
   const l0BySubject = {};
   first.forEach(rec => {
@@ -6111,6 +6125,15 @@ function readinessStats() {
     (bySubject[subject] = bySubject[subject] || []).push(rec);
     const lvl = recordLevelValue(rec);
     if (lvl === 0) (l0BySubject[subject] = l0BySubject[subject] || []).push(rec);
+  });
+
+  const latestL0BySubject = {};
+  latest.forEach(rec => {
+    const q = findQuestionByRecord(rec);
+    const subject = canonSubj(rec.s || (q && q.s) || '');
+    if (!subject) return;
+    const lvl = recordLevelValue(rec);
+    if (lvl === 0) (latestL0BySubject[subject] = latestL0BySubject[subject] || []).push(rec);
   });
 
   const subjects = {};
@@ -6125,13 +6148,28 @@ function readinessStats() {
   });
 
   const l0 = {};
-  Object.entries(l0BySubject).forEach(([subject, records]) => {
-    const scored = scoreRecords(records);
+  const allL0Subjects = new Set([...Object.keys(l0BySubject), ...Object.keys(latestL0BySubject)]);
+  allL0Subjects.forEach(subject => {
+    const firstRecs = l0BySubject[subject] || [];
+    const latestRecs = latestL0BySubject[subject] || [];
+    const firstScored = scoreRecords(firstRecs);
+    const latestScored = scoreRecords(latestRecs);
+
+    const firstMastered = firstScored.weightedAttempts >= 5 && firstScored.raw >= 0.85;
+    const latestMastered = latestScored.weightedAttempts >= 5 && latestScored.raw >= 0.85;
+    const isMastered = firstMastered || latestMastered;
+
+    const useLatest = latestMastered || latestScored.raw > firstScored.raw;
+    const chosenScored = useLatest ? latestScored : firstScored;
+    const chosenRecs = useLatest ? latestRecs : firstRecs;
+
     l0[subject] = {
-      ...scored,
+      ...chosenScored,
       subject,
-      raw: rawAccuracy(records),
-      mastered: scored.weightedAttempts >= 5 && scored.raw >= 0.85
+      raw: rawAccuracy(chosenRecs),
+      firstRaw: rawAccuracy(firstRecs),
+      latestRaw: rawAccuracy(latestRecs),
+      mastered: isMastered
     };
   });
 
