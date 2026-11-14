@@ -6453,6 +6453,12 @@ function getConceptGapsList(limit = 5) {
     const uid = questionUid(q) || k;
     if (GAP_DONE_TODAY[uid] === todayKey) return;
     if (V[k] && Array.isArray(V[k].history) && V[k].history.length > 0) {
+      // Skip questions whose last attempt was today — let them sit overnight first
+      const lastEntry = V[k].history[V[k].history.length - 1];
+      if (lastEntry && lastEntry.t) {
+        const lastDateKey = new Date(lastEntry.t).toLocaleDateString('en-CA');
+        if (lastDateKey === todayKey) return;
+      }
       byIdentity.set(k, q);
     }
   });
