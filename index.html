@@ -1241,6 +1241,7 @@ function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (s) {
+      invalidateQuestionCaches();
       D = s.D || null;
       R = s.R || {};
       W = s.W || {};
@@ -1255,7 +1256,7 @@ function load() {
       lastBackup = s.lastBackup || 0;
       lastFreshSetDay = Number.isInteger(s.lastFreshSetDay) ? s.lastFreshSetDay : null;
       gemVars = Array.isArray(s.gemVars) ? s.gemVars : [];
-      todayMins = s.todayMins || 15;
+      todayMins = s.todayMins || Number(localStorage.getItem('bitmcq_today_mins')) || 15;
       QOV = (s.QOV && typeof s.QOV === 'object') ? s.QOV : {};
       QEDITS = (s.QEDITS && typeof s.QEDITS === 'object' && !Array.isArray(s.QEDITS)) ? s.QEDITS : {};
       QDELETED = (s.QDELETED && typeof s.QDELETED === 'object' && !Array.isArray(s.QDELETED)) ? s.QDELETED : {};
@@ -2284,10 +2285,54 @@ function updateQuestionCopies(uid, patch) {
   if (CURRENT_Q && CURRENT_Q.origQ && questionUid(CURRENT_Q.origQ) === uid) {
     Object.assign(CURRENT_Q.origQ, patch);
   }
+  invalidateQuestionCaches();
+}
+
+let _cachedBankQuestionPool = null;
+let _cachedBankSubjects = null;
+let _questionUidMap = null;
+let _questionQkMap = null;
+
+function invalidateQuestionCaches() {
+  _cachedBankQuestionPool = null;
+  _cachedBankSubjects = null;
+  _questionUidMap = null;
+  _questionQkMap = null;
+}
+
+function ensureQuestionLookupMaps() {
+  if (_questionUidMap && _questionQkMap) return;
+  const uidMap = new Map();
+  const qkMap = new Map();
+
+  const indexQ = q => {
+    if (!q || typeof q !== 'object') return;
+    const uid = questionUid(q);
+    if (uid) uidMap.set(uid, q);
+    if (q._sid) uidMap.set(String(q._sid), q);
+    if (q.id != null && String(q.id).trim() !== '') {
+      uidMap.set(`id:${String(q.u || q.s || '').trim()}:${String(q.id).trim()}`, q);
+    }
+    const k = qk(q);
+    if (k) qkMap.set(k, q);
+  };
+
+  (A || []).forEach(a => (a && Array.isArray(a.errs) ? a.errs.forEach(indexQ) : null));
+  (BANKS || []).forEach(b => { if (b && Array.isArray(b.q)) b.q.forEach(indexQ); });
+  (MOCK_D || []).forEach(indexQ);
+  (DRILL_D || []).forEach(indexQ);
+  (D || []).forEach(indexQ);
+
+  _questionUidMap = uidMap;
+  _questionQkMap = qkMap;
 }
 
 function findQuestionByUid(uid) {
   if (!uid) return null;
+  ensureQuestionLookupMaps();
+  const uidStr = String(uid);
+  const cached = _questionUidMap.get(uidStr);
+  if (cached) return cached;
   const pools = [
     D || [],
     DRILL_D || [],
@@ -2296,27 +2341,32 @@ function findQuestionByUid(uid) {
     ...(A || []).map(a => (a && Array.isArray(a.errs) ? a.errs : []))
   ];
   for (const pool of pools) {
-    const found = pool.find(q => q && typeof q === 'object' && questionUid(q) === uid);
-    if (found) return found;
+    const found = pool.find(q => q && typeof q === 'object' && questionUid(q) === uidStr);
+    if (found) {
+      _questionUidMap.set(uidStr, found);
+      return found;
+    }
   }
   return null;
 }
 
 function findQuestionByRecord(rec) {
   if (!rec || typeof rec !== 'object') return null;
+  if (rec._resolvedQ && !isQuestionDeleted(rec._resolvedQ)) return rec._resolvedQ;
+  let q = null;
   if (rec.uid) {
-    const byUid = findQuestionByUid(rec.uid);
-    if (byUid) return byUid;
+    q = findQuestionByUid(rec.uid);
   }
-  if (rec.qid) {
-    const byQid = findQuestionByUid(rec.qid);
-    if (byQid) return byQid;
+  if (!q && rec.qid) {
+    q = findQuestionByUid(rec.qid);
   }
-  if (rec.k != null) {
-    const byKey = byN(rec.k);
-    if (byKey) return byKey;
+  if (!q && rec.k != null) {
+    q = byN(rec.k);
   }
-  return null;
+  if (q && !isQuestionDeleted(q)) {
+    rec._resolvedQ = q;
+  }
+  return q;
 }
 
 function recordIdentity(rec) {
@@ -2440,6 +2490,7 @@ function applyQuestionOverridesEverywhere() {
   (A || []).forEach(a => prepare(a && a.errs));
   syncFlashcardSourceLinks();
   pruneSessionQuestions();
+  invalidateQuestionCaches();
 }
 
 function qovEntryFor(q) {
@@ -2884,7 +2935,9 @@ function retryMitSyllabusLoad() {
 }
 
 function refreshSyllabusHome() {
-  if (view === 'home' && D && !loadMode && !$('#gk') && !$('#q-editor-overlay')) home(true);
+  if (view === 'home' && D && !loadMode && !$('#gk') && !$('#q-editor-overlay')) {
+    refreshHomeIfIdle();
+  }
 }
 const DAY_MS = 86400000;
 const localDateKey = (ts) => {
@@ -2950,12 +3003,12 @@ function hasPracticeAttempt(q, latest) {
   return !!latestPracticeRecordFor(q, latest || latestPracticeRecordMap());
 }
 
-function currentPracticeQuestions(status) {
-  const latest = latestPracticeRecordMap();
+function currentPracticeQuestions(status, latest = null) {
+  const latestMap = latest || latestPracticeRecordMap();
   const doneToday = questionsAnsweredToday();
   const questions = bankQuestionPool().filter(q => {
     if (!q || !normalSessionEligible(q) || wasAnsweredToday(q, doneToday)) return false;
-    const r = latestPracticeRecordFor(q, latest);
+    const r = latestPracticeRecordFor(q, latestMap);
     if (!r) return false;
     if (status === 'w') return !r.ok && r.ch !== -1;
     if (status === 's') return !r.ok && r.ch === -1;
@@ -3150,6 +3203,12 @@ function dueKeys(quickOnly = false, availableOnly = false) {
 function findQuestionByRawKey(key) {
   if (key == null) return null;
   const raw = String(key);
+  ensureQuestionLookupMaps();
+  const cachedByUid = _questionUidMap ? _questionUidMap.get(raw) : null;
+  if (cachedByUid) return cachedByUid;
+  const cachedByQk = _questionQkMap ? _questionQkMap.get(raw) : null;
+  if (cachedByQk) return cachedByQk;
+
   const byUid = raw.startsWith('qk:') || raw.startsWith('id:') || raw.startsWith('sid:') || raw.startsWith('h:');
   const pools = [
     D || [],
@@ -3161,8 +3220,12 @@ function findQuestionByRawKey(key) {
     for (const q of pool) {
       if (!q || typeof q !== 'object') continue;
       if (byUid || q._sid === raw) {
-        if (questionUid(q) === raw) return q;
+        if (questionUid(q) === raw) {
+          if (_questionUidMap) _questionUidMap.set(raw, q);
+          return q;
+        }
       } else if (qk(q) === raw) {
+        if (_questionQkMap) _questionQkMap.set(raw, q);
         return q;
       }
     }
@@ -4240,6 +4303,7 @@ function deleteQuestionByQ(q) {
   delete QOV[oldQk];
   QDELETED[uid] = Date.now();
   delete QEDITS[uid];
+  invalidateQuestionCaches();
   if (removedSession) P = Math.min(Math.max(0, P - removedBeforeP), Math.max(0, Q.length - 1));
   save();
   if (view === 'q') {
@@ -5496,16 +5560,16 @@ function rateCard(grade) {
 }
 
 // Milestone Management (M1 to M7)
-function getCurrentMilestone() {
+function getCurrentMilestone(existingStats = null) {
   if (!DIAGNOSTIC_DONE) {
     return { id: 1, tag: 'M1', title: 'Day-1 Diagnostic Mock', desc: 'Complete a full timed mock exam to establish your baseline.', done: false };
   }
 
-  const readiness = readinessStats();
+  const readiness = existingStats || readinessStats();
   const practice = readiness.subjects;
   const l0 = readiness.l0;
   const diag = diagnosticSubjectStats();
-  const signals = milestoneSubjectSignals();
+  const signals = milestoneSubjectSignals(readiness);
   const redSubjs = signals.filter(s => s.isWeak);
   const amberSubjs = signals.filter(s => s.isBorderline);
   const redIncomplete = redSubjs.filter(s => ((FIX_DAYS[s.k] || []).length < 2));
@@ -6613,8 +6677,8 @@ function diagnosticSubjectStats() {
   return { available: true, subjects, source: tagged.length ? 'diagnostic' : 'legacy-diagnostic' };
 }
 
-function milestoneSubjectSignals() {
-  const practice = readinessStats().subjects;
+function milestoneSubjectSignals(existingStats = null) {
+  const practice = existingStats ? (existingStats.subjects || existingStats) : readinessStats().subjects;
   const diagnostic = diagnosticSubjectStats();
   const names = new Set([...Object.keys(practice), ...Object.keys(diagnostic.subjects)]);
   const rows = [];
@@ -6659,10 +6723,10 @@ function syncStatusChip() {
   return `<button class="chip ${cls}" style="cursor:pointer" onclick="openSettings()" title="${esc(st.message || label)}">${label}</button>`;
 }
 
-function renderReadinessMeter() {
+function renderReadinessMeter(existingStats = null) {
   if (!(D && D.length) && !bankQuestionPool().length) return '';
   const TARGET_MARK = Number(localStorage.getItem('bitmcq_target_mark')) || 80;
-  const stats = readinessStats();
+  const stats = existingStats || readinessStats();
   const overall = stats.overall;
   const projectedMark = Math.round(overall.score * 1000) / 10;
   const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
@@ -6813,6 +6877,7 @@ function clearDrillDeck() {
 }
 
 function bankQuestionPool() {
+  if (_cachedBankQuestionPool) return _cachedBankQuestionPool;
   const out = [], seen = new Set();
   const add = q => {
     if (!q) return;
@@ -6825,14 +6890,17 @@ function bankQuestionPool() {
     if (Array.isArray(bank.q)) bank.q.forEach(add);
   });
   if (Array.isArray(D)) D.forEach(add);
+  _cachedBankQuestionPool = out;
   return out;
 }
 
 function bankSubjects() {
+  if (_cachedBankSubjects) return _cachedBankSubjects;
   const set = new Set();
   bankQuestionPool().forEach(q => set.add(canonSubj(q.s)));
   (D || []).forEach(q => set.add(canonSubj(q.s)));
-  return [...set].sort((a, b) => a.localeCompare(b));
+  _cachedBankSubjects = [...set].sort((a, b) => a.localeCompare(b));
+  return _cachedBankSubjects;
 }
 
 function selectSubjectDrillQuestions(subjectName, requestedCount, includeAnsweredToday = false) {
@@ -7075,6 +7143,13 @@ function toggleMoreMenu() {
 }
 
 // Home View
+function setSessionMins(m) {
+  todayMins = Number(m) || 15;
+  try { localStorage.setItem('bitmcq_today_mins', String(todayMins)); } catch (e) {}
+  save();
+  home(true);
+}
+
 function home(preserveScroll = false) {
   if (!preserveScroll) {
     window.scrollTo(0, 0);
@@ -7131,12 +7206,13 @@ function home(preserveScroll = false) {
 
   const maxCap = getMaxInterval();
   const due = dueKeys();
-  const wr = currentPracticeQuestions('w').map(sessionKeyForQuestion);
-  const sk = currentPracticeQuestions('s').map(sessionKeyForQuestion);
-  const codeTraceDue = codeTraceDueQuestions().length;
-  const codeTraceCount = codeTracePool().length;
-  const showCodeTraceReminder = codeTraceCount > 0 && codeTraceReminderDue();
   const latestPractice = latestPracticeRecordMap();
+  const wr = currentPracticeQuestions('w', latestPractice).map(sessionKeyForQuestion);
+  const sk = currentPracticeQuestions('s', latestPractice).map(sessionKeyForQuestion);
+  const tracePool = codeTracePool();
+  const codeTraceCount = tracePool.length;
+  const codeTraceDue = codeTraceDueQuestions(tracePool).length;
+  const showCodeTraceReminder = codeTraceCount > 0 && codeTraceReminderDue();
   const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice)).length;
   const freshButtonText = `✨ Practice Unseen Questions (${freshCount} available)`;
   const coldQuestionCount = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q)).length;
@@ -7152,7 +7228,7 @@ function home(preserveScroll = false) {
   const homeL0Tracked = Math.max(drillSubjects.length, homeL0Rows.length, 19);
 
   const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
-  const milestone = getCurrentMilestone();
+  const milestone = getCurrentMilestone(homeReadiness);
   const weeklyMock = weeklyMockStatus();
 
   let resumeMockBanner = '';
@@ -7242,9 +7318,9 @@ function home(preserveScroll = false) {
 
       <div class="row" style="margin:14px 0 16px">
         <span class="mu" style="font-weight:600">Session length:</span>
-        <button class="${todayMins === 10 ? 'p' : ''} sm" onclick="todayMins=10;save();home(true)">10 min (12 Q)</button>
-        <button class="${todayMins === 15 ? 'p' : ''} sm" onclick="todayMins=15;save();home(true)">15 min (18 Q) ★</button>
-        <button class="${todayMins === 25 ? 'p' : ''} sm" onclick="todayMins=25;save();home(true)">25 min (28 Q)</button>
+        <button class="${todayMins === 10 ? 'p' : ''} sm" onclick="setSessionMins(10)">10 min (12 Q)</button>
+        <button class="${todayMins === 15 ? 'p' : ''} sm" onclick="setSessionMins(15)">15 min (18 Q) ★</button>
+        <button class="${todayMins === 25 ? 'p' : ''} sm" onclick="setSessionMins(25)">25 min (28 Q)</button>
       </div>
 
       <button class="p big-btn" onclick="startToday()">
@@ -7311,7 +7387,7 @@ function home(preserveScroll = false) {
       <div class="mu sm" style="text-align:center;margin-top:6px">${freshCount} unattempted questions across all 19 subjects</div>
     </div>
 
-    ${renderReadinessMeter()}
+    ${renderReadinessMeter(homeReadiness)}
 
     <!-- Secondary Practice & Diagnostics Tucked Under "More" -->
     <div class="card" style="margin-top:14px">
@@ -7673,9 +7749,9 @@ function codeTracePool() {
   return preferredQuestionTier(candidates);
 }
 
-function codeTraceDueQuestions() {
+function codeTraceDueQuestions(pool = null) {
   const t = today();
-  return codeTracePool().filter(q => {
+  return (pool || codeTracePool()).filter(q => {
     const v = V[qk(q)];
     return v && v.d <= t;
   });
@@ -10092,6 +10168,7 @@ function importBank(x, defaultName, replaceExisting = false) {
     R = nextR; W = nextW; Q = []; QRESULTS = []; P = 0;
   }
   syncFlashcardSourceLinks();
+  invalidateQuestionCaches();
   return bank;
 }
 
@@ -10099,14 +10176,20 @@ function isDashboardIdle() {
   return typeof view === 'undefined' || view === 'home';
 }
 
+let _homeRefreshTimer = null;
 function refreshHomeIfIdle(message) {
-  if (isDashboardIdle()) {
-    home();
+  if (!isDashboardIdle()) {
+    if (message) { try { showToast(message); } catch (e) {} }
     return;
   }
-  if (message) {
-    try { showToast(message); } catch (e) {}
-  }
+  if (_homeRefreshTimer) clearTimeout(_homeRefreshTimer);
+  _homeRefreshTimer = setTimeout(() => {
+    _homeRefreshTimer = null;
+    if (isDashboardIdle()) {
+      home(true);
+      if (message) { try { showToast(message); } catch (e) {} }
+    }
+  }, 40);
 }
 
 function loadDefaultBank(force = false) {
@@ -10161,6 +10244,7 @@ function loadSet(bankId, k, startFresh = false) {
     });
   R = {}; W = {}; Q = []; QRESULTS = []; P = 0; loadMode = 0; impMode = 0;
   syncFlashcardSourceLinks();
+  invalidateQuestionCaches();
   const saved = save();
   if (startFresh) start(D.map(q => q.n));
   else home();
