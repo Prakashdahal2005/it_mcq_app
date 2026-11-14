@@ -3795,6 +3795,111 @@ function sharpenCurrentQuestion() {
   });
 }
 
+function formatQuestionForClipboard(qObj) {
+  if (!qObj) return '';
+  const lines = [];
+  if (qObj.s) {
+    lines.push(`[${qObj.s}]`);
+  }
+  const stem = qObj.q || '';
+  lines.push(stem);
+  if (Array.isArray(qObj.code) && qObj.code.length) {
+    lines.push('```\n' + qObj.code.join('\n') + '\n```');
+  }
+  lines.push('');
+
+  const opts = qObj.displayOpts || qObj.o || qObj.origO || [];
+  if (Array.isArray(opts) && opts.length > 0) {
+    opts.forEach((opt, idx) => {
+      const label = 'ABCD'[idx] || String(idx + 1);
+      lines.push(`${label}) ${opt}`);
+    });
+    lines.push('');
+  }
+
+  const isMockActive = typeof MK !== 'undefined' && MK && !MK.expired;
+  if (!isMockActive) {
+    const ansIdx = qObj.displayA != null ? qObj.displayA : (qObj.origA != null ? qObj.origA : qObj.a);
+    if (ansIdx != null && opts[ansIdx] != null) {
+      const label = 'ABCD'[ansIdx] || String(ansIdx + 1);
+      lines.push(`Answer: ${label}) ${opts[ansIdx]}`);
+    } else if (qObj.expectedAnswer) {
+      lines.push(`Answer: ${qObj.expectedAnswer}`);
+    }
+    if (qObj.e && String(qObj.e).trim()) {
+      lines.push(`Explanation: ${String(qObj.e).trim()}`);
+    }
+  }
+
+  return lines.join('\n').trim();
+}
+
+function copyCurrentQuestion(btn) {
+  const qObj = CURRENT_Q || (typeof P !== 'undefined' && typeof Q !== 'undefined' && Q[P] ? byN(Q[P]) : null);
+  if (!qObj) return;
+  const text = formatQuestionForClipboard(qObj);
+  if (!text) return;
+
+  const targetBtn = btn || document.getElementById('copy-q-btn');
+  const origHtml = targetBtn ? targetBtn.innerHTML : '';
+  const origColor = targetBtn ? targetBtn.style.color : '';
+  const origBorder = targetBtn ? targetBtn.style.borderColor : '';
+
+  function onSuccess() {
+    if (targetBtn) {
+      targetBtn.innerHTML = '✓ Copied';
+      targetBtn.style.color = 'var(--ok, #059669)';
+      targetBtn.style.borderColor = 'var(--ok-bd, #10b981)';
+      setTimeout(() => {
+        targetBtn.innerHTML = origHtml || '📋 Copy';
+        targetBtn.style.color = origColor;
+        targetBtn.style.borderColor = origBorder;
+      }, 1500);
+    }
+    if (typeof showToast === 'function') showToast('Question copied to clipboard');
+  }
+
+  function onError() {
+    if (targetBtn) {
+      targetBtn.innerHTML = '❌ Failed';
+      setTimeout(() => {
+        targetBtn.innerHTML = origHtml || '📋 Copy';
+        targetBtn.style.color = origColor;
+        targetBtn.style.borderColor = origBorder;
+      }, 1500);
+    }
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
+      fallbackCopyQuestion(text, onSuccess, onError);
+    });
+  } else {
+    fallbackCopyQuestion(text, onSuccess, onError);
+  }
+}
+
+function fallbackCopyQuestion(text, onSuccess, onError) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (ok) onSuccess();
+    else onError();
+  } catch (e) {
+    onError();
+  }
+}
+
 function openQuestionEditor(n) {
   const rawQ = CURRENT_Q && CURRENT_Q.origQ ? CURRENT_Q.origQ : (n != null ? byN(n) : null);
   const q = rawQ || byN(n);
@@ -7856,6 +7961,9 @@ function show() {
           <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
           </button>
+          <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (or press C after answering)">
+            📋 Copy
+          </button>
           <button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
             ✏️ Edit
           </button>
@@ -9823,9 +9931,14 @@ document.addEventListener('keydown', e => {
     const j = '1234'.indexOf(k);
     if (i >= 0) pick(i);
     else if (j >= 0) pick(j);
-  } else if ((k === 'enter' || k === ' ') && $('#nx')) {
-    e.preventDefault();
-    navForward();
+  } else {
+    if ((k === 'enter' || k === ' ') && $('#nx')) {
+      e.preventDefault();
+      navForward();
+    } else if (k === 'c') {
+      e.preventDefault();
+      copyCurrentQuestion($('#copy-q-btn'));
+    }
   }
 });
 
