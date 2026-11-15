@@ -7626,6 +7626,7 @@ function startSubjectDrill() {
   startSubjectDrillFromBank(subject, requestedCount);
 }
 
+const DUE_REVIEW_CAP = 60; // Max MCQs shown in a single due-review session
 function startDueReview() {
   const seen = new Set();
   const due = dueKeys().filter(key => {
@@ -7636,13 +7637,17 @@ function startDueReview() {
     return true;
   });
   if (!due.length) { alert('No MCQs are due right now.'); return; }
+  const overflow = due.length > DUE_REVIEW_CAP ? due.length - DUE_REVIEW_CAP : 0;
   if (due.length > 30) {
-    if (!confirm(`You have ${due.length} MCQs due today. Start full due review to clear today's queue? (Cancel = practice 15 Q chunk)`)) {
+    const capNote = overflow > 0
+      ? ` (capped at ${DUE_REVIEW_CAP} highest-priority; ${overflow} deferred to next session)`
+      : '';
+    if (!confirm(`You have ${due.length} MCQs due today. Start full due review to clear today's queue?${capNote} (Cancel = practice 15 Q chunk)`)) {
       start(due.slice(0, 15));
       return;
     }
   }
-  start(due);
+  start(due.slice(0, DUE_REVIEW_CAP));
 }
 
 function isCodeSnippetQuestion(q) {
@@ -8365,15 +8370,17 @@ function updateConfidence(cf) {
   const timeTakenMs = Math.max(500, Date.now() - (questionStartTime || Date.now()));
   REC.cf = cf;
   sr(rawQ, REC.ok, cf, timeTakenMs);
+  // Update DOM classes first, THEN snapshot feedbackHtml so the saved HTML
+  // reflects the newly-active confidence button (fixes nav-back showing wrong label).
+  document.querySelectorAll('.cf-btn').forEach(b => {
+    b.classList.toggle('on', +b.dataset.cf === cf);
+  });
   const hist = sessionHistory[P];
   if (hist) {
     hist.cf = cf;
     const fbEl = $('#fb');
     if (fbEl) hist.feedbackHtml = fbEl.innerHTML;
   }
-  document.querySelectorAll('.cf-btn').forEach(b => {
-    b.classList.toggle('on', +b.dataset.cf === cf);
-  });
   save();
 }
 
