@@ -765,6 +765,12 @@
 
   async function performSync(opts) {
     opts = opts || {};
+    if (opts.mode === 'manual') {
+      state.quotaExceeded = false;
+    } else if (opts.mode === 'auto' && (!isAutoSyncEnabled() || state.quotaExceeded)) {
+      settleInitialSync();
+      return;
+    }
     if (!navigator.onLine) {
       setStatus('offline', 'Offline. Changes will sync when connection returns.');
       settleInitialSync();
@@ -863,10 +869,15 @@
           continue;
         }
         console.warn('Cloud sync error:', err);
-        if (err.kind === 'unauthorized') {
+        var errMsg = err.message || 'Sync failed';
+        if (errMsg.indexOf('plan limits') !== -1 || errMsg.indexOf('limit exceeded') !== -1 || errMsg.indexOf('quota') !== -1) {
+          state.quotaExceeded = true;
+          setAutoSyncEnabled(false);
+          setStatus('error', 'Upstash Redis plan limit reached. Background auto-sync stopped; local study is safe. Sync manually when quota resets.');
+        } else if (err.kind === 'unauthorized') {
           setStatus('unauthorized', err.message);
         } else {
-          setStatus('error', err.message || 'Sync failed');
+          setStatus('error', errMsg);
         }
         break;
       } finally {
@@ -879,12 +890,23 @@
     }
   }
 
+  function isAutoSyncEnabled() {
+    return localStorage.getItem('bitmcq_auto_sync') === 'true';
+  }
+
+  function setAutoSyncEnabled(val) {
+    localStorage.setItem('bitmcq_auto_sync', val ? 'true' : 'false');
+    if (val) state.quotaExceeded = false;
+    refreshUI();
+  }
+
   function onLocalSave() {
     if (state.suppress) return;
     state.dirty = true;
+    if (!isAutoSyncEnabled() || state.quotaExceeded) return;
     if (state.timer) clearTimeout(state.timer);
     state.timer = setTimeout(function () {
-      if (state.dirty && !state.busy && navigator.onLine) {
+      if (state.dirty && !state.busy && navigator.onLine && isAutoSyncEnabled() && !state.quotaExceeded) {
         performSync({ mode: 'auto' });
       }
     }, DEBOUNCE_SAVE_MS);
@@ -895,17 +917,23 @@
     if (meta.lastSync) state.lastSync = meta.lastSync;
 
     window.addEventListener('online', function () {
-      setStatus('syncing', 'Online. Resuming sync...');
-      performSync({ mode: 'auto' });
+      if (isAutoSyncEnabled() && !state.quotaExceeded) {
+        setStatus('syncing', 'Online. Resuming sync...');
+        performSync({ mode: 'auto' });
+      } else {
+        setStatus(state.status || 'synced', 'Online');
+      }
     });
 
     window.addEventListener('offline', function () {
-      setStatus('offline', 'Offline. Changes saved locally and will sync when reconnected.');
+      setStatus('offline', 'Offline. Changes saved locally.');
     });
 
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible') {
-        if (state.dirty && !state.busy) performSync({ mode: 'auto' });
+        if (state.dirty && !state.busy && isAutoSyncEnabled() && !state.quotaExceeded) {
+          performSync({ mode: 'auto' });
+        }
       }
     });
 
@@ -920,18 +948,17 @@
     });
 
     setInterval(function () {
-      if (navigator.onLine && (state.dirty || (Date.now() - state.lastSync > PERIODIC_MS))) {
+      if (isAutoSyncEnabled() && !state.quotaExceeded && navigator.onLine && (state.dirty || (Date.now() - state.lastSync > PERIODIC_MS))) {
         performSync({ mode: 'auto' });
       }
     }, PERIODIC_MS);
 
     // Initial check after page loads
-    if (navigator.onLine) {
+    if (navigator.onLine && isAutoSyncEnabled() && !state.quotaExceeded) {
       setTimeout(function () {
         performSync({ mode: 'auto' });
       }, 1200);
     } else {
-      setStatus('offline', 'Offline mode');
       settleInitialSync();
     }
   }
@@ -1028,12 +1055,22 @@
           </div>
         </div>
 
+        <div style="background:var(--code);padding:12px;border-radius:8px;margin-bottom:14px;border:1px solid var(--bd)">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;font-weight:600">
+            <input type="checkbox" id="cloud-autosync-toggle" ${isAutoSyncEnabled() ? 'checked' : ''} onchange="CloudSync.toggleAutoSync(this.checked)">
+            <span>Auto-sync in background on every save</span>
+          </label>
+          <div style="font-size:0.78rem;color:var(--mu);margin-top:6px;line-height:1.35;margin-left:24px">
+            <b>Manual sync is recommended</b> for Upstash Redis free/fixed plans to preserve your request quota. When unchecked, your progress stays safely on this device and only syncs when you click "Sync Now".
+          </div>
+        </div>
+
         <div id="cloud-sync-msg-box" style="font-size:0.85rem;margin-bottom:12px;color:var(--mu)">
           ${state.message ? `Status: <span style="${state.status === 'error' ? 'color:var(--no, #dc2626);font-weight:600' : ''}">${esc(state.message)}</span>` : `Last cloud sync: <span>${lastSyncText}</span>`}
         </div>
-        ${state.status === 'error' && state.message && state.message.indexOf('Redis') !== -1 ? `
+        ${state.status === 'error' && state.message && (state.message.indexOf('Redis') !== -1 || state.message.indexOf('plan limits') !== -1) ? `
           <div style="font-size:0.8rem;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:6px;padding:8px 10px;margin-bottom:12px;line-height:1.4">
-            💡 <b>Upstash Redis Note:</b> If Redis is returning 500, check the <a href="https://console.upstash.com" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline">Upstash Console</a> or Vercel Storage. Common causes: <b>daily command quota reached (10k requests/day)</b>, <b>database paused due to inactivity</b>, or <b>payload size limits</b>. Your local study data is safe and offline practice works completely.
+            🛑 <b>Upstash Redis Limit Reached:</b> Upstash has blocked requests because this database reached its Fixed plan command limit. Background auto-sync has been stopped automatically so it won't repeatedly fail. Your study progress is completely safe in your local browser storage. You can continue practicing offline, and click "Sync Now" manually once your Upstash quota resets or if you upgrade/enable auto-upgrade in <a href="https://console.upstash.com" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline">Upstash Console</a>.
           </div>
         ` : ''}
 
@@ -1100,6 +1137,8 @@
     syncNow: function () { performSync({ mode: 'manual', preferRemote: false }); },
     saveSecret: saveSecretFromUI,
     toggleSecret: toggleSecretVisibility,
+    toggleAutoSync: function (val) { setAutoSyncEnabled(val); },
+    isAutoSyncEnabled: isAutoSyncEnabled,
     getSecret: getSecret,
     setSecret: setSecret,
     _state: state,
