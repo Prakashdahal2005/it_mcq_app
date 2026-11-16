@@ -7455,10 +7455,16 @@ function home(preserveScroll = false) {
         🚑 Error Rescue · ${conceptGapCount} active
       </button>
 
-      <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
-        ${freshButtonText}
-      </button>
-      <div class="mu sm" style="text-align:center;margin-top:6px">${freshCount} unattempted questions across all 19 subjects</div>
+      <div style="margin-top:10px">
+        <div class="row" style="gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+          <input id="fresh-q-count" type="number" min="1" max="${freshCount}" value="${Math.min(20, freshCount)}" style="width:72px" ${freshCount ? '' : 'disabled'} title="How many unseen questions to practise">
+          <label for="fresh-q-count" class="mu sm">questions</label>
+          <button class="big-btn" style="flex:1;min-width:160px;background:var(--card);border:2px solid var(--bd)" onclick="startFreshSet()" ${freshCount ? '' : 'disabled'}>
+            ${freshButtonText}
+          </button>
+        </div>
+        <div class="mu sm" style="text-align:center">${freshCount} truly unseen questions · never attempted, skipped, or answered</div>
+      </div>
     </div>
 
     ${renderReadinessMeter(homeReadiness)}
@@ -7662,16 +7668,21 @@ function startQuickMode() {
 }
 
 function startFreshSet() {
-  const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
+  const countInput = $('#fresh-q-count');
+  const requestedCount = countInput ? parseInt(countInput.value, 10) : 0;
   const latestPractice = latestPracticeRecordMap();
+  // Strictly unseen: never attempted, skipped, or don't-know'd
   const pool = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice));
   if (!pool.length) {
-    alert('All normal-session bank questions have been attempted. Use Today’s Mission or Due Review to keep practiced questions solid.');
+    alert('You have attempted every question in the bank at least once. Use Today’s Mission or Due Review to keep things sharp.');
     return;
   }
-  const pick = pickCoverageQuestions(pool, targetQ, calculateUnitCoverage(), { maxPerUnit: 2, includeUnmapped: true });
+  const targetQ = (Number.isInteger(requestedCount) && requestedCount >= 1)
+    ? Math.min(requestedCount, pool.length)
+    : Math.max(10, Math.round(todayMins * 60 / 50));
+  const pick = pickCoverageQuestions(pool, targetQ, calculateUnitCoverage(), { maxPerUnit: Math.max(2, Math.ceil(targetQ / 10)), includeUnmapped: true });
   if (!pick.length) {
-    alert('No unattempted questions are left for today. Use Today’s Mission or Due Review to keep practiced questions solid.');
+    alert('No truly unseen questions found. Use Today’s Mission or Due Review to revisit practiced ones.');
     return;
   }
   start(pick.map(q => questionUid(q) || qk(q)));
@@ -8263,6 +8274,9 @@ function show() {
               <button id="dontknow-btn" class="sm" onclick="dontKnow()">
                 🤷 Don't know <kbd class="kbd-badge sm">S</kbd>
               </button>
+              <button id="skipknown-btn" class="sm" onclick="skipKnown()" title="I know it — just skipping (keeps SR on track, won't appear in unseen pool)">
+                ⏭ Skip (know it) <kbd class="kbd-badge sm">K</kbd>
+              </button>
             `)}
           </div>
           <div class="row" style="gap:6px">
@@ -8612,6 +8626,8 @@ function pick(i, cfOverride) {
   bs.forEach(b => b.disabled = true);
   const dk = $('#dontknow-btn');
   if (dk) dk.disabled = true;
+  const sk2 = $('#skipknown-btn');
+  if (sk2) sk2.disabled = true;
 
   let hist = sessionHistory[P];
   if (!hist) hist = sessionHistory[P] = { qKey: qk(rawQ), CURRENT_Q };
@@ -8876,6 +8892,78 @@ function dontKnow() {
     nxFooterDk.innerHTML = (P >= Q.length - 1) ? (MK ? 'Finish' : 'Complete Session →') : 'Continue → <kbd class="kbd-badge sm">Enter / N</kbd>';
     nxFooterDk.onclick = () => fin();
   }
+  hist.feedbackHtml = $('#fb').innerHTML;
+  typesetMath($('#fb'));
+  save();
+}
+
+function skipKnown() {
+  // "I know it — just skipping": gives a small positive SR credit (grade 2, hesitant-correct).
+  // Schedules the question a few days out instead of resetting to tomorrow.
+  // Logged to L so it is excluded from the unseen pool, but does NOT penalise SR.
+  if (locked) return;
+  if (recallWaiting) revealRecallOptions();
+  locked = true;
+
+  const rawQ = CURRENT_Q.origQ || byN(Q[P]);
+  QRESULTS[P] = 'k'; // 'k' = skip-known
+
+  const bs = [...document.querySelectorAll('.opt')];
+  bs.forEach(b => b.disabled = true);
+  if (bs[CURRENT_Q.displayA]) bs[CURRENT_Q.displayA].classList.add('ok');
+
+  let hist = sessionHistory[P];
+  if (!hist) hist = sessionHistory[P] = { qKey: qk(rawQ), CURRENT_Q };
+  hist.locked = true;
+  hist.chosenIdx = -2;
+  hist.ok = true;
+
+  if (!hist.recordedFirstAttempt) {
+    hist.recordedFirstAttempt = true;
+    REC = {
+      k: qk(rawQ),
+      uid: ensureQuestionUid(rawQ),
+      lvl: effLevel(rawQ),
+      t: Date.now(),
+      s: cl(rawQ.s),
+      u: rawQ.u || '',
+      q: rawQ.q.slice(0, 120),
+      ch: -2,          // -2 = "skip known" (distinct from -1 = don't know)
+      ok: true,        // counts as a correct attempt for the unseen pool
+      cf: 2,           // confidence 2 = hesitant
+      set: S,
+      skipKnown: true,
+      variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
+    };
+    L.push(REC);
+    // SR: grade 2 (hesitant correct) — schedules a few days out, does NOT reset interval
+    sr(rawQ, true, 2);
+  }
+
+  const nxBtn = document.getElementById('nx');
+  if (nxBtn) {
+    nxBtn.classList.add('p');
+    nxBtn.innerHTML = (P >= Q.length - 1) ? (MK ? 'Finish' : 'Complete Session →') : 'Continue → <kbd class="kbd-badge sm">Enter / N</kbd>';
+    nxBtn.onclick = () => fin();
+  }
+
+  $('#fb').innerHTML = `
+    <div class="exp">
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <b style="color:var(--ac)">⏭ Skipped — rescheduled a few days out.</b>
+        <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
+      </div>
+      <div style="margin-top:6px">Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
+      <div id="current-exp-container" style="margin-top:6px">
+        ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, true) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
+      </div>
+      <div class="mu sm" style="margin-top:6px">SR interval preserved — this won't count as a miss.</div>
+    </div>
+    <p class="row" style="margin-top:12px;gap:8px">
+      <button class="sm" onclick="navBack()" ${P <= 0 ? 'disabled' : ''}>← Back (B)</button>
+      <button class="p sm" onclick="fin()">Continue → (Enter or N)</button>
+    </p>
+  `;
   hist.feedbackHtml = $('#fb').innerHTML;
   typesetMath($('#fb'));
   save();
@@ -10133,6 +10221,10 @@ document.addEventListener('keydown', e => {
     if (k === 's') {
       if (MK) toggleFlag();
       else dontKnow();
+      return;
+    }
+    if (k === 'k' && !MK) {
+      skipKnown();
       return;
     }
     const i = 'abcd'.indexOf(k);
