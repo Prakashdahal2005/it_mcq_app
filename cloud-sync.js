@@ -712,7 +712,8 @@
       var errText = '';
       try {
         var errJson = await res.json();
-        errText = errJson.error || errJson.details || res.statusText;
+        var detailPart = errJson.details && errJson.details !== errJson.error ? ' — ' + errJson.details : '';
+        errText = (errJson.error || errJson.details || res.statusText) + detailPart;
       } catch (e) {
         errText = res.statusText;
       }
@@ -752,7 +753,8 @@
       var errText = '';
       try {
         var errJson = await res.json();
-        errText = errJson.error || errJson.details || res.statusText;
+        var detailPart = errJson.details && errJson.details !== errJson.error ? ' — ' + errJson.details : '';
+        errText = (errJson.error || errJson.details || res.statusText) + detailPart;
       } catch (e) {
         errText = res.statusText;
       }
@@ -1027,8 +1029,13 @@
         </div>
 
         <div id="cloud-sync-msg-box" style="font-size:0.85rem;margin-bottom:12px;color:var(--mu)">
-          ${state.message ? `Status: <span>${esc(state.message)}</span>` : `Last cloud sync: <span>${lastSyncText}</span>`}
+          ${state.message ? `Status: <span style="${state.status === 'error' ? 'color:var(--no, #dc2626);font-weight:600' : ''}">${esc(state.message)}</span>` : `Last cloud sync: <span>${lastSyncText}</span>`}
         </div>
+        ${state.status === 'error' && state.message && state.message.indexOf('Redis') !== -1 ? `
+          <div style="font-size:0.8rem;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:6px;padding:8px 10px;margin-bottom:12px;line-height:1.4">
+            💡 <b>Upstash Redis Note:</b> If Redis is returning 500, check the <a href="https://console.upstash.com" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline">Upstash Console</a> or Vercel Storage. Common causes: <b>daily command quota reached (10k requests/day)</b>, <b>database paused due to inactivity</b>, or <b>payload size limits</b>. Your local study data is safe and offline practice works completely.
+          </div>
+        ` : ''}
 
         <div class="row" style="gap:8px;flex-wrap:wrap">
           <button type="button" class="p sm" onclick="CloudSync.syncNow()">🔄 Sync Now</button>

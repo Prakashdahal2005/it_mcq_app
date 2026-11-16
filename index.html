@@ -3812,6 +3812,51 @@ function regenerateCurrentQuestion() {
   alert('A Gemini API key is required to regenerate questions. Please configure your Gemini API Key in Settings (⚙).');
 }
 
+function isQuestionSharpened(q) {
+  if (!q) return false;
+  const k = qk(q);
+  const vRec = V[k];
+  return !!(vRec && vRec._variant && vRec._variant.sharpened);
+}
+
+function isQuestionQueuedToSharpen(q) {
+  if (!q) return false;
+  const uid = (typeof questionUid === 'function' ? questionUid(q) : null) || (typeof qk === 'function' ? qk(q) : null);
+  const active = window._backgroundQuestionAiKeys;
+  if (active && uid && active.has(`sharpen:${uid}`)) return true;
+  const k = qk(q);
+  return !!(V[k] && V[k]._sharpenQueued);
+}
+
+function updateSharpenButtonUI(q) {
+  const btn = document.getElementById('sharpen-btn');
+  if (!btn || !q) return;
+  const queued = isQuestionQueuedToSharpen(q);
+  const sharpened = isQuestionSharpened(q);
+  if (queued) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Sharpen queued...';
+    btn.title = 'Sharpening in background queue; you can continue practicing';
+    btn.style.background = '#fef9c3';
+    btn.style.color = '#854d0e';
+    btn.style.borderColor = '#fde047';
+  } else if (sharpened) {
+    btn.disabled = false;
+    btn.textContent = '🎯 Sharpened ✓';
+    btn.title = 'This question was sharpened with competitive distractors (click to re-sharpen)';
+    btn.style.background = '#dcfce7';
+    btn.style.color = '#166534';
+    btn.style.borderColor = '#86efac';
+  } else {
+    btn.disabled = false;
+    btn.textContent = '🎯 Sharpen MCQ';
+    btn.title = 'Keep exact same concept, but rewrite with competitive entrance-grade distractors in background without waiting (Alt+S)';
+    btn.style.background = '#fef3c7';
+    btn.style.color = '#92400e';
+    btn.style.borderColor = '#fcd34d';
+  }
+}
+
 function sharpenCurrentQuestion() {
   if (MK || !CURRENT_Q || P >= Q.length) return;
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
@@ -3824,38 +3869,20 @@ function sharpenCurrentQuestion() {
     showToast('A Gemini API key is required to sharpen MCQs. Please add your Gemini key in Settings (⚙).', 'warn');
     return;
   }
-  const targetP = P;
-  const targetUid = questionUid(rawQ) || qk(rawQ);
-  const btn = $('#sharpen-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '🎯 Sharpening...';
+  if (isQuestionQueuedToSharpen(rawQ)) {
+    showToast('This question is already queued for background sharpening.', 'info');
+    return;
   }
-  showToast('🎯 Sharpening MCQ with concise entrance-grade distractors... (You can wait or continue)');
-  rewriteQuestionWithGemini(rawQ, { sharpen: true, background: false }).then(() => {
-    const currentRaw = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
-    const currentUid = currentRaw ? (questionUid(currentRaw) || qk(currentRaw)) : null;
-    if (P === targetP && currentUid === targetUid) {
-      sessionHistory[P] = null;
-      show();
-      showToast('🎯 Question sharpened with concise, competitive distractors!');
-    } else {
-      showToast('🎯 Previous question sharpened in background. Updated for your next review.');
-    }
-  }).catch(err => {
-    const currentRaw = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
-    const currentUid = currentRaw ? (questionUid(currentRaw) || qk(currentRaw)) : null;
-    if (P === targetP && currentUid === targetUid) {
-      const activeBtn = $('#sharpen-btn');
-      if (activeBtn) {
-        activeBtn.disabled = false;
-        activeBtn.innerHTML = '🎯 Sharpen MCQ';
-      }
-      showToast('Sharpening failed: ' + (err.message || err), 'error');
-    } else {
-      console.warn('Background sharpening failed for question ' + targetUid, err);
-    }
-  });
+
+  const k = qk(rawQ);
+  V[k] = V[k] || {};
+  V[k]._sharpenQueued = true;
+  save();
+
+  updateSharpenButtonUI(rawQ);
+  showToast('🎯 Marked to sharpen in background. You can keep practicing!');
+
+  enqueueBackgroundQuestionAi('sharpen', rawQ);
 }
 
 function formatQuestionForClipboard(qObj) {
@@ -4375,7 +4402,7 @@ function enqueueBackgroundQuestionAi(kind, q, sourceOverride = null) {
     });
   }
   active.add(key);
-  backgroundQuestionAiQueue.push({ kind, q, sourceOverride, key });
+  backgroundQuestionAiQueue.push({ kind, q, sourceOverride, key, attempts: 0 });
   save();
   setTimeout(drainBackgroundQuestionAiQueue, 0);
   return true;
@@ -4401,6 +4428,7 @@ async function drainBackgroundQuestionAiQueue() {
   if (backgroundQuestionAiInProgress || !backgroundQuestionAiQueue.length) return;
   backgroundQuestionAiInProgress = true;
   const job = backgroundQuestionAiQueue.shift();
+  let delayNext = 350;
   try {
     if (!GEM_KEY || isQuestionDeleted(job.q)) return;
     if (job.kind === 'sibling') {
@@ -4418,20 +4446,58 @@ async function drainBackgroundQuestionAiQueue() {
       clearQuestionQuarantine(job.q);
       save();
     } else if (job.kind === 'sharpen') {
-      if (effWellMade(job.q) || isQuestionQuarantined(job.q)) return;
+      const k = qk(job.q);
+      if (effWellMade(job.q) || isQuestionQuarantined(job.q)) {
+        if (V[k]) delete V[k]._sharpenQueued;
+        return;
+      }
       await rewriteQuestionWithGemini(job.q, {
         background: true,
         sharpen: true
       });
+      if (V[k]) delete V[k]._sharpenQueued;
       save();
+      const isCurrentActiveView = typeof view !== 'undefined' && view === 'q';
+      const currentRaw = isCurrentActiveView ? ((CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : (typeof byN === 'function' && typeof P === 'number' && Q && Q[P] != null ? byN(Q[P]) : null)) : null;
+      if (isCurrentActiveView && currentRaw && (questionUid(currentRaw) || qk(currentRaw)) === (questionUid(job.q) || qk(job.q))) {
+        sessionHistory[P] = null;
+        show();
+        showToast('🎯 Question sharpened with concise, competitive distractors!');
+      } else {
+        showToast(`🎯 Q${job.q.n != null ? job.q.n : ''} sharpened in background for your next review.`);
+      }
     }
   } catch (err) {
-    console.warn(`Background ${job.kind} failed; the question remains ${job.kind === 'sibling' ? 'cold' : 'quarantined'}:`, err);
+    if (job.kind === 'sharpen') {
+      job.attempts = (job.attempts || 0) + 1;
+      const k = qk(job.q);
+      if (job.attempts < 3) {
+        console.warn(`Background sharpen attempt ${job.attempts}/3 failed for ${job.key}; keeping in queue:`, err);
+        backgroundQuestionAiQueue.push(job);
+        delayNext = 4000;
+      } else {
+        if (V[k]) delete V[k]._sharpenQueued;
+        setQuestionColdState(job.q, true);
+        save();
+        console.warn(`Background sharpen failed after 3 attempts for ${job.key}; marked cold:`, err);
+        showToast(`🧊 Q${job.q.n != null ? job.q.n : ''} could not be sharpened after 3 attempts; marked cold so it won't appear in practice.`, 'warn');
+        const isCurrentActiveView = typeof view !== 'undefined' && view === 'q';
+        const currentRaw = isCurrentActiveView ? ((CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : (typeof byN === 'function' && typeof P === 'number' && Q && Q[P] != null ? byN(Q[P]) : null)) : null;
+        if (isCurrentActiveView && currentRaw && (questionUid(currentRaw) || qk(currentRaw)) === (questionUid(job.q) || qk(job.q))) {
+          updateColdButtonUI(job.q);
+          updateSharpenButtonUI(job.q);
+        }
+      }
+    } else {
+      console.warn(`Background ${job.kind} failed; the question remains ${job.kind === 'sibling' ? 'cold' : 'quarantined'}:`, err);
+    }
   } finally {
     const active = window._backgroundQuestionAiKeys;
-    if (active) active.delete(job.key);
+    if (active && (!backgroundQuestionAiQueue.some(j => j.key === job.key))) {
+      active.delete(job.key);
+    }
     backgroundQuestionAiInProgress = false;
-    if (backgroundQuestionAiQueue.length) setTimeout(drainBackgroundQuestionAiQueue, 350);
+    if (backgroundQuestionAiQueue.length) setTimeout(drainBackgroundQuestionAiQueue, delayNext);
   }
 }
 
@@ -5023,13 +5089,15 @@ function startFlashcardReview() {
     FC_SESSION_TOTAL = 0;
     return;
   }
-  ACTIVE_FC_SESSION_IDS = due.map(c => c.id);
+  const FC_CAP = 60;
+  const sessionCards = due.slice(0, FC_CAP);
+  ACTIVE_FC_SESSION_IDS = sessionCards.map(c => c.id);
   ACTIVE_FC_INDEX = 0;
   ACTIVE_FC_SHOW_BACK = false;
   ACTIVE_FC_SHOW_BACK_MAP = {};
   ACTIVE_FC_RATED = new Set();
   ACTIVE_FC_RATED_MAP = {};
-  FC_SESSION_TOTAL = due.length;
+  FC_SESSION_TOTAL = sessionCards.length;
   view = 'cards';
   renderFlashcardView();
 }
@@ -5073,7 +5141,7 @@ function renderCardManagerView(){
         </div>
       </div>
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
-        <span class="chip">Due: <b>${due}</b></span>
+        <span class="chip" title="${due} cards due; review sessions capped at 60 to prevent burnout">Due: <b>${Math.min(due, 60)}</b>${due > 60 ? ` <span class="mu" style="font-size:10px">(of ${due})</span>` : ''}</span>
         <span class="chip">Learning: <b>${learning}</b></span>
         <span class="chip">Graduated: <b>${grad}</b></span>
       </div>
@@ -7315,7 +7383,7 @@ function home(preserveScroll = false) {
         </div>
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
-          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()">MCQs due: <b>${due.length}</b></button>
+          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()" title="${due.length} total MCQs due in spaced repetition; capped to 60 for today's review to keep pace manageable and avoid overload">MCQs due: <b>${Math.min(due.length, 60)}</b>${due.length > 60 ? ` <span class="mu" style="font-size:10px">(of ${due.length})</span>` : ''}</button>
           ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession(true)">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
@@ -7636,13 +7704,14 @@ function startDueReview() {
     seen.add(id);
     return true;
   });
-  if (!due.length) { alert('No MCQs are due right now.'); return; }
+  if (!due.length) { alert('No MCQs are due right now. You are all caught up!'); return; }
+  const sessionCount = Math.min(due.length, DUE_REVIEW_CAP);
   const overflow = due.length > DUE_REVIEW_CAP ? due.length - DUE_REVIEW_CAP : 0;
   if (due.length > 30) {
-    const capNote = overflow > 0
-      ? ` (capped at ${DUE_REVIEW_CAP} highest-priority; ${overflow} deferred to next session)`
-      : '';
-    if (!confirm(`You have ${due.length} MCQs due today. Start full due review to clear today's queue?${capNote} (Cancel = practice 15 Q chunk)`)) {
+    const promptMsg = overflow > 0
+      ? `Start today's due review (${sessionCount} questions)? (Capped at ${DUE_REVIEW_CAP} highest-priority to keep review manageable; ${overflow} deferred to next session. Click Cancel for a quick 15 Q chunk)`
+      : `Start due review (${sessionCount} questions)? (Click Cancel for a quick 15 Q chunk)`;
+    if (!confirm(promptMsg)) {
       start(due.slice(0, 15));
       return;
     }
@@ -8070,8 +8139,20 @@ function show() {
         <span class="mu">Question ${P + 1} of ${Q.length} · Q${rawQ.n} · ${esc(rawQ.s)}</span>
         <div class="row" style="gap:6px">
           ${!isWellMade ? `
-            <button class="sm" id="sharpen-btn" style="padding:2px 8px;font-size:11px;background:#fef3c7;color:#92400e;border-color:#fcd34d" onclick="sharpenCurrentQuestion()" title="Keep exact same concept, but rewrite with competitive entrance-grade distractors and eliminate obvious answers (Alt+S)">
-              🎯 Sharpen MCQ
+            <button class="sm" id="sharpen-btn" style="padding:2px 8px;font-size:11px;${
+              isQuestionQueuedToSharpen(rawQ)
+                ? 'background:#fef9c3;color:#854d0e;border-color:#fde047'
+                : (isQuestionSharpened(rawQ)
+                  ? 'background:#dcfce7;color:#166534;border-color:#86efac'
+                  : 'background:#fef3c7;color:#92400e;border-color:#fcd34d')
+            }" onclick="sharpenCurrentQuestion()" title="${
+              isQuestionQueuedToSharpen(rawQ)
+                ? 'Sharpening in background queue; you can continue practicing'
+                : (isQuestionSharpened(rawQ)
+                  ? 'This question was sharpened with competitive distractors (click to re-sharpen)'
+                  : 'Keep exact same concept, but rewrite with competitive entrance-grade distractors in background without waiting (Alt+S)')
+            }" ${isQuestionQueuedToSharpen(rawQ) ? 'disabled' : ''}>
+              ${isQuestionQueuedToSharpen(rawQ) ? '⏳ Sharpen queued...' : (isQuestionSharpened(rawQ) ? '🎯 Sharpened ✓' : '🎯 Sharpen MCQ')}
             </button>
             <button class="sm" id="refresh-now-btn" style="padding:2px 8px;font-size:11px;background:var(--ac-bg);color:var(--ac);border-color:var(--ac)" onclick="regenerateCurrentQuestion()" title="Generate a fresh verified sibling variant within the same unit and topic">
               ✨ Sibling variant
@@ -11028,8 +11109,22 @@ try {
   document.documentElement.style.setProperty('--font-scale', savedFontScale);
 } catch (e) {}
 
+function resumePendingSharpenJobs() {
+  if (!GEM_KEY) return;
+  try {
+    const pool = bankQuestionPool();
+    pool.forEach(q => {
+      const k = qk(q);
+      if (V[k] && V[k]._sharpenQueued && !effWellMade(q) && !isColdQuestion(q)) {
+        enqueueBackgroundQuestionAi('sharpen', q);
+      }
+    });
+  } catch (e) {}
+}
+
 load();
 home();
+resumePendingSharpenJobs();
 retryMitSyllabusLoad();
 if (window.CloudSync) {
   CloudSync.init();
