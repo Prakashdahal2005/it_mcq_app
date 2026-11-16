@@ -730,15 +730,34 @@
     return data;
   }
 
+  function prepareStateForUpload(stateObj) {
+    if (!stateObj || typeof stateObj !== 'object') return stateObj;
+    var copy = Object.assign({}, stateObj);
+    if (Array.isArray(copy.BANKS)) {
+      copy.BANKS = copy.BANKS.map(function (b) {
+        if (!b || typeof b !== 'object') return b;
+        var name = String(b.name || '').trim().toLowerCase();
+        // If it's the bundled static question bank (1727 questions from question_bank.json),
+        // omit the static questions array so we don't upload 1MB of duplicate static data.
+        if (name === 'question bank' || b.isBundled === true || (b.id === 1 && Array.isArray(b.q) && b.q.length >= 1000)) {
+          return { id: b.id, name: b.name, isBundled: true, q: [], sets: [] };
+        }
+        return b; // Keep custom user-imported banks intact
+      });
+    }
+    return copy;
+  }
+
   async function postRemoteState(stateObj, baseVersion) {
     var headers = getApiHeaders();
     if (baseVersion != null && !isNaN(baseVersion) && baseVersion > 0) {
       headers['x-base-version'] = String(baseVersion);
     }
+    var uploadPayload = prepareStateForUpload(stateObj);
     var res = await fetch('/api/state', {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify(stateObj)
+      body: JSON.stringify(uploadPayload)
     });
 
     if (res.status === 401) {
