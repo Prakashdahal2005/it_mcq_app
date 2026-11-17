@@ -1019,6 +1019,14 @@ window.MathJax = {
  */
 const $ = s => document.querySelector(s);
 const KEY = 'bitmcq1';
+const BANK_CACHE_KEY = 'bundledBankCache';
+const ARCHIVE_FULL_RECENT = 3;
+const MAX_SR_HISTORY = 300;
+const MAX_SR_MISS_DATES = 90;
+let cachedBundledBanks = null;
+let cachedBankSignature = '';
+let bankCacheReady = false;
+let bankCacheSyncTimer = null;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function showToast(msg, type) {
@@ -1221,6 +1229,178 @@ function trimAttemptLog() {
   return before - L.length;
 }
 
+function openBankDb() {
+  return new Promise(resolve => {
+    if (typeof indexedDB === 'undefined') { resolve(null); return; }
+    let req;
+    try { req = indexedDB.open('bitmcq_storage', 1); } catch (e) { resolve(null); return; }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+}
+
+function bankCacheGet(db, key) {
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction('kv', 'readonly');
+      const req = tx.objectStore('kv').get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+
+function bankCacheSet(db, key, value) {
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(value, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+    } catch (e) { resolve(false); }
+  });
+}
+
+function isBundledBank(b) {
+  if (!b || typeof b !== 'object') return false;
+  if (b.isBundled === true) return true;
+  const name = String(b.name || '').trim().toLowerCase();
+  return name === 'question bank' || (b.id === 1 && Array.isArray(b.q) && b.q.length >= 1000);
+}
+
+function bankCacheSignature() {
+  const banks = (BANKS || []).map(b => [
+    b && b.id,
+    b && Array.isArray(b.q) ? b.q.length : 0,
+    b && Array.isArray(b.sets) ? b.sets.length : 0
+  ].join(':')).join('|');
+  const edits = Object.keys(QEDITS || {}).length;
+  const deleted = Object.keys(QDELETED || {}).length;
+  const lastEdit = Object.values(QEDITS || {}).reduce((max, e) => Math.max(max, Number(e && e.updatedAt) || 0), 0);
+  return `${banks}|e${edits}|d${deleted}|t${lastEdit}`;
+}
+
+function banksForLocalStorage() {
+  if (!bankCacheReady || !cachedBundledBanks || !cachedBankSignature || cachedBankSignature !== bankCacheSignature()) return BANKS;
+  return (BANKS || []).map(b => isBundledBank(b) ? { ...b, q: [], sets: [] } : b);
+}
+
+async function preloadBanksFromCache() {
+  bankCacheReady = true;
+  try {
+    const db = await openBankDb();
+    if (!db) return;
+    const cached = await bankCacheGet(db, BANK_CACHE_KEY);
+    if (cached && Array.isArray(cached.BANKS) && cached.BANKS.length) {
+      cachedBundledBanks = cached.BANKS;
+      cachedBankSignature = cached.sig || '';
+    }
+  } catch (e) {
+    console.warn('Question bank cache read failed; using persisted state:', e);
+  }
+}
+
+async function syncBankCache() {
+  if (!bankCacheReady) return;
+  const sig = bankCacheSignature();
+  if (cachedBundledBanks && cachedBankSignature === sig) return;
+  const db = await openBankDb();
+  if (!db) return;
+  const payload = { BANKS: JSON.parse(JSON.stringify(BANKS || [])), sig };
+  const ok = await bankCacheSet(db, BANK_CACHE_KEY, payload);
+  if (!ok) return;
+  cachedBundledBanks = payload.BANKS;
+  cachedBankSignature = sig;
+  try { save(); } catch (e) {}
+}
+
+function scheduleBankCacheSync() {
+  if (!bankCacheReady || typeof indexedDB === 'undefined') return;
+  if (cachedBundledBanks && cachedBankSignature === bankCacheSignature()) return;
+  if (bankCacheSyncTimer) clearTimeout(bankCacheSyncTimer);
+  bankCacheSyncTimer = setTimeout(() => {
+    bankCacheSyncTimer = null;
+    syncBankCache();
+  }, 400);
+}
+
+function archiveErrorUid(e) {
+  if (!e || typeof e !== 'object') return '';
+  return e.uid || (e._sid ? String(e._sid) : questionUid(e));
+}
+
+function buildArchiveSourceMap() {
+  const map = new Map();
+  const pools = [D || [], DRILL_D || [], MOCK_D || [], ...(BANKS || []).map(b => b && Array.isArray(b.q) ? b.q : []), gemVars || []];
+  pools.forEach(pool => {
+    if (!Array.isArray(pool)) return;
+    pool.forEach(q => {
+      if (!q || typeof q !== 'object') return;
+      const uid = questionUid(q);
+      if (uid && !map.has(uid)) map.set(uid, q);
+    });
+  });
+  return map;
+}
+
+function compactArchivedError(e) {
+  const out = {};
+  const textKeys = new Set(['q', 'o', 'a', 'e', 'code', 'origO', 'origA', 'displayOpts', 'expectedAnswer', '_orig']);
+  Object.keys(e || {}).forEach(k => { if (!textKeys.has(k)) out[k] = e[k]; });
+  out._compact = 1;
+  return out;
+}
+
+function serializeArchivedAttempts() {
+  if (!Array.isArray(A) || A.length <= ARCHIVE_FULL_RECENT) return A;
+  const sourceMap = buildArchiveSourceMap();
+  return A.map((attempt, i) => {
+    if (!attempt || i >= A.length - ARCHIVE_FULL_RECENT || !Array.isArray(attempt.errs)) return attempt;
+    return {
+      ...attempt,
+      errs: attempt.errs.map(e => {
+        if (!e || e._compact) return e;
+        return sourceMap.has(archiveErrorUid(e)) ? compactArchivedError(e) : e;
+      })
+    };
+  });
+}
+
+function rehydrateArchivedAttempts() {
+  const sourceMap = buildArchiveSourceMap();
+  (A || []).forEach(attempt => {
+    if (!attempt || !Array.isArray(attempt.errs)) return;
+    attempt.errs.forEach(e => {
+      if (!e || !e._compact) return;
+      const src = sourceMap.get(archiveErrorUid(e));
+      if (!src || isQuestionDeleted(src)) return;
+      const copyKeys = ['q', 'o', 'a', 'e', 'code', 'origO', 'origA', 'displayOpts', 'expectedAnswer', 'qType', 'type', 's', 'u', 'topic_id', 'unit', 'unit_name', 'shuffle_safe', 'quick', 'level'];
+      copyKeys.forEach(k => { if (e[k] === undefined && src[k] !== undefined) e[k] = src[k]; });
+      if (!e._orig) e._orig = src;
+      delete e._compact;
+    });
+  });
+}
+
+function serializeV() {
+  const out = {};
+  Object.keys(V || {}).forEach(k => {
+    const v = V[k];
+    if (!v || typeof v !== 'object') { out[k] = v; return; }
+    const copy = { ...v };
+    if (Array.isArray(v.history) && v.history.length > MAX_SR_HISTORY) copy.history = v.history.slice(-MAX_SR_HISTORY);
+    if (Array.isArray(v.missDates) && v.missDates.length > MAX_SR_MISS_DATES) copy.missDates = v.missDates.slice(-MAX_SR_MISS_DATES);
+    out[k] = copy;
+  });
+  return out;
+}
+
 // Persist the complete app state locally, then notify cloud sync; keep serialization aligned with load() and AppState.
 function save() {
   let saved = false;
@@ -1229,17 +1409,15 @@ function save() {
   if (Array.isArray(L) && L.length > 1500) trimAttemptLog();
 
   const doWrite = () => {
+    const banksForSave = banksForLocalStorage();
     // Omit D only when the active set can be reconstructed from BANKS.
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
       ...(hasBankBackedActiveSet() ? {} : { D }),
-      R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
+      R, W, Q, QRESULTS, P, S, A: serializeArchivedAttempts(), L, V: serializeV(), BANKS: banksForSave, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
       CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, GAP_DONE_TODAY: normalizeGapDoneToday(GAP_DONE_TODAY), DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK,
       CODE_TRACE: normalizeCodeTrace(CODE_TRACE)
     }));
-    localStorage.setItem('bitmcq_cards', JSON.stringify(CARDS));
-    localStorage.setItem('bitmcq_rmarks', JSON.stringify(RESOURCE_MARKS));
-    localStorage.setItem('bitmcq_fix_days', JSON.stringify(FIX_DAYS || {}));
     localStorage.setItem('bitmcq_diag_done', DIAGNOSTIC_DONE ? '1' : '0');
     localStorage.setItem('bitmcq_pb_mock', String(PB_MOCK_SCORE || 0));
     localStorage.setItem('bitmcq_quiet', QUIET_MODE ? 'true' : 'false');
@@ -1267,6 +1445,14 @@ function save() {
     } else {
       console.error('Save failed:', e);
     }
+  }
+  if (saved) {
+    try {
+      localStorage.removeItem('bitmcq_cards');
+      localStorage.removeItem('bitmcq_rmarks');
+      localStorage.removeItem('bitmcq_fix_days');
+    } catch (e) {}
+    scheduleBankCacheSync();
   }
   try { if (window.CloudSync) window.CloudSync.onLocalSave(); } catch (e) {}
   return saved;
@@ -1299,10 +1485,18 @@ function filterCardsAgainstTombstones(cards) {
 }
 
 function restoreBanks(s) {
-  BANKS = Array.isArray(s.BANKS) ? s.BANKS : (s.BK && Array.isArray(s.SETS) ? [{ id: 1, name: 'Question bank 1', q: s.BK.q, sets: s.SETS }] : []);
+  BANKS = Array.isArray(s.BANKS) ? s.BANKS : (s.BK && Array.isArray(s.SETS) ? [{ id: 1, name: 'Question bank 1', q: s.BK.q, sets: s.SETS }] : (cachedBundledBanks ? JSON.parse(JSON.stringify(cachedBundledBanks)) : []));
+  if (cachedBundledBanks && Array.isArray(BANKS)) {
+    BANKS = BANKS.map(bank => {
+      if (!isBundledBank(bank) || (Array.isArray(bank.q) && bank.q.length)) return bank;
+      const cached = (cachedBundledBanks || []).find(item => isBundledBank(item) && (item.id === bank.id || String(item.name || '').toLowerCase() === String(bank.name || '').toLowerCase()));
+      return cached ? { ...bank, q: cached.q || [], sets: cached.sets || [] } : bank;
+    });
+  }
   SETI = typeof s.SETI === 'number' ? s.SETI : -1;
   SETBANK = typeof s.SETBANK === 'number' ? s.SETBANK : (SETI >= 0 && BANKS.length ? BANKS[0].id : null);
   if (BANKS.length) A = A.map(a => a.bi != null && a.bankId == null ? { ...a, bankId: BANKS[0].id } : a);
+  if (Array.isArray(BANKS)) BANKS.forEach(b => { if (b && isBundledBank(b)) b.isBundled = true; });
 }
 
 // Restore current and legacy local state, then apply question tombstones and overrides across active copies.
@@ -1378,6 +1572,7 @@ function load() {
         P = Math.min(P || 0, Math.max(0, Q.length - 1));
       }
       applyQuestionOverridesEverywhere();
+      rehydrateArchivedAttempts();
       return true;
     }
   } catch (e) {
@@ -10418,6 +10613,7 @@ function importBank(x, defaultName, replaceExisting = false) {
     });
   }
   bank.name = name;
+  if (name === 'Question bank') bank.isBundled = true;
   bank.q = bank.q.filter(q => q && !isQuestionDeleted(q));
   bank.q.forEach(q => { ensureQuestionUid(q); applyQuestionOverride(q); });
   bank.sets = genSets(bank.q);
@@ -10567,7 +10763,7 @@ function compact() {
     subj,
     ...(SETBANK !== null && SETI >= 0 ? { bankId: SETBANK, bi: SETI } : {}),
     errs: D.filter(q => R[q.n] === 'w' || R[q.n] === 's').map(q => ({
-      n: q.n, id: q.id, _sid: q._sid, u: q.u, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e,
+      n: q.n, id: q.id, _sid: q._sid, uid: questionUid(q), u: q.u, s: q.s, q: q.q, code: q.code, o: q.o, a: q.a, e: q.e,
       p: W[q.n] ?? -1, r: R[q.n], fx: 0, quick: effQuick(q), level: effLevel(q), _orig: q._orig
     }))
   };
@@ -11261,6 +11457,7 @@ window.AppState = {
       V[k]._coldSet = true;
     });
     applyQuestionOverridesEverywhere();
+    rehydrateArchivedAttempts();
     save();
     if (window.CloudSync) CloudSync.refreshUI();
     if (opts && opts.silent) return;
@@ -11317,17 +11514,22 @@ function resumePendingSharpenJobs() {
   } catch (e) {}
 }
 
-load();
-home();
-resumePendingSharpenJobs();
-retryMitSyllabusLoad();
-if (window.CloudSync) {
-  CloudSync.init();
-  if (CloudSync.whenInitialSyncSettled) CloudSync.whenInitialSyncSettled(loadDefaultBank);
-  else loadDefaultBank();
-} else {
-  loadDefaultBank();
+async function bootApp() {
+  await preloadBanksFromCache();
+  load();
+  home();
+  scheduleBankCacheSync();
+  resumePendingSharpenJobs();
+  retryMitSyllabusLoad();
+  if (window.CloudSync) {
+    CloudSync.init();
+    if (CloudSync.whenInitialSyncSettled) CloudSync.whenInitialSyncSettled(loadDefaultBank);
+    else loadDefaultBank();
+  } else {
+    loadDefaultBank();
+  }
 }
+bootApp();
 const mathJaxScript = document.createElement('script');
 mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js';
 mathJaxScript.async = true;
