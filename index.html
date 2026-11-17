@@ -1177,13 +1177,63 @@ function recordApiCall() {
   localStorage.setItem(dayKey, String(cur + 1));
 }
 
+function hasBankBackedActiveSet() {
+  if (!Array.isArray(D) || SETBANK == null || !Number.isInteger(SETI) || SETI < 0) return false;
+  const bank = BANKS.find(b => b && b.id === SETBANK);
+  const indices = bank && Array.isArray(bank.sets) ? bank.sets[SETI] : null;
+  if (!bank || !Array.isArray(bank.q) || !Array.isArray(indices)) return false;
+  const questions = indices
+    .map(ix => bank.q[ix])
+    .filter(q => q && !isQuestionDeleted(q) && normalSessionEligible(q));
+  return questions.length === D.length &&
+    questions.every((q, i) => bankQuestionKey(q) === bankQuestionKey(D[i]));
+}
+
+// Compact L when it grows, keeping recent and mock records plus the latest older
+// entry per identified question. Spaced-repetition scheduling state remains in V.
+function trimAttemptLog() {
+  if (!Array.isArray(L) || L.length < 300) return 0;
+  const KEEP_ALL_DAYS = 7;  // Keep everything from last 7 days
+  const keepAllCutoff = Date.now() - (KEEP_ALL_DAYS * 864e5);
+  const todayKey = localDateKey();
+  const keepAll = [];
+  const dedupeByIdentity = new Map();
+
+  L.forEach(r => {
+    if (!r) return;
+    const ts = Number(r.t) || 0;
+
+    // Always keep: mock records, today's records, anything within last 7 days
+    if (r.mock === 1 || ts >= keepAllCutoff || (ts && new Date(ts).toLocaleDateString('en-CA') === todayKey)) {
+      keepAll.push(r);
+      return;
+    }
+
+    // Older than 7 days: keep only the latest per question identity
+    const identity = r.uid || r.k || r.qid;
+    if (!identity) { keepAll.push(r); return; } // no identity — keep it safe
+    const prev = dedupeByIdentity.get(identity);
+    if (!prev || ts >= (Number(prev.t) || 0)) dedupeByIdentity.set(identity, r);
+  });
+
+  const before = L.length;
+  L = [...dedupeByIdentity.values(), ...keepAll].sort((a, b) => (Number(a.t) || 0) - (Number(b.t) || 0));
+  return before - L.length;
+}
+
 // Persist the complete app state locally, then notify cloud sync; keep serialization aligned with load() and AppState.
 function save() {
   let saved = false;
-  try {
+
+  // Proactive trim: if L has grown large, compact before writing to avoid hitting quota.
+  if (Array.isArray(L) && L.length > 1500) trimAttemptLog();
+
+  const doWrite = () => {
+    // Omit D only when the active set can be reconstructed from BANKS.
     localStorage.setItem(KEY, JSON.stringify({
       schemaVer: SCHEMA_VER,
-      D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
+      ...(hasBankBackedActiveSet() ? {} : { D }),
+      R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED,
       CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, GAP_DONE_TODAY: normalizeGapDoneToday(GAP_DONE_TODAY), DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, COLD_QS, WEEKLY_MOCK,
       CODE_TRACE: normalizeCodeTrace(CODE_TRACE)
     }));
@@ -1195,9 +1245,28 @@ function save() {
     localStorage.setItem('bitmcq_quiet', QUIET_MODE ? 'true' : 'false');
     localStorage.setItem('bitmcq_session_hist', JSON.stringify(sessionHistory || []));
     if (document.body) document.body.classList.toggle('quiet-mode', !!QUIET_MODE);
+  };
+
+  try {
+    doWrite();
     saved = true;
   } catch (e) {
-    console.error('Save failed:', e);
+    const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+    if (isQuota) {
+      // Quota hit: trim L and retry once
+      const trimmed = trimAttemptLog();
+      console.warn(`Storage quota exceeded. Trimmed ${trimmed} old log entries. Retrying save…`);
+      try {
+        doWrite();
+        saved = true;
+        if (trimmed > 0) showToast(`Storage nearly full — trimmed ${trimmed} old log entries to free space.`, 'warn');
+      } catch (e2) {
+        console.error('Save failed even after trim:', e2);
+        showToast('⚠️ Storage full — progress not saved! Export a backup now.', 'error');
+      }
+    } else {
+      console.error('Save failed:', e);
+    }
   }
   try { if (window.CloudSync) window.CloudSync.onLocalSave(); } catch (e) {}
   return saved;
@@ -1242,7 +1311,8 @@ function load() {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (s) {
       invalidateQuestionCaches();
-      D = s.D || null;
+      // Older saves and imports without a matching BANKS set still persist D.
+      D = Array.isArray(s.D) ? s.D : null;
       R = s.R || {};
       W = s.W || {};
       Q = s.Q || [];
@@ -1281,6 +1351,17 @@ function load() {
         sessionHistory = [];
       }
       restoreBanks(s);
+
+      // Phase 2 cleanup: Remove legacy keys that are no longer needed
+      try {
+        localStorage.removeItem('bitmcq_backup_pre_v2');  // Old migration backup (can be 800+ KB)
+        if (s.CARDS && Array.isArray(s.CARDS)) {
+          localStorage.removeItem('bitmcq_cards');  // Duplicate of CARDS in main state
+        }
+      } catch (e) {
+        console.warn('Could not remove legacy localStorage keys:', e);
+      }
+
       DRILL_D = [];
       DRILL_SUBJECT = '';
       Object.keys(R).forEach(k => { if (Number(k) >= DRILL_N_BASE) delete R[k]; });
@@ -10381,8 +10462,29 @@ function refreshHomeIfIdle(message) {
 function loadDefaultBank(force = false) {
   defaultBankLoading = true;
   defaultBankLoadError = '';
-  const hasFullBank = D && (BANKS || []).some(b => b && Array.isArray(b.q) && b.q.length >= 1000);
-  if (!force && hasFullBank) {
+
+  // Check whether the active question set can be reconstructed from any saved bank.
+  const hasFullBank = (BANKS || []).some(b => b && Array.isArray(b.q) && b.q.length >= 1000);
+
+  if (!force && SETBANK != null && Number.isInteger(SETI) && SETI >= 0 && !D) {
+    const bank = BANKS.find(b => b.id === SETBANK);
+    if (bank && Array.isArray(bank.q) && Array.isArray(bank.sets) && Array.isArray(bank.sets[SETI])) {
+      D = bank.sets[SETI]
+        .map(ix => bank.q[ix])
+        .filter(q => q && !isQuestionDeleted(q) && normalSessionEligible(q))
+        .map((q, j) => {
+          ensureQuestionUid(q);
+          applyQuestionOverride(q);
+          return { n: j + 1, ...q };
+        });
+      invalidateQuestionCaches();
+      defaultBankLoading = false;
+      refreshHomeIfIdle('Question bank restored from saved banks.');
+      return;
+    }
+  }
+
+  if (!force && hasFullBank && D) {
     defaultBankLoading = false;
     refreshHomeIfIdle('Question bank is ready.');
     return;
@@ -10609,8 +10711,8 @@ function exportUI() {
   return `
     <div class="row" style="flex-wrap:wrap;gap:8px">
       <select id="xs" style="flex:1;min-width:200px">
-        <option value="study">Study Pack: Errors + Weak Syllabus Concepts</option>
         <option value="all">All Categories: Mistakes + Skipped + Unsure/Guessed</option>
+        <option value="study">Study Pack: Errors + Weak Syllabus Concepts</option>
         <option value="w">Mistakes Only</option>
         <option value="s">Skipped Only</option>
         <option value="ug">Unsure & Guessed (Confidence 1 & 2)</option>
@@ -10627,7 +10729,7 @@ function exportUI() {
       <button class="p sm" onclick="exportLog(0)">⬇ Download</button>
       <button class="sm" onclick="exportLog(1)">📋 Copy</button>
     </div>
-    <div class="mu sm" style="margin-top:6px;line-height:1.4">Study Pack is the default: includes current unresolved errors and non-skipped syllabus concepts that are not yet solid. Checkpoints are kept locally on this device.</div>
+    <div class="mu sm" style="margin-top:6px;line-height:1.4">Default is All Categories: includes mistakes, skipped, and unsure/guessed questions—most useful for quick review. Study Pack adds weak syllabus concepts. Checkpoints are kept locally on this device.</div>
     <div id="xm" class="mu" style="margin-top:6px"></div>
   `;
 }
@@ -10635,7 +10737,7 @@ function exportUI() {
 // Build error-log or weak-topic reports from attempt history; export checkpoints are device-local metadata.
 function exportLog(copy) {
   const root = document.getElementById('export-modal-overlay') || document;
-  const scope = (root.querySelector('#xs') || {}).value || 'study';
+  const scope = (root.querySelector('#xs') || {}).value || 'all';
   const rangeMode = (root.querySelector('#xr') || {}).value || ('since');
   const isMd = ((root.querySelector('#xf') || {}).value || 'md') === 'md';
   const m = root.querySelector('#xm') || $('#xm');
@@ -11105,6 +11207,7 @@ function saveSettings() {
 
 // Initialization
 window.AppState = {
+  // Keep D available to cloud sync; local saves omit it only when BANKS can rebuild it.
   get: () => ({ D, R, W, Q, QRESULTS, P, S, A, L, V, BANKS, SETBANK, SETI, EXAM_DATE, lastBackup, lastFreshSetDay, gemVars, todayMins, QOV, QEDITS, QDELETED, CARDS, CARD_TOMBSTONES, RESOURCE_MARKS, FIX_DAYS, GAP_DONE_TODAY: normalizeGapDoneToday(GAP_DONE_TODAY), DIAGNOSTIC_DONE, QUIET_MODE, PB_MOCK_SCORE, WEEKLY_MOCK: (WEEKLY_MOCK && typeof WEEKLY_MOCK === 'object') ? WEEKLY_MOCK : {}, COLD_QS: (COLD_QS && typeof COLD_QS === 'object') ? COLD_QS : {}, CODE_TRACE: normalizeCodeTrace(CODE_TRACE), schemaVer: SCHEMA_VER }),
   apply: (s, opts = {}) => {
     const wasQ = (typeof view !== 'undefined' && view === 'q');
