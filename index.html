@@ -1023,11 +1023,30 @@ const BANK_CACHE_KEY = 'bundledBankCache';
 const ARCHIVE_FULL_RECENT = 3;
 const MAX_SR_HISTORY = 300;
 const MAX_SR_MISS_DATES = 90;
+const LOCAL_STORAGE_LIMIT = 5000000;
 let cachedBundledBanks = null;
 let cachedBankSignature = '';
 let bankCacheReady = false;
 let bankCacheSyncTimer = null;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function localStorageUsage() {
+  let used = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key != null) used += key.length + (localStorage.getItem(key) || '').length;
+    }
+  } catch (e) {}
+  const pct = LOCAL_STORAGE_LIMIT ? (used / LOCAL_STORAGE_LIMIT) * 100 : 0;
+  return { used, limit: LOCAL_STORAGE_LIMIT, pct, left: Math.max(0, LOCAL_STORAGE_LIMIT - used) };
+}
+
+function formatStorageChars(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(n);
+}
 
 function showToast(msg, type) {
   let host = document.getElementById('toast-host');
@@ -1065,16 +1084,8 @@ function clearMath(element) {
   }
 }
 
-// Schema Version & Pre-Migration Safety Snapshot
+// Schema Version
 const SCHEMA_VER = 2;
-try {
-  if (!localStorage.getItem('bitmcq_backup_pre_v2')) {
-    const rawPrev = localStorage.getItem('bitmcq1');
-    if (rawPrev) localStorage.setItem('bitmcq_backup_pre_v2', rawPrev);
-  }
-} catch (e) {
-  console.warn('Pre-v2 backup snapshot failed:', e);
-}
 
 // Core State
 // Keep persisted fields aligned across save(), load(), AppState, backup, and cloud-sync normalization.
@@ -11261,6 +11272,7 @@ function exportLog(copy) {
 // Settings
 function openSettings() {
   const dailyCount = getDailyApiCount();
+  const storage = localStorageUsage();
   $('#app').innerHTML = `
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
       <h1 style="margin:0">⚙ Settings</h1>
@@ -11302,6 +11314,17 @@ function openSettings() {
 
       <div class="row" style="margin-top:14px;justify-content:space-between;align-items:center">
         <span class="mu sm">API calls today: <b>${dailyCount}</b></span>
+      </div>
+
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)">
+        <label class="mu sm" style="display:block;margin-bottom:6px">Local Storage Usage</label>
+        <div class="row" style="gap:8px;align-items:center">
+          <div style="flex:1;height:8px;background:var(--bg);border:1px solid var(--bd);border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(100, storage.pct).toFixed(1)}%;background:${storage.pct > 85 ? '#ef4444' : storage.pct > 70 ? '#f59e0b' : '#10b981'}"></div>
+          </div>
+          <span class="mu sm">${formatStorageChars(storage.used)} / ${formatStorageChars(storage.limit)} (${storage.pct.toFixed(1)}%)</span>
+        </div>
+        <p class="mu sm" style="margin:6px 0 0">~${formatStorageChars(storage.left)} left. Chrome allows roughly 5M characters per site; other browsers vary.</p>
       </div>
 
       <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)">
