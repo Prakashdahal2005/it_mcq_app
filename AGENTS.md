@@ -22,6 +22,7 @@ Search `index.html` for the named section or function; line numbers are intentio
 | Flashcard creation, links, review, and ratings | `PHASE 5`, `generateConceptCardData()`, `saveConceptCard()`, `findSourceQuestionForCard()`, `renderFlashcardView()`, `rateCard()` | MCQ feedback in `pick()`, `CARD_TOMBSTONES`, `cloud-sync.js`, keydown review (<kbd>Space</kbd>/<kbd>1</kbd>–<kbd>4</kbd>/<kbd>B</kbd>/<kbd>N</kbd>) |
 | Timed and weekly mocks | `weeklyMockStatus()`, `mock()`, `mockEnd()` | `WEEKLY_MOCK`, `persistMockState()`, `MK.flagged` recap |
 | Bank import, backups, and exports | `Import & Bank Handling`, `Backup & Persistence`, `exportLog()` | `restore()`, `cloud-sync.js` |
+| Practice scope & excluded-question archive | `practiceQueueEligible()`, `setPracticeScopePref()`, `renderSettingsArchiveHTML()` | `normalSessionEligible()`, `dueKeys()`, `readinessEligible()`, `openSettings()` |
 | Settings and AI configuration | `Settings`, `saveSettings()` | Gemini request helpers and local storage |
 | MIT syllabus and study coverage | `mit_entrance_syllabus.json`, `calculateUnitCoverage()`, `pickCoverageQuestions()` | `parseBank()`, `parseJson()`, `cloud-sync.js`, `sw.js` |
 

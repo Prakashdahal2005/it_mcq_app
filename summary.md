@@ -27,6 +27,7 @@ Recall is structured around seven interconnected cognitive study engines designe
 - **Adaptive Scheduling (`sr()` Engine)**: Computes dynamic review intervals, tracks ease factors, logs mistake counts (`missCount`), and tracks lapses (`lapses`). Fragile or incorrect items cycle back into the daily queue.
 - **Same-Day Idempotence**: Re-rating confidence after an answer restores the pre-attempt scheduling snapshot before reapplying, so intervals, lapses, and miss counts do not compound. Questions answered today are excluded from every due queue (mission, due review, quick mode, drills, and code trace) for the rest of the day.
 - **Session Queue Builder (`buildTodaySession()`)**: Intelligently balances due spaced reviews, weak-topic reinforcements, and new syllabus questions into an achievable daily review target. Due review is capped at 60 per session while the home chip shows both remaining due and completed-today progress.
+- **Practice Scope Filters**: Automatic queues hide Level 3 and manually too-hard questions by default; home-screen checkboxes include them globally. Out-of-scope, cold, and quarantined questions stay out of normal practice, while mocks and explicit drills retain the full bank. Settings provides an excluded-question browser with counts, filters, review, and restore actions.
 
 ### 1.3. Concept Gaps & Error Rescue Dashboard
 - **Trap Detection**: Automatically identifies and prioritizes **High-Confidence Traps** (questions answered incorrectly with 3★ confidence).
@@ -45,7 +46,7 @@ The 19 syllabus subjects are grouped into calibrated target readiness thresholds
 - **Tier C (Target: 75%) — Calculation, Coding & High-Syllabus Ratios**:
   - *Subjects*: C Programming, Object Oriented Programming (C++), Data Structures and Algorithms (DSA), Calculus & Functions, Linear & Abstract Algebra, Statistics & Probability.
   - *Rationale*: Time-intensive calculations and syntax tracing; target 75% solid foundation rather than diminishing returns from exhaustive edge cases.
-- **Live-Bank Readiness Projection**: Practice Readiness counts only the current live bank (deleted, cold, quarantined, and out-of-scope questions are excluded). Seen questions use difficulty-weighted first-attempt evidence; unseen questions are projected with conservative per-level accuracy, calibrated from that level's seen evidence when at least 5 weighted attempts exist. The ring shows the projected score, with seen-only accuracy and bank coverage as secondary diagnostics.
+- **Live-Bank Readiness Projection**: Practice Readiness counts only the current live bank in the active practice scope (deleted, cold, quarantined, out-of-scope, and hidden L3/too-hard questions are excluded). Seen questions use difficulty-weighted first-attempt evidence; unseen questions are projected with conservative per-level accuracy, calibrated from that level's seen evidence when at least 5 weighted attempts exist. The ring shows the projected score, with seen-only accuracy and bank coverage as secondary diagnostics.
 - **Coverage-Aware Level 0 Mastery**: A subject earns Level 0 mastery only with at least 5 weighted L0 attempts, ≥85% accuracy, and at least 60% of its eligible L0 questions attempted, preventing tiny samples from declaring a subject complete.
 
 ### 1.5. Syllabus Study & Coverage Engine

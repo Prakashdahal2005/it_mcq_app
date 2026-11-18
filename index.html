@@ -1129,6 +1129,8 @@ function normalizeGapDoneToday(value) {
 }
 let DIAGNOSTIC_DONE = false;
 let QUIET_MODE = localStorage.getItem('bitmcq_quiet') === 'true';
+let INCLUDE_L3 = localStorage.getItem('bitmcq_scope_l3') === 'true';
+let INCLUDE_TOO_HARD = localStorage.getItem('bitmcq_scope_toohard') === 'true';
 let PB_MOCK_SCORE = parseInt(localStorage.getItem('bitmcq_pb_mock') || '0', 10);
 let COLD_QS = {}; // n -> { cold: boolean, t: timestamp } or boolean
 let CODE_TRACE = { lastAt: 0, lastDate: '', snoozedUntil: 0 };
@@ -2409,6 +2411,64 @@ function normalSessionEligible(q) {
     !isQuestionOutOfScope(q) && !isLongCodeTraceQuestion(q);
 }
 
+function practiceScopeAllows(q, opts = {}) {
+  if (!q) return false;
+  const includeL3 = opts.includeL3 != null ? !!opts.includeL3 : INCLUDE_L3;
+  const includeTooHard = opts.includeTooHard != null ? !!opts.includeTooHard : INCLUDE_TOO_HARD;
+  if (isQuestionTooHard(q) && !includeTooHard) return false;
+  if (effLevel(q) >= 3 && !includeL3) return false;
+  return true;
+}
+
+function practiceQueueEligible(q, opts = {}) {
+  return normalSessionEligible(q) && practiceScopeAllows(q, opts);
+}
+
+function setPracticeScopePref(key, value) {
+  if (key === 'l3') INCLUDE_L3 = !!value;
+  else if (key === 'tooHard') INCLUDE_TOO_HARD = !!value;
+  else return;
+  const storageKey = key === 'l3' ? 'bitmcq_scope_l3' : 'bitmcq_scope_toohard';
+  localStorage.setItem(storageKey, value ? 'true' : 'false');
+  const archive = document.getElementById('settings-archive');
+  if (archive && typeof refreshSettingsArchive === 'function') {
+    refreshSettingsArchive();
+    return;
+  }
+  if (typeof view !== 'undefined' && view === 'home') home(true);
+}
+
+function practiceScopeExcludedQuestions() {
+  const seen = new Set();
+  const out = [];
+  bankQuestionPool().forEach(q => {
+    if (!q || isQuestionDeleted(q)) return;
+    const hidden = isQuestionOutOfScope(q) || isColdQuestion(q) || isQuestionQuarantined(q) ||
+      (isQuestionTooHard(q) && !INCLUDE_TOO_HARD) ||
+      (effLevel(q) >= 3 && !INCLUDE_L3);
+    if (!hidden) return;
+    const id = questionUid(q) || qk(q);
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(q);
+  });
+  return out;
+}
+
+function practiceScopeExcludedCount() {
+  return practiceScopeExcludedQuestions().length;
+}
+
+function hiddenScopeDueCount() {
+  const t = today();
+  const done = questionsAnsweredToday();
+  return bankQuestionPool().filter(q =>
+    q && normalSessionEligible(q) && !practiceQueueEligible(q) &&
+    !wasAnsweredToday(q, done) &&
+    V[qk(q)] && V[qk(q)].d <= t
+  ).length;
+}
+
 function isQuestionQuarantined(q) {
   if (!q) return false;
   const record = V && V[qk(q)];
@@ -2431,8 +2491,8 @@ function questionPracticeTier(q) {
   return Math.max(0, Math.min(3, effLevel(q)));
 }
 
-function preferredPracticeQuestions(pool) {
-  return preferredQuestionTier((pool || []).filter(q => q && normalSessionEligible(q)));
+function preferredPracticeQuestions(pool, opts = {}) {
+  return preferredQuestionTier((pool || []).filter(q => q && practiceQueueEligible(q, opts)));
 }
 
 function preferredQuestionTier(pool) {
@@ -3306,7 +3366,7 @@ function currentPracticeQuestions(status, latest = null) {
   const latestMap = latest || latestPracticeRecordMap();
   const doneToday = questionsAnsweredToday();
   const questions = bankQuestionPool().filter(q => {
-    if (!q || !normalSessionEligible(q) || wasAnsweredToday(q, doneToday)) return false;
+    if (!q || !practiceQueueEligible(q) || wasAnsweredToday(q, doneToday)) return false;
     const r = latestPracticeRecordFor(q, latestMap);
     if (!r) return false;
     if (status === 'w') return !r.ok && r.ch !== -1;
@@ -3473,7 +3533,7 @@ function dueKeys(quickOnly = false) {
   const doneToday = questionsAnsweredToday();
   const pool = bankQuestionPool().filter(q =>
     (!quickOnly || effQuick(q)) &&
-    normalSessionEligible(q) &&
+    practiceQueueEligible(q) &&
     !wasAnsweredToday(q, doneToday)
   );
 
@@ -3513,7 +3573,7 @@ function dueKeys(quickOnly = false) {
   const activeKeys = new Set((D || []).map(q => qk(q)));
   A.forEach((a, i) => (a.errs || []).forEach((e, j) => {
     if (quickOnly && !effQuick(e)) return;
-    if (!normalSessionEligible(e)) return;
+    if (!practiceQueueEligible(e)) return;
     if (activeKeys.has(qk(e))) return;
     if (wasAnsweredToday(e, doneToday)) return;
     const v = V[qk(e)];
@@ -6147,7 +6207,7 @@ function prepareQuestionForDisplay(rawQ) {
 // Probabilistic Spaced Session Construction (FSRS-scheduled, unbroken subject runs)
 // Compose a session from due reviews, weak subjects, and coverage without repeating today's questions.
 function buildTodaySession(minutes = 15, quickOnly = false) {
-  const allBank = bankQuestionPool().filter(q => normalSessionEligible(q));
+  const allBank = bankQuestionPool().filter(q => practiceQueueEligible(q));
   if (!allBank.length && (!D || !D.length)) return [];
   const targetQ = Math.max(10, Math.round(minutes * 60 / 50));
   const basePool = quickOnly ? allBank.filter(q => effQuick(q)) : allBank;
@@ -6574,7 +6634,8 @@ function rawAccuracy(records) {
 
 function readinessEligible(q) {
   return !!q && !isQuestionDeleted(q) && !isColdQuestion(q) &&
-    !isQuestionQuarantined(q) && !isQuestionOutOfScope(q);
+    !isQuestionQuarantined(q) && !isQuestionOutOfScope(q) &&
+    practiceScopeAllows(q);
 }
 
 function readinessQuestionWeight(q) {
@@ -6993,7 +7054,7 @@ function getConceptGapsList(limit = 5) {
   const todayKey = localDateKey();
 
   pool.forEach(q => {
-    if (!q || isQuestionDeleted(q)) return;
+    if (!q || isQuestionDeleted(q) || !practiceQueueEligible(q)) return;
     const k = qk(q);
     const uid = questionUid(q) || k;
     if (GAP_DONE_TODAY[uid] === todayKey) return;
@@ -7340,6 +7401,12 @@ function renderReadinessMeter(existingStats = null) {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (Math.min(100, Math.max(0, projectedMark)) / 100) * circumference;
   const ringColor = projectedMark >= TARGET_MARK ? 'var(--ok)' : (projectedMark >= 55 ? 'var(--sk)' : 'var(--no)');
+  const hiddenScopeLevels = [];
+  if (!INCLUDE_L3) hiddenScopeLevels.push('L3');
+  if (!INCLUDE_TOO_HARD) hiddenScopeLevels.push('too-hard');
+  const scopeNote = hiddenScopeLevels.length
+    ? `Active practice scope hides ${hiddenScopeLevels.join(' and ')}; mocks and targeted drills still include them.`
+    : 'Active practice scope includes L3 and too-hard; mocks and targeted drills remain full-syllabus.';
 
   return `
   <div class="card">
@@ -7350,7 +7417,7 @@ function renderReadinessMeter(existingStats = null) {
         ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
       </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">First practice attempts only, live bank only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; Too hard 25%); Out of scope, cold, quarantined, and deleted questions are excluded. The ring projects the whole bank: unseen questions assume 70/65/60/55% by L0–L3 (calibrated within 50–85% once a level has ≥5 weighted attempts). Guesses and skips count as misses; mock scores stay separate.</p>
+    <p class="mu" style="margin:6px 0 14px">First practice attempts only, live bank only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; too hard 25% when included); out of scope, cold, quarantined, and deleted questions are excluded. ${scopeNote} The ring projects the active-scope bank: unseen questions assume 70/65/60/55% by L0–L3 (calibrated within 50–85% once a level has ≥5 weighted attempts). Guesses and skips count as misses; mock scores stay separate.</p>
 
     <div class="readiness-container">
       <div class="readiness-ring-wrap">
@@ -7470,7 +7537,10 @@ function selectSubjectDrillQuestions(subjectName, requestedCount, includeAnswere
   );
   const eligible = subjectBank.filter(q => normalSessionEligible(q));
   const answeredTodayCount = eligible.filter(q => wasAnsweredToday(q, doneToday)).length;
-  const pool = preferredPracticeQuestions(eligible.filter(q => includeAnsweredToday || !wasAnsweredToday(q, doneToday))).filter(q => {
+  const pool = preferredPracticeQuestions(
+    eligible.filter(q => includeAnsweredToday || !wasAnsweredToday(q, doneToday)),
+    { includeL3: true, includeTooHard: true }
+  ).filter(q => {
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -7550,9 +7620,10 @@ function selectLevelLadderQuestions(targetLevel = 0, requestedCount = 15) {
     return (ra.attempts - rb.attempts) || (ra.raw - rb.raw);
   });
 
+  const scopeOpts = targetLevel >= 3 ? { includeL3: true, includeTooHard: true } : {};
   const pool = bankQuestionPool().filter(q =>
     q &&
-    normalSessionEligible(q) &&
+    practiceQueueEligible(q, scopeOpts) &&
     !isQuestionDeleted(q) &&
     effLevel(q) === targetLevel
   );
@@ -7766,6 +7837,8 @@ function home(preserveScroll = false) {
   const maxCap = getMaxInterval();
   const due = dueKeys();
   const dueDone = dueDoneToday();
+  const hiddenDue = hiddenScopeDueCount();
+  const excludedCount = practiceScopeExcludedCount();
   const latestPractice = latestPracticeRecordMap();
   const wr = currentPracticeQuestions('w', latestPractice).map(sessionKeyForQuestion);
   const sk = currentPracticeQuestions('s', latestPractice).map(sessionKeyForQuestion);
@@ -7773,7 +7846,7 @@ function home(preserveScroll = false) {
   const codeTraceCount = tracePool.length;
   const codeTraceDue = codeTraceDueQuestions(tracePool).length;
   const showCodeTraceReminder = codeTraceCount > 0 && codeTraceReminderDue();
-  const freshCount = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice)).length;
+  const freshCount = bankQuestionPool().filter(q => practiceQueueEligible(q) && !hasPracticeAttempt(q, latestPractice)).length;
   const freshButtonText = `✨ Practice Unseen Questions (${freshCount} available)`;
   const coldQuestionCount = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q)).length;
   const outOfScopeQuestionCount = bankQuestionPool().filter(q =>
@@ -7871,14 +7944,25 @@ function home(preserveScroll = false) {
         </div>
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
-          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()" title="${due.length} MCQs remaining due today in spaced repetition; capped to 60 per review session">MCQs due: <b>${Math.min(due.length, 60)}</b>${due.length > 60 ? ` <span class="mu" style="font-size:10px">(of ${due.length})</span>` : ''}${dueDone ? ` <span class="mu" style="font-size:10px">· ${dueDone} done today</span>` : ''}</button>
+          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()" title="${due.length} MCQs remaining due today in the active practice scope; capped to 60 per review session">MCQs due: <b>${Math.min(due.length, 60)}</b>${due.length > 60 ? ` <span class="mu" style="font-size:10px">(of ${due.length})</span>` : ''}${dueDone ? ` <span class="mu" style="font-size:10px">· ${dueDone} done today</span>` : ''}${hiddenDue ? ` <span class="mu" style="font-size:10px">· ${hiddenDue} hidden</span>` : ''}</button>
           ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession(true)">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
         </div>
       </div>
 
-      <div class="row" style="margin:14px 0 16px">
+      <div class="row" style="margin:14px 0 8px;gap:10px;flex-wrap:wrap;align-items:center">
+        <span class="mu" style="font-weight:600">Practice scope:</span>
+        <label class="mu sm" style="display:flex;gap:5px;align-items:center;cursor:pointer">
+          <input type="checkbox" ${INCLUDE_L3 ? 'checked' : ''} onchange="setPracticeScopePref('l3', this.checked)"> Include L3 advanced
+        </label>
+        <label class="mu sm" style="display:flex;gap:5px;align-items:center;cursor:pointer">
+          <input type="checkbox" ${INCLUDE_TOO_HARD ? 'checked' : ''} onchange="setPracticeScopePref('tooHard', this.checked)"> Include too-hard
+        </label>
+        <button class="sm" onclick="openSettings()" title="Review or restore out-of-scope, too-hard, cold, quarantined, and L3 questions in Settings">Excluded (${excludedCount})</button>
+      </div>
+
+      <div class="row" style="margin:0 0 16px">
         <span class="mu" style="font-weight:600">Session length:</span>
         <button class="${todayMins === 10 ? 'p' : ''} sm" onclick="setSessionMins(10)">10 min (12 Q)</button>
         <button class="${todayMins === 15 ? 'p' : ''} sm" onclick="setSessionMins(15)">15 min (18 Q) ★</button>
@@ -8016,10 +8100,10 @@ function home(preserveScroll = false) {
 function startToday() {
   const qList = buildTodaySession(todayMins, false);
   if (!qList.length) {
-    const eligible = bankQuestionPool().filter(q => normalSessionEligible(q)).length;
+    const eligible = bankQuestionPool().filter(q => practiceQueueEligible(q)).length;
     alert(eligible
       ? 'You have answered all eligible practice questions today. No same-day repeats were added; try again tomorrow.'
-      : 'No normal-session questions are available. Cold-marked, out-of-scope, quarantined, and long code-trace questions are excluded.');
+      : 'No normal-session questions are available in the current practice scope. L3/too-hard may be hidden; enable them above or review excluded questions in Settings.');
     return;
   }
   const targetQ = Math.max(10, Math.round(todayMins * 60 / 50));
@@ -8031,7 +8115,7 @@ function buildRevisionSession(limit = 12) {
   const questions = new Map();
   const doneToday = questionsAnsweredToday();
   bankQuestionPool().forEach(q => {
-    if (q && normalSessionEligible(q)) {
+    if (q && practiceQueueEligible(q)) {
       questions.set(qk(q), { key: q.n != null ? q.n : (questionUid(q) || qk(q)), q });
     }
   });
@@ -8051,7 +8135,7 @@ function buildRevisionSession(limit = 12) {
 
   const candidates = [...questions.entries()]
     .map(([key, item]) => {
-      if (!normalSessionEligible(item.q)) return null;
+      if (!practiceQueueEligible(item.q)) return null;
       if (wasAnsweredToday(item.q, doneToday)) return null;
       const history = V[key] && Array.isArray(V[key].history) ? V[key].history : [];
       if (!history.length) return null;
@@ -8101,9 +8185,9 @@ function startCommuteQuick() {
 function startQuickMode() {
   const doneToday = questionsAnsweredToday();
   const pool = preferredPracticeQuestions(bankQuestionPool().filter(q =>
-    q && effQuick(q) && normalSessionEligible(q) && !wasAnsweredToday(q, doneToday)
+    q && effQuick(q) && practiceQueueEligible(q) && !wasAnsweredToday(q, doneToday)
   ));
-  if (!pool.length) { alert('No quick questions are left for today. Try again tomorrow or start a full practice session.'); return; }
+  if (!pool.length) { alert('No quick questions are left in the active practice scope today. Enable hidden L3/too-hard questions above or try again tomorrow.'); return; }
   const keyOf = q => questionUid(q) || qk(q);
   const latestPractice = latestPracticeRecordMap();
   const dueOrder = new Map();
@@ -8160,9 +8244,9 @@ function startFreshSet() {
   const requestedCount = countInput ? parseInt(countInput.value, 10) : 0;
   const latestPractice = latestPracticeRecordMap();
   // Strictly unseen: never attempted, skipped, or don't-know'd
-  const pool = bankQuestionPool().filter(q => normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice));
+  const pool = bankQuestionPool().filter(q => practiceQueueEligible(q) && !hasPracticeAttempt(q, latestPractice));
   if (!pool.length) {
-    alert('You have attempted every question in the bank at least once. Use Today’s Mission or Due Review to keep things sharp.');
+    alert('You have attempted every question in the active practice scope at least once. Use Today’s Mission or Due Review to keep things sharp.');
     return;
   }
   const targetQ = (Number.isInteger(requestedCount) && requestedCount >= 1)
@@ -8203,7 +8287,13 @@ function startDueReview() {
     seen.add(id);
     return true;
   });
-  if (!due.length) { alert('No MCQs are due right now. You are all caught up!'); return; }
+  if (!due.length) {
+    const hidden = hiddenScopeDueCount();
+    alert(hidden
+      ? `No MCQs are due in the active practice scope. ${hidden} due question(s) are hidden by your L3/too-hard scope settings; enable them above or review them in Settings.`
+      : 'No MCQs are due right now. You are all caught up!');
+    return;
+  }
   const sessionCount = Math.min(due.length, DUE_REVIEW_CAP);
   const overflow = due.length > DUE_REVIEW_CAP ? due.length - DUE_REVIEW_CAP : 0;
   if (due.length > 30) {
@@ -8446,7 +8536,7 @@ function startUnattemptedSession() {
   const doneToday = questionsAnsweredToday();
   const latestPractice = latestPracticeRecordMap();
   const pool = preferredPracticeQuestions(bankQuestionPool().filter(q =>
-    q && normalSessionEligible(q) && !hasPracticeAttempt(q, latestPractice) && !wasAnsweredToday(q, doneToday)
+    q && practiceQueueEligible(q) && !hasPracticeAttempt(q, latestPractice) && !wasAnsweredToday(q, doneToday)
   ));
   if (!pool.length) { alert('No unattempted questions are left for today. Try the Due Review or a full mock.'); return; }
   const targetQ = Math.max(10, Math.round((todayMins || 15) * 60 / 50));
@@ -10154,7 +10244,7 @@ function done() {
     if (dueLeft === 0 && dueDone > 0 && dueDone >= inboxZeroTarget && !localStorage.getItem(inboxZeroCelebratedKey)) {
       localStorage.setItem(inboxZeroCelebratedKey, '1');
       setTimeout(() => {
-        triggerAutoConfetti('Inbox Zero! All Due MCQs Cleared 🏆', `${dueDone} due card${dueDone === 1 ? '' : 's'} reviewed today. Outstanding consistency!`);
+        triggerAutoConfetti('Inbox Zero! Active-Scope Due MCQs Cleared 🏆', `${dueDone} due card${dueDone === 1 ? '' : 's'} reviewed today. Outstanding consistency!`);
       }, 400);
     } else if (todayDone >= targetMins && !localStorage.getItem(todayGoalCelebratedKey)) {
       localStorage.setItem(todayGoalCelebratedKey, '1');
@@ -11482,6 +11572,161 @@ function exportLog(copy) {
   }
 }
 
+let ARCHIVE_FILTER = 'all';
+
+function archiveQuestionById(id) {
+  const raw = String(id);
+  return bankQuestionPool().find(q =>
+    String(questionUid(q) || qk(q)) === raw
+  ) || findQuestionByRawKey(raw);
+}
+
+function excludedQuestionGroups() {
+  const bank = bankQuestionPool().filter(q => q && !isQuestionDeleted(q));
+  return {
+    tooHard: bank.filter(q => isQuestionTooHard(q)),
+    outOfScope: bank.filter(q => isQuestionOutOfScope(q)),
+    cold: bank.filter(q => isColdQuestion(q)),
+    quarantined: bank.filter(q => isQuestionQuarantined(q)),
+    l3: bank.filter(q => effLevel(q) >= 3)
+  };
+}
+
+function archiveQuestionsForFilter(filter) {
+  if (filter === 'all') return practiceScopeExcludedQuestions();
+  const groups = excludedQuestionGroups();
+  return groups[filter] || [];
+}
+
+function setArchiveFilter(filter) {
+  ARCHIVE_FILTER = filter;
+  refreshSettingsArchive();
+}
+
+function archiveQuestionBadges(q) {
+  const badges = [`<span class="chip" style="font-size:10px">L${effLevel(q)}</span>`];
+  if (isQuestionTooHard(q)) badges.push('<span class="chip c-no" style="font-size:10px">Too hard</span>');
+  if (isQuestionOutOfScope(q)) badges.push('<span class="chip c-sk" style="font-size:10px">Out of scope</span>');
+  if (isColdQuestion(q)) badges.push('<span class="chip" style="font-size:10px">Cold</span>');
+  if (isQuestionQuarantined(q)) badges.push('<span class="chip c-no" style="font-size:10px">Quarantined</span>');
+  return badges.join(' ');
+}
+
+function renderSettingsArchiveContentHTML() {
+  const groups = excludedQuestionGroups();
+  const all = practiceScopeExcludedQuestions();
+  const filters = [
+    ['all', 'All', all.length],
+    ['outOfScope', 'Out of scope', groups.outOfScope.length],
+    ['tooHard', 'Too hard', groups.tooHard.length],
+    ['cold', 'Cold', groups.cold.length],
+    ['quarantined', 'Quarantined', groups.quarantined.length],
+    ['l3', 'Level 3', groups.l3.length]
+  ];
+  const questions = archiveQuestionsForFilter(ARCHIVE_FILTER);
+  const shown = questions.slice(0, 200);
+  const deletedCount = Object.keys(QDELETED || {}).length;
+  const rows = shown.map(q => {
+    const id = String(questionUid(q) || qk(q));
+    const idJson = esc(JSON.stringify(id));
+    const stem = String(q.q || q.question || '')
+      .replace(/```[\s\S]*?```/g, ' [code] ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const preview = stem.length > 180 ? stem.slice(0, 180) + '…' : stem;
+    const actions = [`<button class="sm" onclick="startArchivedReview([${idJson}])">Review</button>`];
+    if (isQuestionTooHard(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'tooHard')">Unmark too hard</button>`);
+    if (isQuestionOutOfScope(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'outOfScope')">Restore to scope</button>`);
+    if (isColdQuestion(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'cold')">Restore cold</button>`);
+    if (isQuestionQuarantined(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'quarantined')">Clear quarantine</button>`);
+    return `
+      <div style="border:1px solid var(--bd);border-radius:10px;padding:10px;background:var(--card)">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+          <div class="mu sm"><b>${esc(q.s || '')}</b> · ${archiveQuestionBadges(q)}</div>
+          <div class="row" style="gap:5px;flex-wrap:wrap">${actions.join('')}</div>
+        </div>
+        <div style="margin-top:6px">${esc(preview || '(no stem text)')}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">
+      ${filters.map(([key, label, count]) =>
+        `<button class="sm ${ARCHIVE_FILTER === key ? 'p' : ''}" onclick="setArchiveFilter('${key}')">${label} (${count})</button>`
+      ).join('')}
+    </div>
+    <div class="row" style="justify-content:space-between;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <span class="mu sm">${questions.length} question(s) in this view${shown.length < questions.length ? ` · showing first ${shown.length}` : ''}</span>
+      <button class="sm p" onclick="startArchivedFilterReview()" ${questions.length ? '' : 'disabled'}>Review filtered (${questions.length})</button>
+    </div>
+    ${rows ? `<div style="margin-top:10px;display:grid;gap:8px">${rows}</div>` : '<p class="mu sm">No questions in this view.</p>'}
+    ${deletedCount ? `<p class="mu sm">Deleted tombstones: ${deletedCount}. Deleted questions were removed from banks and cannot be previewed or restored here.</p>` : ''}
+  `;
+}
+
+function renderSettingsArchiveHTML() {
+  return `
+    <div class="card" style="margin-top:14px">
+      <h3 style="margin:0 0 6px">Practice Scope &amp; Excluded Questions</h3>
+      <p class="mu sm" style="margin:0 0 10px">Choose what automatic sessions may include. Mocks and explicit drills still use the full bank. Out-of-scope, cold, and quarantined questions stay out of normal practice unless reviewed here. Level 3 and too-hard tabs list all flagged items even when included.</p>
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <label class="mu sm" style="display:flex;gap:5px;align-items:center;cursor:pointer">
+          <input type="checkbox" ${INCLUDE_L3 ? 'checked' : ''} onchange="setPracticeScopePref('l3', this.checked)"> Include L3 advanced
+        </label>
+        <label class="mu sm" style="display:flex;gap:5px;align-items:center;cursor:pointer">
+          <input type="checkbox" ${INCLUDE_TOO_HARD ? 'checked' : ''} onchange="setPracticeScopePref('tooHard', this.checked)"> Include too-hard
+        </label>
+      </div>
+      <div id="settings-archive">${renderSettingsArchiveContentHTML()}</div>
+    </div>
+  `;
+}
+
+function refreshSettingsArchive() {
+  const el = document.getElementById('settings-archive');
+  if (el) el.innerHTML = renderSettingsArchiveContentHTML();
+}
+
+function startArchivedReview(ids) {
+  const questions = (Array.isArray(ids) ? ids : [ids])
+    .map(archiveQuestionById)
+    .filter(Boolean);
+  if (!questions.length) {
+    showToast('No questions are available in this view.');
+    return;
+  }
+  clearDrillDeck();
+  DRILL_D = questions.map((q, index) => ({ ...q, n: DRILL_N_BASE + index }));
+  start(DRILL_D.map(q => q.n));
+}
+
+function startArchivedFilterReview() {
+  startArchivedReview(archiveQuestionsForFilter(ARCHIVE_FILTER).map(q => questionUid(q) || qk(q)));
+}
+
+function restoreArchivedQuestion(id, flag) {
+  const q = archiveQuestionById(id);
+  if (!q) return;
+  let label = '';
+  if (flag === 'tooHard' || flag === 'outOfScope') {
+    const override = qovEntryFor(q);
+    override[flag] = false;
+    label = flag === 'tooHard' ? 'Too hard' : 'Out of scope';
+  } else if (flag === 'cold') {
+    setQuestionColdState(q, false);
+    label = 'Cold';
+  } else if (flag === 'quarantined') {
+    clearQuestionQuarantine(q);
+    label = 'Quarantine';
+  } else {
+    return;
+  }
+  save();
+  refreshSettingsArchive();
+  showToast(`${label} flag cleared.`);
+}
+
 // Settings
 function openSettings() {
   const dailyCount = getDailyApiCount();
@@ -11566,6 +11811,7 @@ function openSettings() {
         <button onclick="home()">Cancel</button>
       </p>
     </div>
+    ${renderSettingsArchiveHTML()}
     ${window.CloudSync ? CloudSync.settingsHTML() : ''}
   `;
 }
