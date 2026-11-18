@@ -3250,9 +3250,9 @@ function questionsAnsweredToday() {
   (L || []).forEach(r => {
     if (!r || r.mock === 1 || r.t == null) return;
     if (localDateKey(r.t) !== todayKey) return;
-    if (r.uid) out.add(r.uid);
-    if (r.qid) out.add(r.qid);
-    if (r.k) out.add(r.k);
+    if (r.uid) out.add(String(r.uid));
+    if (r.qid) out.add(String(r.qid));
+    if (r.k) out.add(String(r.k));
   });
   return out;
 }
@@ -3260,7 +3260,19 @@ function questionsAnsweredToday() {
 function wasAnsweredToday(q, doneSet) {
   if (!q) return false;
   const set = doneSet || questionsAnsweredToday();
-  return set.has(questionUid(q)) || set.has(qk(q));
+  const aliases = [questionUid(q), q._sid, q.qid, qk(q)];
+  return aliases.some(key => key != null && key !== '' && set.has(String(key)));
+}
+
+function dueDoneToday() {
+  const todayKey = localDateKey();
+  const done = new Set();
+  (L || []).forEach(rec => {
+    if (!rec || rec.dueToday !== 1 || localDateKey(rec.t) !== todayKey) return;
+    const key = rec.uid || rec.qid || rec.k;
+    if (key) done.add(String(key));
+  });
+  return done.size;
 }
 
 function latestPracticeRecordMap() {
@@ -3363,6 +3375,35 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
   if (!Array.isArray(v.history)) v.history = [];
   if (!v.f) v.f = Date.now();
 
+  // Confidence can be re-rated after grading. Re-run the same-day schedule from
+  // the pre-attempt snapshot instead of compounding intervals, lapses, or misses.
+  const dayKey = localDateKey();
+  if (v._srDay === dayKey && v._srSnapshot) {
+    const snap = v._srSnapshot;
+    v.stab = snap.stab;
+    v.diff = snap.diff;
+    v.d = snap.d;
+    v.missCount = snap.missCount;
+    v.lapses = snap.lapses;
+    v.history.length = Math.min(v.history.length, snap.historyLen);
+    if (Array.isArray(snap.missDates)) v.missDates = snap.missDates.slice(); else delete v.missDates;
+    if (snap.confWrongRetest) v.confWrongRetest = snap.confWrongRetest; else delete v.confWrongRetest;
+    if (snap.leech) v.leech = true; else delete v.leech;
+  } else {
+    v._srDay = dayKey;
+    v._srSnapshot = {
+      stab: v.stab,
+      diff: v.diff,
+      d: v.d,
+      missCount: v.missCount || 0,
+      lapses: v.lapses || 0,
+      historyLen: v.history.length,
+      missDates: Array.isArray(v.missDates) ? v.missDates.slice() : null,
+      confWrongRetest: v.confWrongRetest || null,
+      leech: !!v.leech
+    };
+  }
+
   // Grade 1: Wrong, Don't Know, OR Correct at Confidence 1 (lucky guess counts as a miss!)
   // Grade 2: Correct at Confidence 2 (hesitant)
   // Grade 3: Correct at Confidence 3 (>=15s)
@@ -3427,13 +3468,13 @@ function sr(q, isCorrect, confidence = 3, timeTakenMs = 10000) {
   }
 }
 
-function dueKeys(quickOnly = false, availableOnly = false) {
+function dueKeys(quickOnly = false) {
   const t = today();
-  const doneToday = availableOnly ? questionsAnsweredToday() : null;
+  const doneToday = questionsAnsweredToday();
   const pool = bankQuestionPool().filter(q =>
     (!quickOnly || effQuick(q)) &&
     normalSessionEligible(q) &&
-    (!doneToday || !wasAnsweredToday(q, doneToday))
+    !wasAnsweredToday(q, doneToday)
   );
 
   const byIdentity = new Map();
@@ -3474,6 +3515,7 @@ function dueKeys(quickOnly = false, availableOnly = false) {
     if (quickOnly && !effQuick(e)) return;
     if (!normalSessionEligible(e)) return;
     if (activeKeys.has(qk(e))) return;
+    if (wasAnsweredToday(e, doneToday)) return;
     const v = V[qk(e)];
     if (v && v.d <= t) addDue(e, i + ':' + j, 1500, false);
   }));
@@ -5939,7 +5981,7 @@ function getCurrentMilestone(existingStats = null) {
   const l0Fails = Object.entries(l0).filter(([_, v]) => v.attempts >= 5 && !v.mastered).map(([k]) => k);
   if (l0Fails.length > 0) {
     const sample = l0Fails.slice(0, 2).join(', ') + (l0Fails.length > 2 ? ` +${l0Fails.length - 2} more` : '');
-    return { id: 2, tag: 'M2', title: 'Level 0 Core Mastery', desc: `Get every subject to ≥85% on at least 5 L0 attempts (${l0Fails.length}: ${sample}).`, done: false };
+    return { id: 2, tag: 'M2', title: 'Level 0 Core Mastery', desc: `Get every subject to ≥85% on at least 5 L0 attempts with ≥60% L0 coverage (${l0Fails.length}: ${sample}).`, done: false };
   }
 
   const mockAttempts = (L || []).filter(r => r.mock === 1);
@@ -6530,52 +6572,182 @@ function rawAccuracy(records) {
   return ok / scoredRecords.length;
 }
 
-// Estimate readiness from first practice attempts; mock results and repeated attempts are handled separately.
-// For Level 0 Core Mastery, learning is rewarded: questions retried and answered correctly on latest attempts redeem past misses.
-function readinessStats() {
-  const first = firstPracticeAttempts();
-  const latest = latestPracticeAttempts();
-  const bySubject = {};
-  const l0BySubject = {};
-  first.forEach(rec => {
-    const q = findQuestionByRecord(rec);
-    const subject = canonSubj(rec.s || (q && q.s) || '');
-    if (!subject) return;
-    (bySubject[subject] = bySubject[subject] || []).push(rec);
-    const lvl = recordLevelValue(rec);
-    if (lvl === 0) (l0BySubject[subject] = l0BySubject[subject] || []).push(rec);
+function readinessEligible(q) {
+  return !!q && !isQuestionDeleted(q) && !isColdQuestion(q) &&
+    !isQuestionQuarantined(q) && !isQuestionOutOfScope(q);
+}
+
+function readinessQuestionWeight(q) {
+  if (!q) return 0;
+  if (isQuestionTooHard(q)) return 0.25;
+  const level = Math.max(0, Math.min(3, effLevel(q)));
+  return [1, 0.75, 0.5, 0.25][level];
+}
+
+function addReadinessAliases(set, q) {
+  if (!q) return;
+  [questionUid(q), q._sid, q.qid, qk(q)].forEach(key => {
+    if (key != null && key !== '') set.add(String(key));
+  });
+}
+
+function readinessAliasMatch(set, q) {
+  if (!q) return false;
+  return [questionUid(q), q._sid, q.qid, qk(q)].some(key =>
+    key != null && key !== '' && set.has(String(key))
+  );
+}
+
+const READINESS_UNSEEN_LEVEL_DEFAULTS = [0.70, 0.65, 0.60, 0.55];
+
+// Project performance over the live practice bank by assuming a conservative
+// accuracy for unseen questions, calibrated from seen performance at that level.
+function coverageProjection(entries, eligiblePool) {
+  const byLevel = [0, 1, 2, 3].map(() => ({ seenPoints: 0, seenWeight: 0, unseenCount: 0, unseenWeight: 0 }));
+  const seenAliases = new Set();
+  (entries || []).forEach(({ rec, q }) => {
+    const level = Math.max(0, Math.min(3, effLevel(q)));
+    const scored = { ...rec, lvl: level };
+    byLevel[level].seenPoints += recordPointValue(scored);
+    byLevel[level].seenWeight += recordDifficultyWeight(scored);
+    addReadinessAliases(seenAliases, q);
+  });
+  (eligiblePool || []).forEach(q => {
+    if (readinessAliasMatch(seenAliases, q)) return;
+    const level = Math.max(0, Math.min(3, effLevel(q)));
+    byLevel[level].unseenCount++;
+    byLevel[level].unseenWeight += readinessQuestionWeight(q);
   });
 
-  const latestL0BySubject = {};
-  latest.forEach(rec => {
+  let seenPoints = 0, seenWeight = 0, unseenWeight = 0, assumedPoints = 0;
+  const assumedByLevel = byLevel.map((bucket, level) => {
+    seenPoints += bucket.seenPoints;
+    seenWeight += bucket.seenWeight;
+    unseenWeight += bucket.unseenWeight;
+    const seenAccuracy = bucket.seenWeight > 0 ? bucket.seenPoints / bucket.seenWeight : null;
+    const assumed = (seenAccuracy != null && bucket.seenWeight >= 5)
+      ? Math.min(0.85, Math.max(0.5, seenAccuracy))
+      : READINESS_UNSEEN_LEVEL_DEFAULTS[level];
+    assumedPoints += bucket.unseenWeight * assumed;
+    return { level, seenAccuracy, assumed, unseenCount: bucket.unseenCount, unseenWeight: bucket.unseenWeight };
+  });
+
+  const totalWeight = seenWeight + unseenWeight;
+  const total = (eligiblePool || []).length;
+  return {
+    score: totalWeight > 0 ? (seenPoints + assumedPoints) / totalWeight : 0,
+    seen: (entries || []).length,
+    total,
+    pct: total ? (entries || []).length / total : 0,
+    seenPoints,
+    seenWeight,
+    unseenWeight,
+    assumedPoints,
+    assumedByLevel,
+    byLevel,
+    seenAliases
+  };
+}
+
+// Estimate readiness from first practice attempts; mock results and repeated attempts are handled separately.
+// Only questions in the live practice bank count; deleted, cold, quarantined, and out-of-scope are excluded.
+// For Level 0 Core Mastery, learning is rewarded: questions retried and answered correctly on latest attempts redeem past misses.
+function readinessStats() {
+  const eligible = [];
+  const eligibleKeys = new Set();
+  bankQuestionPool().forEach(q => {
+    if (!readinessEligible(q)) return;
+    const key = questionUid(q) || qk(q);
+    if (eligibleKeys.has(key)) return;
+    eligibleKeys.add(key);
+    eligible.push(q);
+  });
+  const eligibleAliases = new Set();
+  eligible.forEach(q => addReadinessAliases(eligibleAliases, q));
+  const inEligibleBank = q => !!q && readinessEligible(q) && readinessAliasMatch(eligibleAliases, q);
+
+  const firstByQ = new Map();
+  firstPracticeAttempts().forEach(rec => {
     const q = findQuestionByRecord(rec);
-    const subject = canonSubj(rec.s || (q && q.s) || '');
+    if (!inEligibleBank(q)) return;
+    const id = questionUid(q) || qk(q);
+    const prev = firstByQ.get(id);
+    if (!prev || (rec.t || 0) < (prev.rec.t || 0)) firstByQ.set(id, { rec, q, id });
+  });
+  const latestByQ = new Map();
+  latestPracticeAttempts().forEach(rec => {
+    const q = findQuestionByRecord(rec);
+    if (!inEligibleBank(q)) return;
+    const id = questionUid(q) || qk(q);
+    const prev = latestByQ.get(id);
+    if (!prev || (rec.t || 0) >= (prev.rec.t || 0)) latestByQ.set(id, { rec, q, id });
+  });
+  const firstEntries = [...firstByQ.values()];
+  const latestEntries = [...latestByQ.values()];
+  const scoredRecord = ({ rec, q }) => ({ ...rec, lvl: Math.max(0, Math.min(3, effLevel(q))) });
+
+  const bySubject = {};
+  const l0EntriesBySubject = {};
+  firstEntries.forEach(entry => {
+    const { rec, q } = entry;
+    const subject = canonSubj(q.s || rec.s || '');
     if (!subject) return;
-    const lvl = recordLevelValue(rec);
-    if (lvl === 0) (latestL0BySubject[subject] = latestL0BySubject[subject] || []).push(rec);
+    (bySubject[subject] = bySubject[subject] || []).push(scoredRecord(entry));
+    if (effLevel(q) === 0) (l0EntriesBySubject[subject] = l0EntriesBySubject[subject] || []).push(entry);
+  });
+  const latestL0BySubject = {};
+  latestEntries.forEach(entry => {
+    const { rec, q } = entry;
+    const subject = canonSubj(q.s || rec.s || '');
+    if (!subject || effLevel(q) !== 0) return;
+    (latestL0BySubject[subject] = latestL0BySubject[subject] || []).push(entry);
   });
 
   const subjects = {};
   Object.entries(bySubject).forEach(([subject, records]) => {
     const scored = scoreRecords(records);
+    const subjectEntries = firstEntries.filter(entry => canonSubj(entry.q.s || entry.rec.s) === subject);
+    const subjectEligible = eligible.filter(q => canonSubj(q.s) === subject);
+    const coverage = coverageProjection(subjectEntries, subjectEligible);
     subjects[subject] = {
       ...scored,
       subject,
       target: subjectTarget(subject),
-      raw: rawAccuracy(records)
+      raw: rawAccuracy(records),
+      adjustedScore: coverage.total ? coverage.score : scored.score,
+      coverage
     };
   });
 
+  const l0EligibleBySubject = {};
+  eligible.forEach(q => {
+    if (effLevel(q) !== 0) return;
+    const subject = canonSubj(q.s);
+    (l0EligibleBySubject[subject] = l0EligibleBySubject[subject] || []).push(q);
+  });
+  const l0SeenBySubject = {};
+  firstEntries.forEach(entry => {
+    if (effLevel(entry.q) !== 0) return;
+    const subject = canonSubj(entry.q.s);
+    if (!l0SeenBySubject[subject]) l0SeenBySubject[subject] = new Set();
+    l0SeenBySubject[subject].add(questionUid(entry.q) || qk(entry.q));
+  });
+
   const l0 = {};
-  const allL0Subjects = new Set([...Object.keys(l0BySubject), ...Object.keys(latestL0BySubject)]);
+  const allL0Subjects = new Set([...Object.keys(l0EntriesBySubject), ...Object.keys(latestL0BySubject)]);
   allL0Subjects.forEach(subject => {
-    const firstRecs = l0BySubject[subject] || [];
-    const latestRecs = latestL0BySubject[subject] || [];
+    const firstRecs = (l0EntriesBySubject[subject] || []).map(scoredRecord);
+    const latestRecs = (latestL0BySubject[subject] || []).map(scoredRecord);
     const firstScored = scoreRecords(firstRecs);
     const latestScored = scoreRecords(latestRecs);
 
-    const firstMastered = firstScored.weightedAttempts >= 5 && firstScored.raw >= 0.85;
-    const latestMastered = latestScored.weightedAttempts >= 5 && latestScored.raw >= 0.85;
+    const totalL0 = (l0EligibleBySubject[subject] || []).length;
+    const seenL0 = l0SeenBySubject[subject] ? l0SeenBySubject[subject].size : 0;
+    const coverage = totalL0 ? Math.min(1, seenL0 / totalL0) : 0;
+    const coverageOk = totalL0 > 0 && coverage >= 0.6;
+
+    const firstMastered = coverageOk && firstScored.weightedAttempts >= 5 && firstScored.raw >= 0.85;
+    const latestMastered = coverageOk && latestScored.weightedAttempts >= 5 && latestScored.raw >= 0.85;
     const isMastered = firstMastered || latestMastered;
 
     const useLatest = latestMastered || latestScored.raw > firstScored.raw;
@@ -6588,12 +6760,30 @@ function readinessStats() {
       raw: rawAccuracy(chosenRecs),
       firstRaw: rawAccuracy(firstRecs),
       latestRaw: rawAccuracy(latestRecs),
+      coverage,
+      seenCount: seenL0,
+      total: totalL0,
       mastered: isMastered
     };
   });
 
-  const overall = scoreRecords(first);
-  return { overall, subjects, l0, first };
+  const firstScoredRecords = firstEntries.map(scoredRecord);
+  const overallCoverage = coverageProjection(firstEntries, eligible);
+  const overall = {
+    ...scoreRecords(firstScoredRecords),
+    adjustedScore: overallCoverage.score,
+    coverage: overallCoverage
+  };
+  const l0Tracked = Object.keys(l0EligibleBySubject).filter(subject =>
+    (l0EligibleBySubject[subject] || []).length > 0
+  ).length;
+  return {
+    overall,
+    subjects,
+    l0,
+    first: firstScoredRecords,
+    coverage: { ...overallCoverage, l0Tracked }
+  };
 }
 
 function calculateUnitCoverage() {
@@ -7089,19 +7279,23 @@ function renderReadinessMeter(existingStats = null) {
   const TARGET_MARK = Number(localStorage.getItem('bitmcq_target_mark')) || 80;
   const stats = existingStats || readinessStats();
   const overall = stats.overall;
-  const projectedMark = Math.round(overall.score * 1000) / 10;
+  const coverage = overall.coverage || { seen: overall.attempts, total: overall.attempts, pct: 1 };
+  const projectedMark = Math.round((overall.adjustedScore != null ? overall.adjustedScore : overall.score) * 1000) / 10;
+  const seenMark = Math.round(overall.score * 1000) / 10;
   const markGap = Math.round((projectedMark - TARGET_MARK) * 10) / 10;
 
-  const studiedQuestionKeys = Object.keys(V).filter(k => V[k] && Array.isArray(V[k].history) && V[k].history.length > 0);
-  const lockedCount = studiedQuestionKeys.filter(k => isLockedIn(k)).length;
-  const studiedTotal = Math.max(studiedQuestionKeys.length, overall.attempts);
+  const studiedRecords = stats.first || [];
+  const studiedTotal = studiedRecords.length;
+  const lockedCount = studiedRecords.filter(rec => isLockedIn(rec.k || rec.uid || '')).length;
   const lockedPct = studiedTotal ? Math.round(lockedCount / studiedTotal * 100) : 0;
 
   const rowBySubject = new Map(Object.values(stats.subjects).map(r => [canonSubj(r.subject), {
     k: r.subject,
     tot: r.attempts,
     weightedAttempts: r.weightedAttempts,
-    acc: r.score,
+    acc: r.adjustedScore,
+    seenAcc: r.score,
+    coverage: r.coverage,
     raw: r.raw,
     target: r.target,
     isCalibrated: r.weightedAttempts >= 15,
@@ -7114,6 +7308,8 @@ function renderReadinessMeter(existingStats = null) {
         tot: 0,
         weightedAttempts: 0,
         acc: null,
+        seenAcc: null,
+        coverage: null,
         raw: null,
         target: subjectTarget(subject),
         isCalibrated: false,
@@ -7135,8 +7331,7 @@ function renderReadinessMeter(existingStats = null) {
 
   const l0Rows = Object.values(stats.l0);
   const l0Mastered = l0Rows.filter(r => r.mastered).length;
-  const allSubjsList = bankSubjects();
-  const l0Tracked = Math.max(allSubjsList.length, l0Rows.length, 19);
+  const l0Tracked = coverage.l0Tracked != null ? coverage.l0Tracked : Object.keys(stats.l0).length;
 
   const activeDeckSubjs = new Set((D || []).map(q => canonSubj(q.s)));
   const unattemptedInDeck = [...activeDeckSubjs].filter(s => !stats.subjects[s]);
@@ -7155,7 +7350,7 @@ function renderReadinessMeter(existingStats = null) {
         ${PB_MOCK_SCORE > 0 ? `<span class="chip" style="background:var(--ac-bg);color:var(--ac);border-color:var(--ac)">🏆 Mock Best: <b>${PB_MOCK_SCORE}%</b></span>` : ''}
       </div>
     </div>
-    <p class="mu" style="margin:6px 0 14px">First practice attempts only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; Too hard 25%); Out of scope is excluded. Guesses and skips count as misses; mock scores stay separate. Repeat memory is excluded.</p>
+    <p class="mu" style="margin:6px 0 14px">First practice attempts only, live bank only. Readiness is difficulty-weighted (L0 full; L1/L2/L3 75%/50%/25%; Too hard 25%); Out of scope, cold, quarantined, and deleted questions are excluded. The ring projects the whole bank: unseen questions assume 70/65/60/55% by L0–L3 (calibrated within 50–85% once a level has ≥5 weighted attempts). Guesses and skips count as misses; mock scores stay separate.</p>
 
     <div class="readiness-container">
       <div class="readiness-ring-wrap">
@@ -7171,10 +7366,12 @@ function renderReadinessMeter(existingStats = null) {
       <div style="flex:1;min-width:200px">
         <div class="row" style="gap:6px;margin-bottom:8px">
           <span class="chip">🔒 Locked in: <b>${lockedCount}/${studiedTotal} studied</b> (${lockedPct}%)</span>
+          <span class="chip">📚 Coverage: <b>${coverage.seen}/${coverage.total}</b> (${Math.round(coverage.pct * 100)}%)</span>
           <span class="chip ${markGap >= 0 ? 'c-ok' : 'c-no'}">${markGap >= 0 ? 'Ahead: <b>+' + markGap + ' marks</b>' : 'Gap: <b>' + markGap + ' marks</b>'}</span>
         </div>
         <div class="row sm mu" style="gap:10px;flex-wrap:wrap">
           <span>🎯 Distinct practice: <b>${overall.attempts}</b> questions (${overall.weightedAttempts.toFixed(1)} weighted evidence)</span>
+          <span title="Accuracy on questions you have already practiced today's bank">Seen-only: <b>${seenMark}%</b></span>
           <span>✅ Raw first-attempt: <b>${Math.round(overall.raw * 100)}%</b></span>
           <span style="cursor:pointer" onclick="startLevelLadderSession(${l0Mastered >= l0Tracked ? 1 : 0})" title="Click to drill unattempted &amp; due L0 foundation questions">🎯 L0 mastered: <b style="text-decoration:underline">${l0Mastered}/${l0Tracked}</b> subjects</span>
         </div>
@@ -7214,7 +7411,7 @@ function renderReadinessMeter(existingStats = null) {
             <div class="row sm" style="align-items:center;font-size:12px;margin-top:2px">
               <span class="status-dot ${dotClass}"></span>
               <b>${statusText}</b>
-              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d · ${r.assessed ? Math.round(r.acc * 100) + '%' : 'not assessed'}</span>
+              <span class="mu" style="margin-left:auto">${r.tot} att · ${fixCount}d · ${r.assessed ? Math.round(r.acc * 100) + '%' : 'not assessed'}${r.coverage ? ` · ${r.coverage.seen}/${r.coverage.total} seen` : ''}</span>
             </div>
           </div>
         `;
@@ -7438,10 +7635,11 @@ function selectLevelLadderQuestions(targetLevel = 0, requestedCount = 15) {
 
 function startLevelLadderSession(preferredLevel = null) {
   const stats = readinessStats();
-  const allSubjs = bankSubjects();
   const l0Rows = Object.values(stats.l0);
   const l0MasteredCount = l0Rows.filter(r => r.mastered).length;
-  const l0TrackedCount = Math.max(allSubjs.length, l0Rows.length, 19);
+  const l0TrackedCount = stats.coverage && stats.coverage.l0Tracked != null
+    ? stats.coverage.l0Tracked
+    : l0Rows.length;
 
   let level = preferredLevel != null ? preferredLevel : (l0MasteredCount >= l0TrackedCount ? 1 : 0);
   let res = selectLevelLadderQuestions(level, 15);
@@ -7567,6 +7765,7 @@ function home(preserveScroll = false) {
 
   const maxCap = getMaxInterval();
   const due = dueKeys();
+  const dueDone = dueDoneToday();
   const latestPractice = latestPracticeRecordMap();
   const wr = currentPracticeQuestions('w', latestPractice).map(sessionKeyForQuestion);
   const sk = currentPracticeQuestions('s', latestPractice).map(sessionKeyForQuestion);
@@ -7586,7 +7785,9 @@ function home(preserveScroll = false) {
   const homeReadiness = readinessStats();
   const homeL0Rows = Object.values(homeReadiness.l0);
   const homeL0Mastered = homeL0Rows.filter(r => r.mastered).length;
-  const homeL0Tracked = Math.max(drillSubjects.length, homeL0Rows.length, 19);
+  const homeL0Tracked = homeReadiness.coverage && homeReadiness.coverage.l0Tracked != null
+    ? homeReadiness.coverage.l0Tracked
+    : homeL0Rows.length;
 
   const dueCards = CARDS.filter(c => !c.grad && (c.due || 0) <= today());
   const milestone = getCurrentMilestone(homeReadiness);
@@ -7670,7 +7871,7 @@ function home(preserveScroll = false) {
         </div>
         <div class="row hide-quiet">
           <span class="chip">🔥 ${streak()}d streak</span>
-          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()" title="${due.length} total MCQs due in spaced repetition; capped to 60 for today's review to keep pace manageable and avoid overload">MCQs due: <b>${Math.min(due.length, 60)}</b>${due.length > 60 ? ` <span class="mu" style="font-size:10px">(of ${due.length})</span>` : ''}</button>
+          <button class="chip c-ok" style="cursor:pointer" onclick="startDueReview()" title="${due.length} MCQs remaining due today in spaced repetition; capped to 60 per review session">MCQs due: <b>${Math.min(due.length, 60)}</b>${due.length > 60 ? ` <span class="mu" style="font-size:10px">(of ${due.length})</span>` : ''}${dueDone ? ` <span class="mu" style="font-size:10px">· ${dueDone} done today</span>` : ''}</button>
           ${codeTraceDue ? `<button class="chip c-sk" style="cursor:pointer" onclick="startCodeTraceSession(true)">Code trace due: <b>${codeTraceDue}</b></button>` : ''}
           ${weeklyMock.completed ? `<span class="chip c-ok">📅 Weekly mock: <b>done</b></span>` : (weeklyMock.started ? `<button class="chip c-sk" style="cursor:pointer" onclick="resumeActiveMock()">📅 Weekly mock: <b>resume</b></button>` : `<button class="chip c-sk" style="cursor:pointer" onclick="mock(100,false)">📅 Weekly mock: <b>start (full)</b></button>`)}
           ${syncStatusChip()}
@@ -8129,7 +8330,9 @@ function codeTracePool() {
 
 function codeTraceDueQuestions(pool = null) {
   const t = today();
+  const doneToday = questionsAnsweredToday();
   return (pool || codeTracePool()).filter(q => {
+    if (wasAnsweredToday(q, doneToday)) return false;
     const v = V[qk(q)];
     return v && v.d <= t;
   });
@@ -8175,7 +8378,9 @@ function startCalcTraceSession() {
 
 function startCodeTraceSession(dueOnly = false) {
   const seen = new Set();
+  const doneToday = questionsAnsweredToday();
   const candidates = codeTracePool().filter(q => {
+    if (wasAnsweredToday(q, doneToday)) return false;
     const key = questionUid(q) || qk(q);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -8187,10 +8392,7 @@ function startCodeTraceSession(dueOnly = false) {
   }
   const t = today();
   if (dueOnly) {
-    const dueList = candidates.filter(q => {
-      const v = V[qk(q)];
-      return v && v.d <= t;
-    });
+    const dueList = codeTraceDueQuestions(candidates);
     if (!dueList.length) {
       alert('No code-tracing questions are currently due.');
       return;
@@ -8926,6 +9128,8 @@ function pick(i, cfOverride) {
   // PRACTICE MODE: Only first attempt counts for stats & FSRS!
   if (!hist.recordedFirstAttempt) {
     hist.recordedFirstAttempt = true;
+    const priorSr = V[qk(rawQ)];
+    const wasDue = !!(priorSr && priorSr.d <= today());
     REC = {
       k: qk(rawQ),
       uid: ensureQuestionUid(rawQ),
@@ -8941,6 +9145,7 @@ function pick(i, cfOverride) {
       oos: isQuestionOutOfScope(rawQ),
       tm: Math.round(timeTakenMs / 1000),
       set: S,
+      dueToday: wasDue ? 1 : 0,
       variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
     };
     L.push(REC);
@@ -9108,6 +9313,7 @@ function dontKnow() {
 
   if (!hist.recordedFirstAttempt) {
     hist.recordedFirstAttempt = true;
+    const priorSr = V[qk(rawQ)];
     REC = {
       k: qk(rawQ),
       uid: ensureQuestionUid(rawQ),
@@ -9120,6 +9326,7 @@ function dontKnow() {
       ok: false,
       set: S,
       skipped: true,
+      dueToday: priorSr && priorSr.d <= today() ? 1 : 0,
       variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
     };
     L.push(REC);
@@ -9207,6 +9414,7 @@ function skipKnown() {
 
   if (!hist.recordedFirstAttempt) {
     hist.recordedFirstAttempt = true;
+    const priorSr = V[qk(rawQ)];
     REC = {
       k: qk(rawQ),
       uid: ensureQuestionUid(rawQ),
@@ -9220,6 +9428,7 @@ function skipKnown() {
       cf: 2,           // confidence 2 = hesitant
       set: S,
       skipKnown: true,
+      dueToday: priorSr && priorSr.d <= today() ? 1 : 0,
       variant: !!(CURRENT_Q && CURRENT_Q.isShowingVariant)
     };
     L.push(REC);
@@ -9934,14 +10143,18 @@ function done() {
   // Celebration check: Inbox Zero (all due MCQs cleared) or Today's Goal reached
   try {
     const dueLeft = typeof dueKeys === 'function' ? dueKeys().length : 0;
+    const dueDone = typeof dueDoneToday === 'function' ? dueDoneToday() : 0;
+    const inboxZeroTarget = Math.min(DUE_REVIEW_CAP, dueDone + dueLeft);
     const todayKey = localDateKey();
+    const inboxZeroCelebratedKey = 'bitmcq_inbox_zero_celeb_' + todayKey;
     const todayDone = parseInt(localStorage.getItem('bitmcq_today_done') || '0', 10);
     const targetMins = todayMins || 15;
     const todayGoalCelebratedKey = 'bitmcq_goal_celeb_' + todayKey;
 
-    if (dueLeft === 0 && (Q || []).length > 0) {
+    if (dueLeft === 0 && dueDone > 0 && dueDone >= inboxZeroTarget && !localStorage.getItem(inboxZeroCelebratedKey)) {
+      localStorage.setItem(inboxZeroCelebratedKey, '1');
       setTimeout(() => {
-        triggerAutoConfetti('Inbox Zero! All Due MCQs Cleared 🏆', 'Every due card reviewed for today. Outstanding consistency!');
+        triggerAutoConfetti('Inbox Zero! All Due MCQs Cleared 🏆', `${dueDone} due card${dueDone === 1 ? '' : 's'} reviewed today. Outstanding consistency!`);
       }, 400);
     } else if (todayDone >= targetMins && !localStorage.getItem(todayGoalCelebratedKey)) {
       localStorage.setItem(todayGoalCelebratedKey, '1');
