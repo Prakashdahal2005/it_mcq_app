@@ -7918,6 +7918,7 @@ function home(preserveScroll = false) {
       <h1>🧠 Recall</h1>
       <div class="row" style="gap:6px">
         <button class="sm" onclick="openExportModal()" title="Export Error Log &amp; Study Pack">📥 Export</button>
+        ${window.CloudSync ? '<button class="sm" onclick="CloudSync.syncNow()" title="Sync progress with the cloud now">🔄 Sync Now</button>' : ''}
         <button class="sm" onclick="toggleQuietMode()" title="Toggle quiet mode without streak/advice">${QUIET_MODE ? '🤫 Quiet' : '🔔 Normal'}</button>
         <button class="sm" onclick="openSettings()">⚙</button>
       </div>
