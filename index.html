@@ -7329,10 +7329,26 @@ function syncStatusChip() {
   if (!st) return '';
   const age = st.lastSync ? (Date.now() - st.lastSync) : 0;
   const stale = !!st.lastSync && age > 24 * 60 * 60 * 1000;
-  if (!['offline', 'unauthorized', 'error'].includes(st.status) && !stale) return '';
-  const label = st.status === 'offline' ? 'Offline' : st.status === 'unauthorized' ? 'Sync locked' : st.status === 'error' ? 'Sync error' : 'Sync stale';
-  const cls = st.status === 'offline' ? 'c-sk' : 'c-no';
-  return `<button class="chip ${cls}" style="cursor:pointer" onclick="openSettings()" title="${esc(st.message || label)}">${label}</button>`;
+  let label = '', cls = '';
+  if (st.status === 'syncing') {
+    label = 'Syncing...';
+    cls = 'c-sk';
+  } else if (st.status === 'offline') {
+    label = 'Offline';
+    cls = 'c-sk';
+  } else if (st.status === 'unauthorized') {
+    label = 'Sync locked';
+    cls = 'c-no';
+  } else if (st.status === 'error') {
+    label = 'Sync error';
+    cls = 'c-no';
+  } else if (st.status === 'synced') {
+    label = stale ? 'Sync stale' : 'Connected';
+    cls = stale ? 'c-no' : 'c-ok';
+  } else {
+    return '';
+  }
+  return `<button id="dashboard-sync-chip" class="chip ${cls}" style="cursor:pointer" onclick="openSettings()" title="${esc(st.message || label)}">${label}</button>`;
 }
 
 function renderReadinessMeter(existingStats = null) {

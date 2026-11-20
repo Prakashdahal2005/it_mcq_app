@@ -1104,6 +1104,32 @@
     var badgeText = document.getElementById('cloud-status-text');
     var badge = document.getElementById('cloud-status-badge');
     var msgBox = document.getElementById('cloud-sync-msg-box');
+    var dashChip = document.getElementById('dashboard-sync-chip');
+    if (dashChip) {
+      var dLabel = '', dCls = '', dTitle = state.message || '';
+      if (state.status === 'syncing') {
+        dLabel = 'Syncing...'; dCls = 'c-sk';
+      } else if (state.status === 'offline') {
+        dLabel = 'Offline'; dCls = 'c-sk';
+      } else if (state.status === 'unauthorized') {
+        dLabel = 'Sync locked'; dCls = 'c-no';
+      } else if (state.status === 'error') {
+        dLabel = 'Sync error'; dCls = 'c-no';
+      } else if (state.status === 'synced') {
+        var stale = !!state.lastSync && (Date.now() - state.lastSync) > 24 * 60 * 60 * 1000;
+        dLabel = stale ? 'Sync stale' : 'Connected'; dCls = stale ? 'c-no' : 'c-ok';
+      } else {
+        dLabel = ''; dCls = '';
+      }
+      if (dLabel) {
+        dashChip.style.display = '';
+        dashChip.textContent = dLabel;
+        dashChip.className = 'chip ' + dCls;
+        dashChip.title = dTitle || dLabel;
+      } else {
+        dashChip.style.display = 'none';
+      }
+    }
     if (!badge || !badgeText) return;
 
     var color = '#16a34a';
