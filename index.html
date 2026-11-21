@@ -207,7 +207,7 @@ button:disabled { opacity: .45; cursor: default; }
   border-radius: 12px;
   border: 1px solid var(--bd);
   background: var(--card);
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   line-height: 1.45;
   transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
@@ -305,9 +305,9 @@ pre {
   max-width: 100%;
   border: 1px solid var(--bd);
 }
-.q { font-size: 20px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; }
+.q { font-size: calc(20px * var(--font-scale, 1)); font-weight: 600; line-height: 1.5; white-space: pre-wrap; }
 @media (min-width: 1000px) {
-  .q { font-size: 21px; }
+  .q { font-size: calc(21px * var(--font-scale, 1)); }
 }
 
 /* Two-column Question View on Desktop */
@@ -319,7 +319,7 @@ pre {
 @media (min-width: 920px) {
   .study-layout {
     display: grid;
-    grid-template-columns: 1.15fr 1fr;
+    grid-template-columns: 1.6fr 1fr;
     gap: 24px;
     align-items: start;
   }
@@ -8719,7 +8719,7 @@ function show() {
           ${pauseBtn}
           <button class="sm" onclick="toggleCalcPanel()" title="Calculator (Alt+C)">Calc</button>
           <span class="chip mu">${isQuick ? '⚡ Quick' : '📝 Pen &amp; Paper'}</span>
-          <select class="chip" style="font-size:11.5px;padding:2px 4px;cursor:pointer;background:var(--card);border:1px solid var(--bd);color:inherit" onchange="setQuestionLevel(${rawQ.n}, this.value)" title="Change question difficulty level">
+          <select class="chip" style="font-size:11.5px;padding:2px 4px;cursor:pointer;background:var(--card);border:1px solid var(--bd);color:inherit" onchange="setQuestionLevel(${rawQ.n}, this.value)" title="Change question difficulty level (L / Shift+L)">
             <option value="0" ${curLvl === 0 ? 'selected' : ''}>L0 · Core</option>
             <option value="1" ${curLvl === 1 ? 'selected' : ''}>L1 · Standard</option>
             <option value="2" ${curLvl === 2 ? 'selected' : ''}>L2 · Exact</option>
@@ -8774,7 +8774,7 @@ function show() {
           ` : ''}
           ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
           <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
-            ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'}
+            ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
           </button>
           <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (or press C after answering)">
             📋 Copy
@@ -8783,7 +8783,7 @@ function show() {
             ✏️ Edit
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionByN(${rawQ.n})" title="Delete this MCQ everywhere; linked flashcards are kept">
-            🗑 Delete
+            🗑 Delete <kbd class="kbd-badge sm">⇧Del</kbd>
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
             🚩 Looks wrong
@@ -8889,7 +8889,7 @@ function show() {
 
       ${MK ? renderMockPalette() : ''}
     </div>
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b> back · <b>N</b> forward · <b>S</b> don't know · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
+    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>L</b>/<b>⇧L</b> level · <b>⇧Del</b> delete · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
   `;
   typesetMath($('#app'));
   updateVariantQueueStatus();
@@ -10798,6 +10798,35 @@ document.addEventListener('keydown', e => {
   }
   if (view !== 'q' || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    navBack();
+    return;
+  }
+  if (k === 'e' && !e.shiftKey) {
+    if (!MK) {
+      e.preventDefault();
+      toggleColdQuestion();
+    }
+    return;
+  }
+  if (k === 'l') {
+    const actionQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+    if (actionQ) {
+      e.preventDefault();
+      setQuestionLevel(actionQ.n, (effLevel(actionQ) + (e.shiftKey ? 3 : 1)) % 4);
+    }
+    return;
+  }
+  if (e.key === 'Delete' && e.shiftKey) {
+    const actionQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+    if (actionQ && !MK) {
+      e.preventDefault();
+      deleteQuestionByN(actionQ.n);
+    }
+    return;
+  }
 
   // Navigation shortcuts
   if (k === 'b') {
