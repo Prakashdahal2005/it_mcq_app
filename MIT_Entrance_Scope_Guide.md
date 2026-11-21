@@ -47,9 +47,9 @@
 
 | Tier | Subjects | Aim | Strategy & Character |
 |---|---|---|---|
-| **A** (compact, high-return recall core) | IIT, MIS, EC, SAD, SE | 85% (4.25/5) | Prioritize concise concepts and common distinctions with strong marks-per-hour return. |
-| **B** (technical systems and broader syllabi) | DBMS, CN, OS, DL, AI, CG, MP, Web | 80% (4.0/5) | Build technical foundations; for broad subjects such as Web, prioritize fundamentals and avoid spending disproportionate time on niche detail. |
-| **C** (trace & calculation-heavy) | C, OOP, DSA, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | 75% (3.75/5) | Skill-based; master core fingerprints so you never face a blind 25% guess. |
+| **A** (high-return recall core) | IIT, MIS, EC, SAD, SE | 85% (4.25/5) | Prioritize concise concepts and common distinctions with strong marks-per-hour return. |
+| **B** (technical systems, programming, and broader syllabi) | C, OOP, DSA, DBMS, CN, OS, DL, AI, CG, MP | 80% (4.0/5) | Build technical foundations and core programming/DSA tracing skills with steady breadth-first coverage. |
+| **C** (lower priority / skill-based) | Web, plus Calculus (9 marks), Linear Algebra (6), Statistics (5) | 75% (3.75/5) | Web: broad/syntax-heavy with lower ROI for this plan (de-prioritize depth if basics known; keep breadth/core). Math/Stats: skill-based, master core fingerprints. |
 
 ## 2. What the paper really is
 
@@ -66,16 +66,18 @@
 
 Format: **know cold** | *trap* | skip deep until the core is fluent.
 
-### Tier A · compact, high-return recall core
+### Tier A — high-return recall core
 - **IIT:** hierarchy registers → cache → RAM → disk → tape; RAM≠ROM; system≠application≠utility software; assembler≠compiler; virus≠worm≠Trojan; firewall≠IDS; DNS/DHCP/FTP/Telnet/SMTP roles; Access is a DBMS. | *trap:* easy wording → skipping options | skip history, case studies.
 - **SAD:** waterfall / prototype (unclear requirements) / **spiral (risk)** / RAD (speed) / agile (Scrum, XP, Kanban); DFD=process, ERD=data, decision table/tree=logic; **alpha (in-house) ≠ beta (real users) ≠ acceptance**. | *trap:* structured vs OO tool | skip Gantt/PERT, interface design.
 - **SE:** **verification (product right) ≠ validation (right product)**; functional≠non-functional; CMM levels; COCOMO (organic/semi/embedded); version≠change≠release; team structures (democratic decentralized = no permanent leader). | *trap:* reverse engineering ≠ re-engineering | skip design patterns.
 - **MIS:** TPS (operational) / MIS (middle, routine) / DSS (middle, non-routine) / ESS (senior); Porter's 5 forces; value chain≠value web; 6 ethical principles (Descartes: if it can't be done repeatedly, don't do it once); push (build-to-stock)≠pull (build-to-order); structured/semi/unstructured; ERP/SCM/CRM/KMS. | *trap:* wording-matching, so memorise the one-liners.
 - **EC:** 7 unique features; B2C/B2B/C2C/C2B; 6 security dimensions; **phishing≠pharming≠spoofing**; DoS≠DDoS; SSL/TLS, PKI, VPN; auctions; EDI; Nepal ETA. | *trap:* dimension vs attack names | skip SET steps, social-media tools.
 
-### Tier B · technical systems and broader syllabi
+### Tier B — technical systems, programming, and broader syllabi
+- **C:** precedence; pre vs post `++`; integer division; `=` vs `==`; switch fall-through; macro without parentheses; pointer arithmetic scales by type size; `strlen`≠`sizeof`; fopen modes; struct≠union; array size n+1 for a string of n. | *trap:* trace on paper; "compile error" is often an option | skip file handling, preprocessor.
+- **OOP:** struct (public) ≠ class (private); **ctor base→derived, dtor reverse**; copy ctor takes a reference; static = one per class; overloading≠overriding; pure virtual = abstract; virtual destructor; non-overloadable `:: . .* ?: sizeof`; member memory allocated at **object creation**. | *trap:* "declaration" vs "creation" | skip template depth, file streams.
+- **DSA:** LIFO/FIFO; overflow≠underflow; infix↔postfix by hand; BST in-order = sorted; BFS=queue, DFS=stack; Prim/Kruskal=MST, Dijkstra=shortest path; array/stack/queue/list are linear, trees/graphs aren't; merge sort suits linked lists. | skip worked graph algorithms, hashing detail.
 - **DL:** NAND/NOR universal; De Morgan; half/full adder; mux 2ⁿ:1 needs n selects; encoder≠decoder; SR/D/JK/T (JK=11 toggles, SR=11 invalid); latch≠FF; sync≠async (ripple) counter; mod-N → ⌈log₂N⌉ FFs; ring≠Johnson; K-map (Gray order); 1's≠2's complement; BCD, Gray, parity. | *trap:* edge vs level | skip ALU/shifter design.
-- **Web:** h1–h6, HTML5 semantic tags; `.class`≠`#id`; box model; JS alert/confirm/prompt; PHP `$var` rules, `;`, `echo`; cookies≠sessions; DTD≠XSD (both schemas); XSLT≠XQuery. | *trap:* tiny syntax differences | prioritize breadth and common fundamentals; defer AJAX/jQuery detail, deep PHP DB/upload work, and obscure syntax until core coverage is secure.
 - **CG:** DDA (float) ≠ Bresenham (integer); translation/scaling/rotation matrices; Cohen-Sutherland≠Liang-Barsky; Z-buffer (image space)≠painter's (object space); flat≠Gouraud≠Phong; Bezier≠B-spline; RGB (additive)≠CMY (subtractive)≠HSV. | *trap:* translation/transformation wording | skip derivations, OpenGL, VR.
 - **AI:** PEAS, 5 agent types; BFS/DFS/IDS; **greedy f=h ≠ A\* f=g+h**; minimax, alpha-beta (alpha = best for MAX); CNF; forward≠backward chaining; Bayes; supervised/unsupervised/RL; ANN training updates weights. | *trap:* which f for which search | skip Dempster-Shafer, scripts, NLP detail.
 - **MP (8085 & computer architecture):** 8085 = 8-bit data, 16-bit address (64 KB), 40 pins; address bus one-way, data bus two-way; flags S Z AC P CY; interrupts TRAP > 7.5 > 6.5 > 5.5 > INTR; fetch→decode→execute; RISC≠CISC; Booth = multiplication; pipelining = overlap. | *trap:* bus direction, flag/interrupt details, and one-step pipeline arithmetic | skip assembly programs and microprogramming.
@@ -83,10 +85,8 @@ Format: **know cold** | *trap* | skip deep until the core is fluent.
 - **OS:** process≠thread; FCFS/SJF/SRTF/RR/priority; busy-waiting (lock, strict alternation, Peterson) ≠ blocking (sleep/wakeup, semaphore, monitor); **4 deadlock conditions** (mutual exclusion, hold & wait, no preemption, circular wait); Ostrich = ignore, not recovery; internal≠external fragmentation; FIFO/LRU/optimal. | *trap:* ignore extra numbers in the stem | skip file-system implementation, I/O layers.
 - **CN:** layers and devices (hub 1, switch 2, router 3); TCP≠UDP; IPv4 32-bit classful ≠ IPv6 128-bit classless; ARP≠RARP; SMTP (send) ≠ POP/IMAP (receive); stop-and-wait / Go-Back-N / selective repeat; TDM≠FDM≠WDM; RIP (distance-vector)≠OSPF (link-state); fibre immune to EMI. | *trap:* TCP header is 20–60 B | skip CRC/Hamming, routing walkthroughs.
 
-### Tier C · calculation, coding, and tracing
-- **C:** precedence; pre vs post `++`; integer division; `=` vs `==`; switch fall-through; macro without parentheses; pointer arithmetic scales by type size; `strlen`≠`sizeof`; fopen modes; struct≠union; array size n+1 for a string of n. | *trap:* trace on paper; "compile error" is often an option | skip file handling, preprocessor.
-- **OOP:** struct (public) ≠ class (private); **ctor base→derived, dtor reverse**; copy ctor takes a reference; static = one per class; overloading≠overriding; pure virtual = abstract; virtual destructor; non-overloadable `:: . .* ?: sizeof`; member memory allocated at **object creation**. | *trap:* "declaration" vs "creation" | skip template depth, file streams.
-- **DSA:** LIFO/FIFO; overflow≠underflow; infix↔postfix by hand; BST in-order = sorted; BFS=queue, DFS=stack; Prim/Kruskal=MST, Dijkstra=shortest path; array/stack/queue/list are linear, trees/graphs aren't; merge sort suits linked lists. | skip worked graph algorithms, hashing detail.
+### Tier C — lower priority / skill-based
+- **Web:** h1–h6, HTML5 semantic tags; `.class`≠`#id`; box model; JS alert/confirm/prompt; PHP `$var` rules, `;`, `echo`; cookies≠sessions; DTD≠XSD (both schemas); XSLT≠XQuery. | *trap:* tiny syntax differences | lower ROI for this plan (basics known); prioritize breadth and common fundamentals, defer AJAX/jQuery detail, deep PHP DB/upload work, and obscure syntax.
 - **Calculus (9):** derivative rules (chain, implicit); limit as a derivative (xᵏ−2ᵏ)/(x−2) = k·2ᵏ⁻¹; extremes = critical points **plus endpoints**; f'>0 increasing; ∫ and substitution; improper integral with a discontinuity inside diverges (∫dx/(x−a)); y'+ky=0 → Ce⁻ᵏˣ; partial derivative; plane a(x−x₀)+b(y−y₀)+c(z−z₀)=0. | *trap:* skipped endpoints, hidden discontinuity | skip volumes, arc length, Newton/Euler, Lagrange. **Promote first:** series tests, related rates.
 - **Linear Algebra (6):** reduce to 0 = nonzero → no solution; det 0 → singular/dependent; 2×2 inverse = (1/det)[[d,−b],[−c,a]]; symmetric A=Aᵀ; |a+b| ≤ |a|+|b|; group = closure, associativity, identity, inverse. | *trap:* forgetting ÷det, two true options | skip Gram-Schmidt, SVD, rings. **Promote first:** 2×2 eigenvalues, Cramer.
 - **Statistics (5):** nominal < ordinal < interval < ratio; shift by c: mean ±c, variance unchanged; scale by c: mean×c, variance×c²; constants → variance 0; total probability ΣP(A|Bᵢ)P(Bᵢ), Bayes; r sign = direction, |r| = strength, correlation ≠ causation. | skip CI, sampling distributions. **Promote first:** binomial, normal.
@@ -543,7 +543,7 @@ No unit skipped.
 
 ## 9. Web Technology (BIT251 and BIT301)
 
-Web spans 14 units across HTML, CSS, JavaScript, XML, and PHP for the guide's assumed 5-mark subject allocation. It is Tier B on return per effort: cover the syllabus breadth and common distinctions first, then spend time on exact syntax or deep implementation only when evidence suggests it is worth the effort. This is a study priority, not a verified prediction of the exam's unit distribution.
+Web spans 14 units across HTML, CSS, JavaScript, XML, and PHP for the guide's assumed 5-mark subject allocation. It is Tier C (lower priority) for this plan: broad/syntax-heavy with lower return per effort, and basics are already known, so prioritize breadth and common distinctions and defer deep/obscure syntax or implementation. This is a study priority, not a verified prediction of the exam's unit distribution.
 
 - **Part A: Client side**
 - **U1 Introduction**
@@ -1270,7 +1270,7 @@ Return JSON only: {"alt_explain":"<=80 words with one concrete example",
 | CircuitVerse | https://circuitverse.org/ | Known | adders, mux, flip-flops, counters |
 | Khan Academy | https://www.khanacademy.org/ | Known | Calculus, Linear Algebra, Statistics exercises |
 
-**By subject (Tier B first)**
+**By subject (Tier A/B focus; Web de-prioritized)**
 
 | Subject | Watch | Do (interactive) |
 |---|---|---|
@@ -1286,7 +1286,7 @@ Return JSON only: {"alt_explain":"<=80 words with one concrete example",
 | Statistics | StatQuest: https://www.youtube.com/results?search_query=StatQuest+statistics | Seeing Theory https://seeing-theory.brown.edu/ ; Khan Academy exercises |
 | IIT (Tier A) | CrashCourse CS, 2-3 episodes only | Your own comparison cards (RAM vs ROM, virus vs worm vs Trojan) |
 | Digital Logic (Tier B) | Neso Academy digital electronics for weak units | CircuitVerse https://circuitverse.org/ : half adder, full adder, 4:1 mux, SR/JK/D/T, ring and Johnson counters |
-| Web (Tier B) | none needed | W3Schools "Try it Yourself" https://www.w3schools.com/ ; Flexbox Froggy https://flexboxfroggy.com/ ; CSS Diner https://flukeout.github.io/ |
+| Web (Tier C) | none needed (basics known) | W3Schools "Try it Yourself" https://www.w3schools.com/ ; Flexbox Froggy https://flexboxfroggy.com/ ; CSS Diner https://flukeout.github.io/ (use only for quick refresh) |
 | SAD (Tier A) | short "waterfall vs spiral vs agile" explainers | Draw a DFD, ERD and use-case diagram for a library system in https://app.diagrams.net/ |
 | SE (Tier A) | short videos on verification vs validation, COCOMO, CMM | Write each sibling pair as a two-line comparison |
 | MIS (Tier A) | short explainers on TPS/MIS/DSS/ESS, Porter's five forces, value chain | Turn the one-liners into your own table |
@@ -1308,7 +1308,7 @@ Return JSON only: {"alt_explain":"<=80 words with one concrete example",
 2. **After a miss:** a small "See it" chip under the explanation with one matching resource for that unit. It never replaces the written explanation.
 3. **Stuck-concept rescue (section 9, step 3):** pick from this library first, and use a generated search query only when nothing fits.
 4. **End-of-round options (sections 5 and 6):** one of the 2-3 next options can be a resource or a "do" activity.
-5. **Weekly 5-minute review:** one "this week's pick" for your weakest Tier B subject.
+5. **Weekly 5-minute review:** one "this week's pick" for your weakest high-priority (Tier A/B) subject.
 6. **Subject page:** a Resources shelf you can open any time, with no nagging.
 
 **Variety and frequency (boredom without clutter)**
@@ -1321,7 +1321,7 @@ Return JSON only: {"alt_explain":"<=80 words with one concrete example",
 **Keep it inside the plan**
 - **Time and the loop:** a video or simulator slot is 15-25 minutes. After it, write 3 lines from memory, then do 3 MCQs the next day (Part I, section 11). It replaces the Light block or interest break and never adds study hours. Anything that costs more than 2 minutes must replace something.
 - **Depth ceiling:** suggest a resource only if it maps to a unit in Part II. Use it for explanation only and ignore any GATE-style numericals and derivations.
-- **Order:** Tier B subjects first (marks per hour), Tier A resources short (2-3 items per subject).
+- **Order:** prioritize Tier A subjects, then Tier B (including C/C++/DSA); keep Tier C/Web resources short and only for quick refresh.
 - **Never suggest:** GATE question banks and long lecture series, compiler design, ALU or datapath design, Packet Tracer deep dives, 4NF/5NF, or re-watching a video you already understood.
 - **Quiet mode, timed mocks and exam week:** no suggestions beyond what the user opens themselves. No notifications, no countdown, no guilt for skipping.
 

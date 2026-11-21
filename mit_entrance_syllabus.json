@@ -1084,7 +1084,7 @@
    "block": "computing",
    "tier": "B",
    "exam_marks": 5,
-   "target_pct": 75,
+   "target_pct": 80,
    "importance": 8,
    "know_cold": [
     "precedence",
@@ -3478,7 +3478,7 @@
    "block": "computing",
    "tier": "B",
    "exam_marks": 5,
-   "target_pct": 75,
+   "target_pct": 80,
    "importance": 8,
    "know_cold": [
     "struct (public) != class (private)",
@@ -4284,7 +4284,7 @@
    "block": "computing",
    "tier": "B",
    "exam_marks": 5,
-   "target_pct": 75,
+   "target_pct": 80,
    "importance": 8,
    "know_cold": [
     "LIFO/FIFO",
@@ -6505,9 +6505,9 @@
    "code": "WEB",
    "name": "Web Technology",
    "block": "computing",
-   "tier": "B",
+   "tier": "C",
    "exam_marks": 5,
-   "target_pct": 80,
+   "target_pct": 75,
    "importance": 7,
    "know_cold": [
     "h1-h6, HTML5 semantic tags",
