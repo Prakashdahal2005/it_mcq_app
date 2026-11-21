@@ -8776,8 +8776,8 @@ function show() {
           <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
           </button>
-          <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (or press C after answering)">
-            📋 Copy
+          <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (Shift+C, or C after answering)">
+            📋 Copy <kbd class="kbd-badge sm">⇧C</kbd>
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
             ✏️ Edit
@@ -8889,7 +8889,7 @@ function show() {
 
       ${MK ? renderMockPalette() : ''}
     </div>
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>L</b>/<b>⇧L</b> level · <b>⇧Del</b> delete · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
+    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>L</b>/<b>⇧L</b> level · <b>⇧C</b> copy · <b>⇧Del</b> delete · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
   `;
   typesetMath($('#app'));
   updateVariantQueueStatus();
@@ -10825,6 +10825,11 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       deleteQuestionByN(actionQ.n);
     }
+    return;
+  }
+  if (e.shiftKey && k === 'c') {
+    e.preventDefault();
+    copyCurrentQuestion($('#copy-q-btn'));
     return;
   }
 
