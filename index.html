@@ -4752,8 +4752,8 @@ function updateColdButtonUI(q) {
   const btn = document.getElementById('cold-btn');
   if (!btn || !q) return;
   const cold = isColdQuestion(q);
-  btn.textContent = cold ? '🧊 Cold (tap to restore)' : '🧊 Too easy';
-  btn.title = cold ? 'Restore normal scheduling for this question' : 'Generate a verified sibling microconcept; if generation fails, keep this question cold';
+  btn.textContent = cold ? '🧊 Cold (permanent)' : '🧊 Too easy';
+  btn.title = cold ? 'This question is permanently cold — delete it if you no longer want it' : 'Mark as too easy / cold — it will appear very rarely and never count toward readiness';
   btn.style.background = cold ? '#e8f4ff' : '';
   btn.style.color = cold ? '#1971c2' : '#555';
   btn.style.borderColor = cold ? '#74c0fc' : '#bbb';
@@ -4768,8 +4768,8 @@ function setQuestionColdState(q, cold) {
   const k = qk(q);
   if (cold) {
     V[k] = V[k] || {};
-    V[k].d = today() + 180;
-    V[k].stab = V[k].stab ? Math.max(V[k].stab, 180) : 180;
+    V[k].d = today() + 3650; // 10 years — cold is permanent, never resurface
+    V[k].stab = V[k].stab ? Math.max(V[k].stab, 3650) : 3650;
     V[k]._coldSet = true;
   } else if (V[k] && V[k]._coldSet) {
     V[k].d = today();
@@ -4823,7 +4823,7 @@ async function drainBackgroundQuestionAiQueue() {
     if (job.kind === 'sibling') {
       if (!isColdQuestion(job.q) || isQuestionQuarantined(job.q) || effWellMade(job.q)) return;
       await rewriteQuestionWithGemini(job.q, { background: true });
-      if (!isQuestionQuarantined(job.q)) setQuestionColdState(job.q, false);
+      // Cold is now permanent — never un-cold even if sibling succeeded
       save();
     } else if (job.kind === 'correction') {
       if (!isQuestionQuarantined(job.q)) return;
@@ -4895,15 +4895,75 @@ function toggleColdQuestion() {
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
   if (isColdQuestion(rawQ)) {
-    setQuestionColdState(rawQ, false);
-    save();
-    updateColdButtonUI(rawQ);
+    // Cold is permanent — never restore from this toggle
+    showToast('🧊 This question is permanently cold. Delete it from the dashboard if you no longer want it.', 'warn');
     return;
   }
   setQuestionColdState(rawQ, true);
   save();
   updateColdButtonUI(rawQ);
-  enqueueBackgroundQuestionAi('sibling', rawQ);
+  // Do NOT enqueue sibling generation — cold stays cold forever
+}
+
+function deleteAllColdQuestions() {
+  const coldQuestions = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q));
+  if (!coldQuestions.length) {
+    showToast('No cold questions to delete.');
+    return;
+  }
+  if (!confirm(`Permanently delete all ${coldQuestions.length} cold question(s)? Linked flashcards will be kept. This cannot be undone.`)) return;
+  // Delete each without individual confirm prompts
+  coldQuestions.forEach(q => {
+    if (!q) return;
+    const uid = ensureQuestionUid(q);
+    const oldQk = qk(q);
+    const matches = item => !!item && (questionUid(item) === uid || qk(item) === oldQk);
+    const remove = arr => {
+      if (!Array.isArray(arr)) return;
+      for (let i = arr.length - 1; i >= 0; i--) if (matches(arr[i])) arr.splice(i, 1);
+    };
+    remove(D);
+    remove(DRILL_D);
+    (BANKS || []).forEach(bank => {
+      if (!bank || !Array.isArray(bank.q)) return;
+      remove(bank.q);
+      bank.sets = genSets(bank.q);
+    });
+    (A || []).forEach(attempt => remove(attempt && attempt.errs));
+    (CARDS || []).forEach(card => {
+      if (card && (card.sourceQk === oldQk || card.qk === oldQk)) {
+        card.sourceMissing = true;
+        card.updatedAt = Date.now();
+      }
+    });
+    QDELETED[uid] = Date.now();
+    delete QEDITS[uid];
+    delete V[oldQk];
+    delete QOV[oldQk];
+  });
+  // Rebuild session queue excluding deleted questions
+  if (Array.isArray(Q) && Q.length) {
+    const keptQ = [], keptR = [], keptH = [];
+    Q.forEach((key, i) => {
+      const item = byN(key);
+      if (!item || isQuestionDeleted(item)) return;
+      keptQ.push(key);
+      keptR.push(Array.isArray(QRESULTS) ? QRESULTS[i] : null);
+      keptH.push(Array.isArray(sessionHistory) ? sessionHistory[i] : null);
+    });
+    Q = keptQ; QRESULTS = keptR; sessionHistory = keptH;
+    P = Math.min(P, Math.max(0, Q.length - 1));
+  }
+  syncFlashcardSourceLinks();
+  invalidateQuestionCaches();
+  save();
+  showToast(`🗑 ${coldQuestions.length} cold question(s) deleted.`, 'success');
+  if (view === 'q') {
+    if (!Q.length) { done(); return; }
+    show();
+  } else {
+    rerenderAfterQuestionChange();
+  }
 }
 
 async function generateSiblingsForColdQuestions() {
@@ -8028,6 +8088,10 @@ function home(preserveScroll = false) {
         🧊 Try AI sibling replacements for ${coldQuestionCount} cold question(s)
       </button>
       <div class="mu sm" style="text-align:center;margin-top:4px">Each stays cold unless its different microconcept is validated.</div>
+      <button class="big-btn" style="margin-top:6px;background:#fff0f0;border:2px solid var(--no-bd);color:var(--no)" onclick="deleteAllColdQuestions()">
+        🗑 Delete All ${coldQuestionCount} Cold Question(s)
+      </button>
+      <div class="mu sm" style="text-align:center;margin-top:4px">Permanently removes cold questions from all banks. Linked flashcards are kept.</div>
       ` : ''}
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
@@ -8774,7 +8838,7 @@ function show() {
           ` : ''}
           ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
           <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
-            ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
+            ${isColdQuestion(rawQ) ? '🧊 Cold (permanent)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
           </button>
           <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (Shift+C, or C after answering)">
             📋 Copy <kbd class="kbd-badge sm">⇧C</kbd>
@@ -8889,7 +8953,7 @@ function show() {
 
       ${MK ? renderMockPalette() : ''}
     </div>
-    <p class="mu">Keyboard: <b>A–D</b> or <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>L</b>/<b>⇧L</b> level · <b>⇧C</b> copy · <b>⇧Del</b> delete · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
+    <p class="mu">Keyboard: <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>D</b> delete · <b>L</b>/<b>⇧L</b> level · <b>⇧C</b> copy · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
   `;
   typesetMath($('#app'));
   updateVariantQueueStatus();
@@ -10870,10 +10934,14 @@ document.addEventListener('keydown', e => {
       skipKnown();
       return;
     }
-    const i = 'abcd'.indexOf(k);
+    // Options: only 1–4 (A–F letter keys disabled so D can be used for delete)
     const j = '1234'.indexOf(k);
-    if (i >= 0) pick(i);
-    else if (j >= 0) pick(j);
+    if (j >= 0) pick(j);
+    else if (k === 'd' && !MK) {
+      // D = delete current question (same as Shift+Del)
+      const actionQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+      if (actionQ) { e.preventDefault(); deleteQuestionByN(actionQ.n); }
+    }
   } else {
     if ((k === 'enter' || k === ' ') && $('#nx')) {
       e.preventDefault();
@@ -11690,7 +11758,7 @@ function renderSettingsArchiveContentHTML() {
     const actions = [`<button class="sm" onclick="startArchivedReview([${idJson}])">Review</button>`];
     if (isQuestionTooHard(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'tooHard')">Unmark too hard</button>`);
     if (isQuestionOutOfScope(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'outOfScope')">Restore to scope</button>`);
-    if (isColdQuestion(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'cold')">Restore cold</button>`);
+    if (isColdQuestion(q)) actions.push(`<button class="sm" onclick="deleteQuestionByUid(${idJson})" style="color:var(--no);border-color:var(--no-bd)" title="Cold is permanent — delete to remove">🗑 Delete cold</button>`);
     if (isQuestionQuarantined(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'quarantined')">Clear quarantine</button>`);
     return `
       <div style="border:1px solid var(--bd);border-radius:10px;padding:10px;background:var(--card)">
@@ -11767,8 +11835,8 @@ function restoreArchivedQuestion(id, flag) {
     override[flag] = false;
     label = flag === 'tooHard' ? 'Too hard' : 'Out of scope';
   } else if (flag === 'cold') {
-    setQuestionColdState(q, false);
-    label = 'Cold';
+    showToast('🧊 Cold questions are permanent. Use 🗑 Delete to remove them entirely.', 'warn');
+    return;
   } else if (flag === 'quarantined') {
     clearQuestionQuarantine(q);
     label = 'Quarantine';
