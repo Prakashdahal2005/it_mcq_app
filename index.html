@@ -8085,14 +8085,10 @@ function home(preserveScroll = false) {
       </button>
       <div class="mu sm" style="text-align:center;margin-top:4px">Due first · unseen next · then hesitant/older questions · no same-day repeats</div>
       ${coldQuestionCount ? `
-      <button class="big-btn" id="cold-sibling-batch-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="generateSiblingsForColdQuestions()">
-        🧊 Try AI sibling replacements for ${coldQuestionCount} cold question(s)
+      <button class="big-btn" id="cold-sibling-batch-btn" style="margin-top:10px;background:#e8f4ff;border:2px solid #74c0fc;color:#1971c2" onclick="startColdQuestionsSession()">
+        🧊 Review ${coldQuestionCount} Cold Question(s)
       </button>
-      <div class="mu sm" style="text-align:center;margin-top:4px">Each stays cold unless its different microconcept is validated.</div>
-      <button class="big-btn" style="margin-top:6px;background:#fff0f0;border:2px solid var(--no-bd);color:var(--no)" onclick="deleteAllColdQuestions()">
-        🗑 Delete All ${coldQuestionCount} Cold Question(s)
-      </button>
-      <div class="mu sm" style="text-align:center;margin-top:4px">Permanently removes cold questions from all banks. Linked flashcards are kept.</div>
+      <div class="mu sm" style="text-align:center;margin-top:4px">Practice your cold questions — mark them un-cold or delete them from there.</div>
       ` : ''}
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
@@ -10925,6 +10921,13 @@ document.addEventListener('keydown', e => {
     return;
   }
 
+  // D = delete current question — works locked or unlocked, never during mock
+  if (k === 'd' && !MK) {
+    const actionQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
+    if (actionQ) { e.preventDefault(); deleteQuestionByN(actionQ.n); }
+    return;
+  }
+
   if (!locked) {
     if (k === 's') {
       if (MK) toggleFlag();
@@ -10938,11 +10941,6 @@ document.addEventListener('keydown', e => {
     // Options: only 1–4 (A–F letter keys disabled so D can be used for delete)
     const j = '1234'.indexOf(k);
     if (j >= 0) pick(j);
-    else if (k === 'd' && !MK) {
-      // D = delete current question (same as Shift+Del)
-      const actionQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
-      if (actionQ) { e.preventDefault(); deleteQuestionByN(actionQ.n); }
-    }
   } else {
     if ((k === 'enter' || k === ' ') && $('#nx')) {
       e.preventDefault();
@@ -11808,6 +11806,17 @@ function renderSettingsArchiveHTML() {
 function refreshSettingsArchive() {
   const el = document.getElementById('settings-archive');
   if (el) el.innerHTML = renderSettingsArchiveContentHTML();
+}
+
+function startColdQuestionsSession() {
+  const coldQuestions = bankQuestionPool().filter(q => isColdQuestion(q) && !isQuestionDeleted(q));
+  if (!coldQuestions.length) {
+    showToast('No cold questions found.');
+    return;
+  }
+  clearDrillDeck();
+  DRILL_D = coldQuestions.map((q, index) => ({ ...q, n: DRILL_N_BASE + index }));
+  start(DRILL_D.map(q => q.n));
 }
 
 function startArchivedReview(ids) {
