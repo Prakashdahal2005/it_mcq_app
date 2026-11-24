@@ -4752,8 +4752,8 @@ function updateColdButtonUI(q) {
   const btn = document.getElementById('cold-btn');
   if (!btn || !q) return;
   const cold = isColdQuestion(q);
-  btn.textContent = cold ? '🧊 Cold (permanent)' : '🧊 Too easy';
-  btn.title = cold ? 'This question is permanently cold — delete it if you no longer want it' : 'Mark as too easy / cold — it will appear very rarely and never count toward readiness';
+  btn.textContent = cold ? '🧊 Cold (tap to restore)' : '🧊 Too easy';
+  btn.title = cold ? 'Restore to normal scheduling' : 'Mark as too easy — will appear very rarely, no AI replacement';
   btn.style.background = cold ? '#e8f4ff' : '';
   btn.style.color = cold ? '#1971c2' : '#555';
   btn.style.borderColor = cold ? '#74c0fc' : '#bbb';
@@ -4895,14 +4895,15 @@ function toggleColdQuestion() {
   const rawQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
   if (!rawQ) return;
   if (isColdQuestion(rawQ)) {
-    // Cold is permanent — never restore from this toggle
-    showToast('🧊 This question is permanently cold. Delete it from the dashboard if you no longer want it.', 'warn');
+    setQuestionColdState(rawQ, false);
+    save();
+    updateColdButtonUI(rawQ);
     return;
   }
   setQuestionColdState(rawQ, true);
   save();
   updateColdButtonUI(rawQ);
-  // Do NOT enqueue sibling generation — cold stays cold forever
+  // Do NOT enqueue sibling generation — no AI replacement for cold questions
 }
 
 function deleteAllColdQuestions() {
@@ -8838,7 +8839,7 @@ function show() {
           ` : ''}
           ${isShowingVariant ? `<button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteVariant(${rawQ.n})" title="Delete this generated variant and return to the original">Delete variant</button>` : ''}
           <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
-            ${isColdQuestion(rawQ) ? '🧊 Cold (permanent)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
+            ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
           </button>
           <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (Shift+C, or C after answering)">
             📋 Copy <kbd class="kbd-badge sm">⇧C</kbd>
@@ -11758,7 +11759,7 @@ function renderSettingsArchiveContentHTML() {
     const actions = [`<button class="sm" onclick="startArchivedReview([${idJson}])">Review</button>`];
     if (isQuestionTooHard(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'tooHard')">Unmark too hard</button>`);
     if (isQuestionOutOfScope(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'outOfScope')">Restore to scope</button>`);
-    if (isColdQuestion(q)) actions.push(`<button class="sm" onclick="deleteQuestionByUid(${idJson})" style="color:var(--no);border-color:var(--no-bd)" title="Cold is permanent — delete to remove">🗑 Delete cold</button>`);
+    if (isColdQuestion(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'cold')">Restore cold</button>`);
     if (isQuestionQuarantined(q)) actions.push(`<button class="sm" onclick="restoreArchivedQuestion(${idJson}, 'quarantined')">Clear quarantine</button>`);
     return `
       <div style="border:1px solid var(--bd);border-radius:10px;padding:10px;background:var(--card)">
@@ -11835,8 +11836,8 @@ function restoreArchivedQuestion(id, flag) {
     override[flag] = false;
     label = flag === 'tooHard' ? 'Too hard' : 'Out of scope';
   } else if (flag === 'cold') {
-    showToast('🧊 Cold questions are permanent. Use 🗑 Delete to remove them entirely.', 'warn');
-    return;
+    setQuestionColdState(q, false);
+    label = 'Cold';
   } else if (flag === 'quarantined') {
     clearQuestionQuarantine(q);
     label = 'Quarantine';
