@@ -733,18 +733,85 @@
   function prepareStateForUpload(stateObj) {
     if (!stateObj || typeof stateObj !== 'object') return stateObj;
     var copy = Object.assign({}, stateObj);
+
+    // 1. Omit static questions from bundled bank (they already exist in question_bank.json on every device)
     if (Array.isArray(copy.BANKS)) {
       copy.BANKS = copy.BANKS.map(function (b) {
         if (!b || typeof b !== 'object') return b;
         var name = String(b.name || '').trim().toLowerCase();
-        // If it's the bundled static question bank (1727 questions from question_bank.json),
-        // omit the static questions array so we don't upload 1MB of duplicate static data.
         if (name === 'question bank' || b.isBundled === true || (b.id === 1 && Array.isArray(b.q) && b.q.length >= 1000)) {
           return { id: b.id, name: b.name, isBundled: true, q: [], sets: [] };
         }
         return b; // Keep custom user-imported banks intact
       });
     }
+
+    // 2. D is the active in-memory set, which is always reconstructed from BANKS or question_bank.json.
+    // If it contains more than 30 questions, omit it so we don't upload megabytes of duplicate question text.
+    if (Array.isArray(copy.D) && (copy.D.length > 30 || copy.SETBANK != null)) {
+      copy.D = null;
+    }
+
+    // 3. Compact attempt error logs: keep all attempt records (dates, scores, mock flags, stats intact),
+    // but strip heavy duplicate question text/options from older attempt.errs to prevent multi-megabyte bloat.
+    if (Array.isArray(copy.A)) {
+      var KEEP_FULL_ERRS = 3;
+      var totalAttempts = copy.A.length;
+      copy.A = copy.A.map(function (attempt, idx) {
+        if (!attempt || !Array.isArray(attempt.errs) || !attempt.errs.length) return attempt;
+        if (idx >= totalAttempts - KEEP_FULL_ERRS) return attempt; // Keep last 3 full
+        var compactErrs = attempt.errs.map(function (e) {
+          if (!e || typeof e !== 'object' || e._compact) return e;
+          return { n: e.n, id: e.id, u: e.u, s: e.s, a: e.a, w: e.w, userAns: e.userAns, _compact: true };
+        });
+        return Object.assign({}, attempt, { errs: compactErrs });
+      });
+    }
+
+    // 4. Strip runtime-only memory flags from V (these are recomputed on app load)
+    if (copy.V && typeof copy.V === 'object') {
+      var slimV = {};
+      Object.keys(copy.V).forEach(function (k) {
+        var v = copy.V[k];
+        if (!v || typeof v !== 'object') { slimV[k] = v; return; }
+        var slim = Object.assign({}, v);
+        delete slim._coldSet;
+        delete slim._sharpenQueued;
+        delete slim._quarantined;
+        slimV[k] = slim;
+      });
+      copy.V = slimV;
+    }
+
+    var LIMIT = 4 * 1024 * 1024; // 4MB — stay well under Vercel's 4.5MB limit
+    var size;
+    try { size = JSON.stringify(copy).length; } catch (e) { size = 0; }
+    if (size <= LIMIT) return copy; // Under 4MB: completely fine, upload as-is
+
+    console.warn('[sync] Payload still exceeds 4MB (' + (size / 1024 / 1024).toFixed(1) + 'MB). Applying safe emergency compacting.');
+
+    // Emergency Step A: Cap V review history to last 20 entries (core scheduling parameters stab/diff/d/b are untouched)
+    if (copy.V && typeof copy.V === 'object') {
+      Object.keys(copy.V).forEach(function (k) {
+        var v = copy.V[k];
+        if (v && Array.isArray(v.history) && v.history.length > 20) {
+          copy.V[k] = Object.assign({}, v, { history: v.history.slice(-20) });
+        }
+      });
+    }
+    try { size = JSON.stringify(copy).length; } catch (e) {}
+    if (size <= LIMIT) return copy;
+
+    // Emergency Step B: If still over 4MB, cap older non-mock attempts to the most recent 100
+    if (Array.isArray(copy.A) && copy.A.length > 100) {
+      var mocks = copy.A.filter(function (e) { return e && (e.mock || e.isMock); });
+      var nonMocks = copy.A.filter(function (e) { return !e || (!e.mock && !e.isMock); });
+      nonMocks = nonMocks.slice(-100);
+      copy.A = mocks.concat(nonMocks).sort(function (a, b) {
+        return ((a && (a.doneAt || a.t)) || 0) - ((b && (b.doneAt || b.t)) || 0);
+      });
+    }
+
     return copy;
   }
 
