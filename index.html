@@ -8085,10 +8085,9 @@ function home(preserveScroll = false) {
       </button>
       <div class="mu sm" style="text-align:center;margin-top:4px">Due first · unseen next · then hesitant/older questions · no same-day repeats</div>
       ${coldQuestionCount ? `
-      <button class="big-btn" id="cold-sibling-batch-btn" style="margin-top:10px;background:#e8f4ff;border:2px solid #74c0fc;color:#1971c2" onclick="startColdQuestionsSession()">
-        🧊 Review ${coldQuestionCount} Cold Question(s)
-      </button>
-      <div class="mu sm" style="text-align:center;margin-top:4px">Practice your cold questions — mark them un-cold or delete them from there.</div>
+      <div style="text-align:center;margin-top:10px">
+        <button class="sm" style="color:#888;border-color:#ccc" onclick="startColdQuestionsSession()">🧊 Review ${coldQuestionCount} cold question(s)</button>
+      </div>
       ` : ''}
       <button class="big-btn" style="margin-top:10px;background:var(--card);border:2px solid var(--bd)" onclick="startCommuteQuick()">
         ⚡ High-quality Revision (due &amp; weaker questions · 12 Q)
