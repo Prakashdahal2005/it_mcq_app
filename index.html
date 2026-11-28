@@ -8836,14 +8836,14 @@ function show() {
           <button class="sm" id="cold-btn" style="padding:2px 8px;font-size:11px;${isColdQuestion(rawQ) ? 'background:#e8f4ff;color:#1971c2;border-color:#74c0fc' : 'color:#555;border-color:#bbb'}" onclick="toggleColdQuestion()" title="Generate a verified sibling microconcept; if generation fails, keep this question cold">
             ${isColdQuestion(rawQ) ? '🧊 Cold (tap to restore)' : '🧊 Too easy'} <kbd class="kbd-badge sm">E</kbd>
           </button>
-          <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (Shift+C, or C after answering)">
-            📋 Copy <kbd class="kbd-badge sm">⇧C</kbd>
+          <button class="sm" id="copy-q-btn" style="padding:2px 8px;font-size:11px" onclick="copyCurrentQuestion(this)" title="Copy question stem and options to clipboard (C)">
+            📋 Copy <kbd class="kbd-badge sm">C</kbd>
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px" onclick="openQuestionEditor(${rawQ.n})" title="Edit this MCQ everywhere">
             ✏️ Edit
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="deleteQuestionByN(${rawQ.n})" title="Delete this MCQ everywhere; linked flashcards are kept">
-            🗑 Delete <kbd class="kbd-badge sm">⇧Del</kbd>
+            🗑 Delete <kbd class="kbd-badge sm">D</kbd>
           </button>
           <button class="sm" style="padding:2px 8px;font-size:11px;color:var(--no);border-color:var(--no-bd)" onclick="quarantineCurrentQuestion()" title="Mark question as questionable and exclude from review">
             🚩 Looks wrong
@@ -8949,7 +8949,7 @@ function show() {
 
       ${MK ? renderMockPalette() : ''}
     </div>
-    <p class="mu">Keyboard: <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>D</b> delete · <b>L</b>/<b>⇧L</b> level · <b>⇧C</b> copy · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
+    <p class="mu">Keyboard: <b>1–4</b> pick · <b>B</b>/<b>←</b> back · <b>N</b>/<b>→</b> forward · <b>S</b> don't know · <b>E</b> cold · <b>D</b> delete · <b>L</b>/<b>⇧L</b> level · <b>C</b> copy · <b>Enter</b> continue · <b>Right-click</b> strike out</p>
   `;
   typesetMath($('#app'));
   updateVariantQueueStatus();
@@ -9059,7 +9059,7 @@ function renderOptionsHtml(q, hist) {
     }
     return `
       <button class="${cls}" id="opt-${i}" onclick="handleOptClick(event, ${i})" oncontextmenu="toggleEliminateOpt(event, ${i})" ${disabled ? 'disabled' : ''} title="Click to choose · Right-click or Alt+click to strike out">
-        <kbd class="kbd-badge">${'ABCD'[i]}</kbd>
+        <kbd class="kbd-badge">${i + 1}</kbd>
         <span class="opt-text">${esc(o)}</span>
         ${stateIcon}
       </button>
@@ -9426,7 +9426,7 @@ function pick(i, cfOverride) {
           <b style="color:var(--no)">✗ Incorrect.</b>
           <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
         </div>
-        <div style="margin-top:6px">Correct: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
+        <div style="margin-top:6px">Correct: <b>${CURRENT_Q.displayA + 1}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
         <div id="current-exp-container" style="margin-top:6px">
           ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, true) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
         </div>
@@ -9527,7 +9527,7 @@ function dontKnow() {
         <b class="c-no">Scheduled for tomorrow.</b>
         <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
       </div>
-      <div style="margin-top:6px">Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
+      <div style="margin-top:6px">Correct answer: <b>${CURRENT_Q.displayA + 1}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
       <div id="current-exp-container" style="margin-top:6px">
         ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, true) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
       </div>
@@ -9618,7 +9618,7 @@ function skipKnown() {
         <b style="color:var(--ac)">⏭ Skipped — rescheduled a few days out.</b>
         <button class="p sm" onclick="fin()" style="font-weight:600">Continue → <kbd class="kbd-badge sm" style="background:rgba(255,255,255,0.25);color:inherit">Enter</kbd></button>
       </div>
-      <div style="margin-top:6px">Correct answer: <b>${'ABCD'[CURRENT_Q.displayA]}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
+      <div style="margin-top:6px">Correct answer: <b>${CURRENT_Q.displayA + 1}) ${esc(CURRENT_Q.displayOpts[CURRENT_Q.displayA])}</b></div>
       <div id="current-exp-container" style="margin-top:6px">
         ${rawQ.e && String(rawQ.e).trim() ? explanationHtml(rawQ.e, true) : `<button id="btn-fetch-exp" class="sm" onclick="fetchExplanationForCurrent()">💡 Why? (Explain with AI)</button>`}
       </div>
@@ -10884,15 +10884,7 @@ document.addEventListener('keydown', e => {
     }
     return;
   }
-  if (e.key === 'Delete' && e.shiftKey) {
-    const actionQ = (CURRENT_Q && CURRENT_Q.origQ) ? CURRENT_Q.origQ : byN(Q[P]);
-    if (actionQ && !MK) {
-      e.preventDefault();
-      deleteQuestionByN(actionQ.n);
-    }
-    return;
-  }
-  if (e.shiftKey && k === 'c') {
+  if (k === 'c' && !e.shiftKey) {
     e.preventDefault();
     copyCurrentQuestion($('#copy-q-btn'));
     return;
@@ -10949,9 +10941,6 @@ document.addEventListener('keydown', e => {
     if ((k === 'enter' || k === ' ') && $('#nx')) {
       e.preventDefault();
       navForward();
-    } else if (k === 'c') {
-      e.preventDefault();
-      copyCurrentQuestion($('#copy-q-btn'));
     }
   }
 });
