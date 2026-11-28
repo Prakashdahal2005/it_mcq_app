@@ -10864,6 +10864,11 @@ document.addEventListener('keydown', e => {
     navBack();
     return;
   }
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    navForward();
+    return;
+  }
   if (k === 'e' && !e.shiftKey) {
     if (!MK) {
       e.preventDefault();
